@@ -2,13 +2,13 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "FastFoodBox",
+  title: "BiteBox",
   description: "Ton Letterboxd des fast-foods",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "FastFoodBox",
+    title: "BiteBox",
   },
   icons: {
     apple: "/icon-192x192.svg",

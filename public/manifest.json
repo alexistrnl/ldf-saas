@@ -1,6 +1,6 @@
 {
-  "name": "FastFoodBox",
-  "short_name": "FastFoodBox",
+  "name": "BiteBox",
+  "short_name": "BiteBox",
   "description": "Ton Letterboxd des fast-foods",
   "start_url": "/",
   "display": "standalone",

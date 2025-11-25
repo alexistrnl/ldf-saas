@@ -94,7 +94,7 @@ export default function ProfilePage() {
         }
 
         // Définir le nom d'utilisateur
-        const name = user.user_metadata?.full_name || user.email || 'FastFood Lover'
+        const name = user.user_metadata?.full_name || user.email || 'BiteBox User'
         setUserName(name)
 
         // Récupérer tous les logs avec restaurant joint
@@ -241,7 +241,7 @@ export default function ProfilePage() {
         {/* Header */}
         <div>
           <h1 className="text-3xl md:text-4xl font-bold mb-2">
-            Mon profil FastFoodBox
+            Mon profil BiteBox
           </h1>
           <p className="text-slate-300 mb-4">
             {userName}, voici toutes les enseignes que tu as goûtées.

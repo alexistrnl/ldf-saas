@@ -474,7 +474,7 @@ export default function AdminRestaurantsPage() {
         <div>
           <h1 className="text-3xl font-bold mb-2">Admin – Enseignes & Plats</h1>
           <p className="text-slate-300">
-            Ajoute les enseignes et leurs plats. Ils seront utilisés partout dans FastFoodBox.
+            Ajoute les enseignes et leurs plats. Ils seront utilisés partout dans BiteBox.
           </p>
         </div>
 

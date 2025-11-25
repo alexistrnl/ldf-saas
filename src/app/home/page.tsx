@@ -126,7 +126,7 @@ export default function HomePage() {
         <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-2">
             <h1 className="text-2xl sm:text-3xl font-bold">
-              Bienvenue sur <span className="text-amber-400">FastFoodBox</span>
+              Bienvenue sur <span className="text-amber-400">BiteBox</span>
             </h1>
             <p className="text-sm text-slate-300">
               Explore les enseignes du moment et ajoute celles que tu as goûtées à ton profil.
