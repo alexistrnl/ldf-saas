@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import AddExperienceModal from "@/components/AddExperienceModal";
 
@@ -23,6 +24,7 @@ type RestaurantWithStats = Restaurant & {
 };
 
 export default function HomePage() {
+  const router = useRouter();
   const [restaurants, setRestaurants] = useState<RestaurantWithStats[]>([]);
   const [filteredRestaurants, setFilteredRestaurants] = useState<RestaurantWithStats[]>([]);
   const [loading, setLoading] = useState(true);
@@ -138,12 +140,20 @@ export default function HomePage() {
             >
               Ajouter une note
             </button>
-            <Link
-              href="/profile"
+            <button
+              onClick={async () => {
+                // Vérifier l'authentification avant de rediriger
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) {
+                  router.push("/profile");
+                } else {
+                  router.push("/login");
+                }
+              }}
               className="inline-flex items-center rounded-full bg-slate-900/80 border border-slate-700 px-4 py-2 text-sm font-medium text-slate-50 hover:border-amber-500 hover:text-amber-300 transition"
             >
               Mon profil
-            </Link>
+            </button>
           </div>
         </header>
 
