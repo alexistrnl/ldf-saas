@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import AddExperienceModal from "@/components/AddExperienceModal";
-import MobileHeader from "@/components/MobileHeader";
+import Image from "next/image";
 
 type Restaurant = {
   id: string;
@@ -171,23 +171,17 @@ export default function RestaurantPage() {
 
   if (loading) {
     return (
-      <>
-        <MobileHeader title="Chargement..." />
-        <div className="min-h-screen bg-slate-950 text-slate-50 flex items-center justify-center">
-          <p>Chargement...</p>
-        </div>
-      </>
+      <div className="min-h-screen bg-slate-950 text-slate-50 flex items-center justify-center">
+        <p>Chargement...</p>
+      </div>
     );
   }
 
   if (error || !restaurant) {
     return (
-      <>
-        <MobileHeader title="Enseigne introuvable" />
-        <div className="min-h-screen bg-slate-950 text-slate-50 flex items-center justify-center">
-          <p className="text-red-400">{error ?? "Enseigne introuvable."}</p>
-        </div>
-      </>
+      <div className="min-h-screen bg-slate-950 text-slate-50 flex items-center justify-center">
+        <p className="text-red-400">{error ?? "Enseigne introuvable."}</p>
+      </div>
     );
   }
 
@@ -203,61 +197,70 @@ export default function RestaurantPage() {
     .slice(0, 4);
 
   return (
-    <>
-      <MobileHeader title={restaurant.name} />
-      <div className="min-h-screen bg-slate-950 text-slate-50 px-4 py-10">
+    <div className="min-h-screen bg-slate-950 text-slate-50 px-4 py-6">
       <div className="max-w-5xl mx-auto">
-        {/* Header enseigne */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
-          <div className="flex items-center gap-4">
-            {restaurant.logo_url && (
-              <img
-                src={restaurant.logo_url}
-                alt={restaurant.name}
-                className="h-16 w-16 rounded-full object-cover"
-              />
-            )}
-            <div>
-              <h1 className="text-2xl font-bold hidden md:block">{restaurant.name}</h1>
+        {/* Hero enseigne */}
+        <section className="mx-auto max-w-3xl rounded-3xl bg-[#020617] px-4 py-5 sm:px-6 sm:py-6 mb-6">
+          <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center sm:gap-6">
+            <div className="flex items-center justify-center">
+              {restaurant.logo_url ? (
+                <Image
+                  src={restaurant.logo_url}
+                  alt={restaurant.name}
+                  width={96}
+                  height={96}
+                  className="h-24 w-24 rounded-full object-cover border border-white/10 shadow-lg"
+                />
+              ) : (
+                <div className="h-24 w-24 rounded-full bg-slate-800 border border-white/10 shadow-lg flex items-center justify-center">
+                  <span className="text-xs text-slate-500">Pas de logo</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-1 flex-col items-center sm:items-start gap-2">
+              {/* Bloc note */}
+              {restaurantRatingStats.count === 0 ? (
+                <span className="text-sm text-slate-500">
+                  Cette enseigne n'a pas encore de note publique.
+                </span>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <div className="flex">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <span
+                        key={star}
+                        className={
+                          restaurantRatingStats.avg >= star
+                            ? "text-yellow-400"
+                            : "text-slate-700"
+                        }
+                      >
+                        ★
+                      </span>
+                    ))}
+                  </div>
+                  <span className="text-sm text-slate-300">
+                    {restaurantRatingStats.avg.toFixed(1)} / 5 • {restaurantRatingStats.count} avis
+                  </span>
+                </div>
+              )}
+
+              {/* Description si elle existe */}
               {restaurant.description && (
-                <p className="text-sm text-slate-300 mt-1">
+                <p className="text-sm text-slate-300 text-center sm:text-left">
                   {restaurant.description}
                 </p>
               )}
-              <div className="mt-2 flex items-center gap-3 text-xs text-slate-300">
-                {restaurantRatingStats.count === 0 ? (
-                  <span className="text-[11px] text-slate-500">
-                    Cette enseigne n'a pas encore de note publique.
-                  </span>
-                ) : (
-                  <>
-                    <div className="flex">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <span
-                          key={star}
-                          className={
-                            restaurantRatingStats.avg >= star
-                              ? "text-yellow-400"
-                              : "text-slate-700"
-                          }
-                        >
-                          ★
-                        </span>
-                      ))}
-                    </div>
-                    <span className="text-[11px] text-slate-400">
-                      {restaurantRatingStats.avg.toFixed(1)} / 5 ·{" "}
-                      {restaurantRatingStats.count} avis
-                    </span>
-                  </>
-                )}
-              </div>
             </div>
           </div>
+        </section>
 
+        {/* Bouton Ajouter une note */}
+        <div className="flex justify-center mb-6">
           <button
             onClick={() => setIsAddExperienceOpen(true)}
-            className="inline-flex items-center rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-black shadow hover:bg-emerald-400 transition"
+            className="inline-flex items-center rounded-full bg-bitebox px-6 py-3 text-sm font-semibold text-white shadow hover:bg-bitebox-dark transition"
           >
             Ajouter une note
           </button>
@@ -265,7 +268,7 @@ export default function RestaurantPage() {
 
         {/* Top 4 plats les mieux notés */}
         {topRatedDishes.length > 0 && (
-          <section className="mt-8">
+          <section className="mt-6">
             <h2 className="text-lg font-semibold text-slate-50 mb-3">
               Les plats les mieux notés
             </h2>
@@ -408,6 +411,5 @@ export default function RestaurantPage() {
         presetRestaurantName={restaurant.name}
       />
     </div>
-    </>
   );
 }

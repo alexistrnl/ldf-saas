@@ -2,3 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Masquer la scrollbar sur mobile */
+@media (max-width: 768px) {
+  * {
+    -ms-overflow-style: none; /* IE et Edge */
+    scrollbar-width: none; /* Firefox */
+  }
+  
+  *::-webkit-scrollbar {
+    display: none; /* Chrome, Safari et Opera */
+  }
+}
+
