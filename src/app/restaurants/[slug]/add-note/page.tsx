@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import Spinner from "@/components/Spinner";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 type DishForRating = {
   id: string;
@@ -13,6 +14,7 @@ type DishForRating = {
 export default function AddNotePage() {
   const params = useParams<{ slug: string }>();
   const router = useRouter();
+  const isMobile = useIsMobile();
 
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -328,19 +330,21 @@ export default function AddNotePage() {
           </div>
 
           {/* Boutons */}
-          <div className="flex items-center justify-end gap-3 pt-4 w-full">
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className="px-4 sm:px-6 py-3 rounded-lg border border-slate-700 text-slate-200 hover:bg-slate-800 transition font-medium whitespace-nowrap"
-              disabled={loading}
-            >
-              Annuler
-            </button>
+          <div className={`flex items-center gap-3 pt-4 w-full ${isMobile ? 'justify-center' : 'justify-end'}`}>
+            {!isMobile && (
+              <button
+                type="button"
+                onClick={() => router.back()}
+                className="px-4 sm:px-6 py-3 rounded-lg border border-slate-700 text-slate-200 hover:bg-slate-800 transition font-medium whitespace-nowrap"
+                disabled={loading}
+              >
+                Annuler
+              </button>
+            )}
             <button
               type="submit"
               disabled={loading || !userId || !restaurant}
-              className="px-4 sm:px-6 py-3 rounded-lg bg-bitebox text-white font-semibold hover:bg-bitebox-dark disabled:opacity-60 disabled:cursor-not-allowed transition whitespace-nowrap flex items-center justify-center gap-2"
+              className={`${isMobile ? 'w-full' : ''} px-4 sm:px-6 py-3 rounded-lg bg-bitebox text-white font-semibold hover:bg-bitebox-dark disabled:opacity-60 disabled:cursor-not-allowed transition whitespace-nowrap flex items-center justify-center gap-2`}
             >
               {loading ? (
                 <>

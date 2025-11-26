@@ -26,6 +26,7 @@ type RestaurantWithStats = Restaurant & {
 export default function HomePage() {
   const [restaurants, setRestaurants] = useState<RestaurantWithStats[]>([]);
   const [filteredRestaurants, setFilteredRestaurants] = useState<RestaurantWithStats[]>([]);
+  const [trendingRestaurants, setTrendingRestaurants] = useState<RestaurantWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -89,6 +90,42 @@ export default function HomePage() {
 
         setRestaurants(restaurantsWithStats);
         setFilteredRestaurants(restaurantsWithStats);
+
+        // Récupérer les enseignes du moment (les plus notées sur les 3 derniers jours)
+        const threeDaysAgo = new Date();
+        threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+        const threeDaysAgoStr = threeDaysAgo.toISOString();
+
+        const { data: recentLogs, error: recentLogsError } = await supabase
+          .from("fastfood_logs")
+          .select("restaurant_id, user_id, rating")
+          .gte("created_at", threeDaysAgoStr);
+
+        if (recentLogsError) {
+          console.error("Erreur chargement logs récents", recentLogsError);
+        } else if (recentLogs) {
+          // Compter le nombre de notes par restaurant sur les 3 derniers jours
+          const noteCountsByRestaurant = new Map<string, number>();
+          
+          for (const log of recentLogs) {
+            if (!log.restaurant_id) continue;
+            const currentCount = noteCountsByRestaurant.get(log.restaurant_id) ?? 0;
+            noteCountsByRestaurant.set(log.restaurant_id, currentCount + 1);
+          }
+
+          // Trier les restaurants par nombre de notes (décroissant)
+          const trendingList = restaurantsWithStats
+            .map((r) => ({
+              ...r,
+              recentNotesCount: noteCountsByRestaurant.get(r.id) ?? 0,
+            }))
+            .filter((r) => r.recentNotesCount > 0)
+            .sort((a, b) => b.recentNotesCount - a.recentNotesCount)
+            .slice(0, 8) // Top 8
+            .map(({ recentNotesCount, ...rest }) => rest);
+
+          setTrendingRestaurants(trendingList);
+        }
       } catch (err) {
         console.error("[Home] unexpected", err);
         setError("Erreur inattendue lors du chargement des enseignes.");
@@ -147,6 +184,72 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* Enseignes du moment */}
+        {!loading && !searchQuery && trendingRestaurants.length > 0 && (
+          <section className="space-y-3">
+            <h2 className="text-lg font-semibold">Enseignes du moment</h2>
+            <p className="text-xs text-slate-400 mb-3">
+              Les enseignes les plus notées ces 3 derniers jours
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              {trendingRestaurants.map((restaurant) => (
+                <Link
+                  key={restaurant.id}
+                  href={getRestaurantUrl(restaurant)}
+                  className="group block bg-slate-900/80 rounded-2xl shadow-md hover:shadow-xl border border-slate-800/70 hover:border-bitebox/60 transition overflow-hidden flex flex-col"
+                >
+                  <div className="w-full bg-slate-950 overflow-hidden rounded-t-2xl flex items-center justify-center">
+                    {restaurant.logo_url ? (
+                      <img
+                        src={restaurant.logo_url}
+                        alt={restaurant.name}
+                        className="w-full h-auto max-h-[240px] sm:max-h-[260px] object-contain"
+                      />
+                    ) : (
+                      <div className="w-full min-h-[100px] flex items-center justify-center py-4">
+                        <span className="text-xs text-slate-500">
+                          Pas de logo
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="px-3 py-1.5 space-y-1">
+                    <p className="text-sm font-semibold truncate group-hover:text-bitebox-light">
+                      {restaurant.name}
+                    </p>
+                    <div className="mt-2 flex items-center justify-between text-xs text-slate-300">
+                      {restaurant.ratingStats.count === 0 ? (
+                        <span className="text-[11px] text-slate-500">Note : à venir</span>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <div className="flex">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <span
+                                key={star}
+                                className={
+                                  restaurant.ratingStats.avg >= star
+                                    ? "text-yellow-400"
+                                    : "text-slate-700"
+                                }
+                              >
+                                ★
+                              </span>
+                            ))}
+                          </div>
+                          <span className="text-[11px] text-slate-400">
+                            {restaurant.ratingStats.avg.toFixed(1)} / 5 ·{" "}
+                            {restaurant.ratingStats.count} avis
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* Liste des enseignes */}
         <section className="space-y-3">
           <h2 className="text-lg font-semibold">
@@ -173,24 +276,24 @@ export default function HomePage() {
                 <Link
                   key={restaurant.id}
                   href={getRestaurantUrl(restaurant)}
-                  className="group block bg-slate-900/80 rounded-2xl shadow-md hover:shadow-xl border border-slate-800/70 hover:border-bitebox/60 transition overflow-hidden h-full flex flex-col"
+                  className="group block bg-slate-900/80 rounded-2xl shadow-md hover:shadow-xl border border-slate-800/70 hover:border-bitebox/60 transition overflow-hidden flex flex-col"
                 >
-                  <div className="aspect-[4/3] sm:aspect-square bg-slate-950 overflow-hidden">
+                  <div className="w-full bg-slate-950 overflow-hidden rounded-t-2xl flex items-center justify-center">
                     {restaurant.logo_url ? (
                       <img
                         src={restaurant.logo_url}
                         alt={restaurant.name}
-                        className="w-full h-full object-cover"
+                        className="w-full h-auto max-h-[240px] sm:max-h-[260px] object-contain"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center">
+                      <div className="w-full min-h-[100px] flex items-center justify-center py-4">
                         <span className="text-xs text-slate-500">
                           Pas de logo
                         </span>
                       </div>
                     )}
                   </div>
-                  <div className="px-3 py-3 space-y-1">
+                  <div className="px-3 py-1.5 space-y-1">
                     <p className="text-sm font-semibold truncate group-hover:text-bitebox-light">
                       {restaurant.name}
                     </p>
