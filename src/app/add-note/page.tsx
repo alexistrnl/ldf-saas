@@ -187,10 +187,10 @@ export default function AddNotePage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-50">
+    <div className="min-h-screen w-full overflow-x-hidden bg-slate-950 text-slate-50">
       {/* Header avec bouton retour */}
-      <header className="sticky top-0 z-30 bg-[#020617]/95 backdrop-blur-md border-b border-white/5">
-        <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
+      <header className="sticky top-0 z-30 w-full bg-[#020617]/95 backdrop-blur-md border-b border-white/5">
+        <div className="mx-auto flex w-full max-w-xl items-center gap-3 px-4 py-3">
           <button
             onClick={() => router.back()}
             aria-label="Revenir en arrière"
@@ -203,7 +203,7 @@ export default function AddNotePage() {
       </header>
 
       {/* Contenu principal */}
-      <main className="mx-auto max-w-3xl px-4 py-6">
+      <main className="mx-auto w-full max-w-xl px-4 py-6 pb-24">
         {error && (
           <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30">
             <p className="text-sm text-red-400">{error}</p>
@@ -220,9 +220,9 @@ export default function AddNotePage() {
 
         <form className="space-y-6" onSubmit={handleSubmit}>
           {/* Enseigne */}
-          <div className="space-y-2">
+          <div className="space-y-2 w-full">
             <label className="text-sm text-slate-300 font-medium">Enseigne</label>
-            <div className="relative">
+            <div className="relative w-full">
               <input
                 type="text"
                 value={restaurantQuery || selectedRestaurantName}
@@ -243,7 +243,7 @@ export default function AddNotePage() {
               {showSuggestions &&
                 restaurantQuery.length > 0 &&
                 filteredRestaurants.length > 0 && (
-                  <div className="absolute z-50 mt-1 w-full max-h-56 overflow-y-auto rounded-lg bg-slate-900 border border-slate-700 shadow-lg">
+                  <div className="absolute z-50 mt-1 w-full max-w-full max-h-56 overflow-y-auto rounded-lg bg-slate-900 border border-slate-700 shadow-lg">
                     {filteredRestaurants.map((r) => (
                       <button
                         key={r.id}
@@ -319,11 +319,11 @@ export default function AddNotePage() {
 
           {/* Notes de plats si restaurant sélectionné */}
           {selectedRestaurantId && dishes.length > 0 && (
-            <div className="space-y-3">
+            <div className="space-y-3 w-full">
               <p className="text-sm text-slate-300 font-medium">
                 Note les plats que tu as goûtés (optionnel)
               </p>
-              <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+              <div className="space-y-3 max-h-96 overflow-y-auto w-full">
                 {dishes.map((dish) => {
                   const value = dishRatings[dish.id] ?? 0;
                   const setValue = (v: number) =>
@@ -334,7 +334,7 @@ export default function AddNotePage() {
                   return (
                     <div
                       key={dish.id}
-                      className="flex flex-col gap-2 rounded-lg bg-slate-900/70 border border-slate-800 px-4 py-3"
+                      className="flex flex-col gap-2 rounded-lg bg-slate-900/70 border border-slate-800 px-4 py-3 w-full"
                     >
                       <div className="flex items-center justify-between gap-2">
                         <p className="text-sm font-medium text-slate-100 truncate">
@@ -389,11 +389,11 @@ export default function AddNotePage() {
           </div>
 
           {/* Boutons */}
-          <div className="flex items-center justify-end gap-3 pt-4">
+          <div className="flex items-center justify-end gap-3 pt-4 w-full">
             <button
               type="button"
               onClick={() => router.back()}
-              className="px-6 py-3 rounded-lg border border-slate-700 text-slate-200 hover:bg-slate-800 transition font-medium"
+              className="px-4 sm:px-6 py-3 rounded-lg border border-slate-700 text-slate-200 hover:bg-slate-800 transition font-medium whitespace-nowrap"
               disabled={loading}
             >
               Annuler
@@ -401,7 +401,7 @@ export default function AddNotePage() {
             <button
               type="submit"
               disabled={loading || !userId || !selectedRestaurantId}
-              className="px-6 py-3 rounded-lg bg-bitebox text-white font-semibold hover:bg-bitebox-dark disabled:opacity-60 disabled:cursor-not-allowed transition"
+              className="px-4 sm:px-6 py-3 rounded-lg bg-bitebox text-white font-semibold hover:bg-bitebox-dark disabled:opacity-60 disabled:cursor-not-allowed transition whitespace-nowrap"
             >
               {loading ? "Enregistrement…" : "Enregistrer"}
             </button>
