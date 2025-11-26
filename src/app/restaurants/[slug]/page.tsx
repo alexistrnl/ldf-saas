@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import AddExperienceModal from "@/components/AddExperienceModal";
 import Image from "next/image";
 import { calculatePublicRating } from "@/lib/ratingUtils";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 type Restaurant = {
   id: string;
@@ -37,6 +38,8 @@ type DishWithStats = Dish & {
 
 export default function RestaurantPage() {
   const params = useParams<{ slug: string }>();
+  const router = useRouter();
+  const isMobile = useIsMobile();
 
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [restaurantRatingStats, setRestaurantRatingStats] = useState<{ count: number; avg: number }>({ count: 0, avg: 0 });
@@ -44,6 +47,14 @@ export default function RestaurantPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isAddExperienceOpen, setIsAddExperienceOpen] = useState(false);
+
+  const handleAddNoteClick = () => {
+    if (isMobile) {
+      router.push(`/restaurants/${params.slug}/add-note`);
+    } else {
+      setIsAddExperienceOpen(true);
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -243,7 +254,7 @@ export default function RestaurantPage() {
 
           {/* Bouton Ajouter une note */}
           <button
-            onClick={() => setIsAddExperienceOpen(true)}
+            onClick={handleAddNoteClick}
             className="inline-flex items-center rounded-full bg-bitebox px-6 py-3 text-sm font-semibold text-white shadow hover:bg-bitebox-dark transition"
           >
             Ajouter une note
@@ -388,12 +399,15 @@ export default function RestaurantPage() {
           )}
         </section>
       </div>
-      <AddExperienceModal
-        isOpen={isAddExperienceOpen}
-        onClose={() => setIsAddExperienceOpen(false)}
-        presetRestaurantId={restaurant.id}
-        presetRestaurantName={restaurant.name}
-      />
+      {/* Modal uniquement sur desktop */}
+      {!isMobile && (
+        <AddExperienceModal
+          isOpen={isAddExperienceOpen}
+          onClose={() => setIsAddExperienceOpen(false)}
+          presetRestaurantId={restaurant.id}
+          presetRestaurantName={restaurant.name}
+        />
+      )}
     </div>
   );
 }

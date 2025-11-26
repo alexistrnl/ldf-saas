@@ -4,10 +4,12 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import AddExperienceModal from './AddExperienceModal'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 export default function BottomNav() {
   const pathname = usePathname()
   const router = useRouter()
+  const isMobile = useIsMobile()
   const [isAddExperienceOpen, setIsAddExperienceOpen] = useState(false)
 
   const isActive = (path: string) => {
@@ -21,7 +23,11 @@ export default function BottomNav() {
   }
 
   const handleAddClick = () => {
-    setIsAddExperienceOpen(true)
+    if (isMobile) {
+      router.push('/add-note')
+    } else {
+      setIsAddExperienceOpen(true)
+    }
   }
 
   const handleProfileClick = async () => {
@@ -90,10 +96,13 @@ export default function BottomNav() {
           </button>
         </div>
       </nav>
-      <AddExperienceModal
-        isOpen={isAddExperienceOpen}
-        onClose={() => setIsAddExperienceOpen(false)}
-      />
+      {/* Modal uniquement sur desktop */}
+      {!isMobile && (
+        <AddExperienceModal
+          isOpen={isAddExperienceOpen}
+          onClose={() => setIsAddExperienceOpen(false)}
+        />
+      )}
     </>
   )
 }

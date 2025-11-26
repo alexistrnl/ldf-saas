@@ -6,10 +6,20 @@ import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 import AddExperienceModal from './AddExperienceModal'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 export default function Navbar() {
   const router = useRouter()
+  const isMobile = useIsMobile()
   const [isAddExperienceOpen, setIsAddExperienceOpen] = useState(false)
+
+  const handleAddNoteClick = () => {
+    if (isMobile) {
+      router.push('/add-note')
+    } else {
+      setIsAddExperienceOpen(true)
+    }
+  }
 
   return (
     <>
@@ -35,7 +45,7 @@ export default function Navbar() {
           {/* Boutons d'action */}
           <div className="flex items-center gap-2 sm:gap-3">
             <button
-              onClick={() => setIsAddExperienceOpen(true)}
+              onClick={handleAddNoteClick}
               className="inline-flex items-center rounded-full bg-bitebox px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium text-white shadow hover:bg-bitebox-dark transition"
             >
               Ajouter une note
@@ -56,10 +66,13 @@ export default function Navbar() {
           </div>
         </div>
       </header>
-      <AddExperienceModal
-        isOpen={isAddExperienceOpen}
-        onClose={() => setIsAddExperienceOpen(false)}
-      />
+      {/* Modal uniquement sur desktop */}
+      {!isMobile && (
+        <AddExperienceModal
+          isOpen={isAddExperienceOpen}
+          onClose={() => setIsAddExperienceOpen(false)}
+        />
+      )}
     </>
   )
 }
