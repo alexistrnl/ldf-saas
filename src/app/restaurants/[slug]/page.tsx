@@ -7,6 +7,7 @@ import AddExperienceModal from "@/components/AddExperienceModal";
 import Image from "next/image";
 import { calculatePublicRating } from "@/lib/ratingUtils";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import Spinner from "@/components/Spinner";
 
 type Restaurant = {
   id: string;
@@ -175,7 +176,7 @@ export default function RestaurantPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-50 flex items-center justify-center">
-        <p>Chargement...</p>
+        <Spinner size="lg" />
       </div>
     );
   }

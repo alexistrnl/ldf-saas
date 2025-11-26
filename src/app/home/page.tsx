@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { calculatePublicRating } from "@/lib/ratingUtils";
+import Spinner from "@/components/Spinner";
 
 type Restaurant = {
   id: string;
@@ -155,7 +156,9 @@ export default function HomePage() {
           </h2>
 
           {loading ? (
-            <p className="text-sm text-slate-400">Chargement des enseignes...</p>
+            <div className="flex items-center justify-center py-8">
+              <Spinner size="md" />
+            </div>
           ) : error ? (
             <p className="text-sm text-red-400">{error}</p>
           ) : filteredRestaurants.length === 0 ? (

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
+import Spinner from "@/components/Spinner";
 
 type ProfileRestaurantSummary = {
   restaurantId: string;
@@ -273,7 +274,7 @@ export default function ProfilePage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-50 flex items-center justify-center">
-        <p>Chargement...</p>
+        <Spinner size="lg" />
       </div>
     );
   }

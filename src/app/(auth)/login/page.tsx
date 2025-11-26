@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { supabase } from '@/lib/supabaseClient'
+import Spinner from '@/components/Spinner'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -95,9 +96,16 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full mt-6 px-8 py-3 bg-bitebox text-white font-semibold rounded-lg hover:bg-bitebox-dark transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full mt-6 px-8 py-3 bg-bitebox text-white font-semibold rounded-lg hover:bg-bitebox-dark transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            {loading ? 'Connexion...' : 'Se connecter'}
+            {loading ? (
+              <>
+                <Spinner size="sm" />
+                <span>Connexion...</span>
+              </>
+            ) : (
+              'Se connecter'
+            )}
           </button>
         </form>
 

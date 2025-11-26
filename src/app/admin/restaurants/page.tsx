@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import Spinner from "@/components/Spinner";
 
 type Restaurant = {
   id: string;
@@ -605,7 +606,9 @@ export default function AdminRestaurantsPage() {
           <h2 className="text-lg font-semibold">Enseignes existantes</h2>
 
           {loading ? (
-            <p className="text-sm text-slate-400">Chargement des enseignes...</p>
+            <div className="flex items-center justify-center py-8">
+              <Spinner size="md" />
+            </div>
           ) : restaurants.length === 0 ? (
             <p className="text-sm text-slate-400">Aucune enseigne pour l’instant.</p>
           ) : (
@@ -748,7 +751,9 @@ export default function AdminRestaurantsPage() {
             </div>
 
             {loadingDishes ? (
-              <p className="text-sm text-slate-400">Chargement des plats...</p>
+              <div className="flex items-center justify-center py-8">
+                <Spinner size="md" />
+              </div>
             ) : dishes.length === 0 ? (
               <p className="text-sm text-slate-400">
                 Aucun plat enregistré pour cette enseigne.

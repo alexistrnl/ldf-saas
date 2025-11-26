@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import Spinner from "@/components/Spinner";
 
 type DishForRating = {
   id: string;
@@ -208,15 +209,16 @@ export default function AddNotePage() {
           </div>
         )}
 
-        <form className="space-y-6" onSubmit={handleSubmit}>
+        <form className="space-y-6 w-full" onSubmit={handleSubmit}>
           {/* Date */}
-          <div className="space-y-2 w-full">
+          <div className="space-y-2 w-full overflow-hidden">
             <label className="text-sm text-slate-300 font-medium">Date de visite</label>
             <input
               type="date"
               value={visitedAt}
               onChange={(e) => setVisitedAt(e.target.value)}
-              className="w-full max-w-full box-border rounded-lg bg-slate-900 border border-slate-700 px-4 py-3 text-sm outline-none focus:border-bitebox transition"
+              className="w-full max-w-full box-border rounded-lg bg-slate-900 border border-slate-700 px-4 py-3 text-sm outline-none focus:border-bitebox transition appearance-none"
+              style={{ WebkitAppearance: 'none', MozAppearance: 'textfield' }}
             />
           </div>
 
@@ -338,9 +340,16 @@ export default function AddNotePage() {
             <button
               type="submit"
               disabled={loading || !userId || !restaurant}
-              className="px-4 sm:px-6 py-3 rounded-lg bg-bitebox text-white font-semibold hover:bg-bitebox-dark disabled:opacity-60 disabled:cursor-not-allowed transition whitespace-nowrap"
+              className="px-4 sm:px-6 py-3 rounded-lg bg-bitebox text-white font-semibold hover:bg-bitebox-dark disabled:opacity-60 disabled:cursor-not-allowed transition whitespace-nowrap flex items-center justify-center gap-2"
             >
-              {loading ? "Enregistrement…" : "Enregistrer"}
+              {loading ? (
+                <>
+                  <Spinner size="sm" />
+                  <span>Enregistrement…</span>
+                </>
+              ) : (
+                "Enregistrer"
+              )}
             </button>
           </div>
         </form>

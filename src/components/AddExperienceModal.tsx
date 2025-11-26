@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import Spinner from "@/components/Spinner";
 
 type AddExperienceModalProps = {
   isOpen: boolean;
@@ -421,9 +422,16 @@ export default function AddExperienceModal({
             <button
               type="submit"
               disabled={loading || !userId}
-              className="text-xs px-4 py-2 rounded-md bg-bitebox text-white font-semibold hover:bg-bitebox-dark disabled:opacity-60"
+              className="text-xs px-4 py-2 rounded-md bg-bitebox text-white font-semibold hover:bg-bitebox-dark disabled:opacity-60 flex items-center justify-center gap-2"
             >
-              {loading ? "Enregistrement…" : "Enregistrer"}
+              {loading ? (
+                <>
+                  <Spinner size="sm" />
+                  <span>Enregistrement…</span>
+                </>
+              ) : (
+                "Enregistrer"
+              )}
             </button>
           </div>
         </form>
