@@ -1,4 +1,4 @@
-<svg width="192" height="192" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+<svg width="180" height="180" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
   <!-- Fond noir -->
   <rect width="192" height="192" fill="#000000" rx="24"/>
   
@@ -8,3 +8,4 @@
   <!-- Bite en haut à droite (coin enlevé) -->
   <path d="M 160 32 L 180 20 L 180 52 L 152 52 Z" fill="#000000"/>
 </svg>
+
