@@ -165,24 +165,26 @@ export default function HomePage() {
                 : "Aucune enseigne pour l'instant. Ajoute-en via la page admin."}
             </p>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-4 gap-3">
               {filteredRestaurants.map((restaurant) => (
                 <Link
                   key={restaurant.id}
                   href={getRestaurantUrl(restaurant)}
                   className="group block bg-slate-900/80 rounded-2xl shadow-md hover:shadow-xl border border-slate-800/70 hover:border-bitebox/60 transition overflow-hidden h-full flex flex-col"
                 >
-                  <div className="aspect-square flex items-center justify-center bg-slate-950">
+                  <div className="aspect-square bg-slate-950 overflow-hidden">
                     {restaurant.logo_url ? (
                       <img
                         src={restaurant.logo_url}
                         alt={restaurant.name}
-                        className="max-h-full max-w-full object-contain"
+                        className="w-full h-full object-cover"
                       />
                     ) : (
-                      <span className="text-xs text-slate-500">
-                        Pas de logo
-                      </span>
+                      <div className="w-full h-full flex items-center justify-center">
+                        <span className="text-xs text-slate-500">
+                          Pas de logo
+                        </span>
+                      </div>
                     )}
                   </div>
                   <div className="px-3 py-3 space-y-1">
