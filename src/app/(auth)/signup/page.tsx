@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { supabase } from '@/lib/supabaseClient'
 
 export default function SignupPage() {
@@ -47,6 +48,9 @@ export default function SignupPage() {
   return (
     <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-red-50 px-4">
       <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-8">
+        <div className="flex flex-col items-center mb-6">
+          <Image src="/bitebox-logo.png" alt="BiteBox logo" width={72} height={72} />
+        </div>
         <h1 className="text-3xl font-bold text-gray-900 mb-6 text-center">
           Créer un compte
         </h1>

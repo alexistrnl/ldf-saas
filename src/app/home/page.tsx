@@ -2,9 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
-import AddExperienceModal from "@/components/AddExperienceModal";
 
 type Restaurant = {
   id: string;
@@ -24,12 +22,10 @@ type RestaurantWithStats = Restaurant & {
 };
 
 export default function HomePage() {
-  const router = useRouter();
   const [restaurants, setRestaurants] = useState<RestaurantWithStats[]>([]);
   const [filteredRestaurants, setFilteredRestaurants] = useState<RestaurantWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isGlobalAddOpen, setIsGlobalAddOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
@@ -121,9 +117,9 @@ export default function HomePage() {
     r.slug ? `/restaurants/${r.slug}` : `/restaurants/${r.id}`;
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-50 px-4 py-10">
-      <div className="max-w-6xl mx-auto space-y-8">
-        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="min-h-screen bg-slate-950 text-slate-50 px-4 py-6">
+        <div className="max-w-6xl mx-auto space-y-8 mt-6">
+        <header className="flex flex-col gap-4">
           <div className="space-y-2">
             <h1 className="text-2xl sm:text-3xl font-bold">
               Bienvenue sur <span className="text-amber-400">BiteBox</span>
@@ -131,29 +127,6 @@ export default function HomePage() {
             <p className="text-sm text-slate-300">
               Explore les enseignes du moment et ajoute celles que tu as goûtées à ton profil.
             </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={() => setIsGlobalAddOpen(true)}
-              className="inline-flex items-center rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-black shadow hover:bg-amber-400 transition"
-            >
-              Ajouter une note
-            </button>
-            <button
-              onClick={async () => {
-                // Vérifier l'authentification avant de rediriger
-                const { data: { user } } = await supabase.auth.getUser();
-                if (user) {
-                  router.push("/profile");
-                } else {
-                  router.push("/login");
-                }
-              }}
-              className="inline-flex items-center rounded-full bg-slate-900/80 border border-slate-700 px-4 py-2 text-sm font-medium text-slate-50 hover:border-amber-500 hover:text-amber-300 transition"
-            >
-              Mon profil
-            </button>
           </div>
         </header>
 
@@ -260,11 +233,7 @@ export default function HomePage() {
         </section>
 
       </div>
-      <AddExperienceModal
-        isOpen={isGlobalAddOpen}
-        onClose={() => setIsGlobalAddOpen(false)}
-      />
-    </main>
+    </div>
   );
 }
 

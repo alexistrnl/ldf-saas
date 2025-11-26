@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
+import MobileHeader from "@/components/MobileHeader";
 
 type ProfileRestaurantSummary = {
   restaurantId: string;
@@ -272,35 +273,43 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-slate-950 text-slate-50 flex items-center justify-center">
-        <p>Chargement...</p>
-      </main>
+      <>
+        <MobileHeader title="Mon profil" />
+        <div className="min-h-screen bg-slate-950 text-slate-50 flex items-center justify-center">
+          <p>Chargement...</p>
+        </div>
+      </>
     );
   }
 
   if (!user) {
     return (
-      <main className="min-h-screen bg-slate-950 text-slate-50 px-4 py-10">
-        <div className="max-w-md mx-auto text-center space-y-4">
-          <p className="text-sm text-slate-300">
-            Tu dois être connecté pour voir ton profil.
-          </p>
-          <Link
-            href="/auth/login"
-            className="inline-flex items-center justify-center rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-black shadow hover:bg-amber-400 transition"
-          >
-            Me connecter
-          </Link>
+      <>
+        <MobileHeader title="Mon profil" />
+        <div className="min-h-screen bg-slate-950 text-slate-50 px-4 py-10">
+          <div className="max-w-md mx-auto text-center space-y-4">
+            <p className="text-sm text-slate-300">
+              Tu dois être connecté pour voir ton profil.
+            </p>
+            <Link
+              href="/login"
+              className="inline-flex items-center justify-center rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-black shadow hover:bg-amber-400 transition"
+            >
+              Me connecter
+            </Link>
+          </div>
         </div>
-      </main>
+      </>
     );
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-50 px-4 py-10">
-      <div className="max-w-5xl mx-auto space-y-8">
+    <>
+      <MobileHeader title="Mon profil" />
+      <div className="min-h-screen bg-slate-950 text-slate-50 px-4 py-10">
+        <div className="max-w-5xl mx-auto space-y-8">
         <header className="flex flex-col gap-1">
-          <h1 className="text-2xl font-bold">Mon profil</h1>
+          <h1 className="text-2xl font-bold hidden md:block">Mon profil</h1>
           <p className="text-sm text-slate-400">{user.email}</p>
         </header>
 
@@ -519,6 +528,7 @@ export default function ProfilePage() {
           )}
         </section>
       </div>
-    </main>
+    </div>
+    </>
   );
 }

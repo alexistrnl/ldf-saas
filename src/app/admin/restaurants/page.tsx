@@ -535,8 +535,8 @@ export default function AdminRestaurantsPage() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-50 px-4 py-10">
-      <div className="max-w-5xl mx-auto space-y-8">
+    <div className="min-h-screen bg-slate-950 text-slate-50 px-4 py-10">
+        <div className="max-w-5xl mx-auto space-y-8">
         <header>
           <h1 className="text-2xl font-bold">Administration des enseignes</h1>
           <p className="text-sm text-slate-300 mt-1">
@@ -943,7 +943,7 @@ export default function AdminRestaurantsPage() {
           </section>
         )}
       </div>
-    </main>
+    </div>
   );
 }
 

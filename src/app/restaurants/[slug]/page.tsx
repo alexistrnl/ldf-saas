@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import AddExperienceModal from "@/components/AddExperienceModal";
+import MobileHeader from "@/components/MobileHeader";
 
 type Restaurant = {
   id: string;
@@ -170,17 +171,23 @@ export default function RestaurantPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-slate-950 text-slate-50 flex items-center justify-center">
-        <p>Chargement...</p>
-      </main>
+      <>
+        <MobileHeader title="Chargement..." />
+        <div className="min-h-screen bg-slate-950 text-slate-50 flex items-center justify-center">
+          <p>Chargement...</p>
+        </div>
+      </>
     );
   }
 
   if (error || !restaurant) {
     return (
-      <main className="min-h-screen bg-slate-950 text-slate-50 flex items-center justify-center">
-        <p className="text-red-400">{error ?? "Enseigne introuvable."}</p>
-      </main>
+      <>
+        <MobileHeader title="Enseigne introuvable" />
+        <div className="min-h-screen bg-slate-950 text-slate-50 flex items-center justify-center">
+          <p className="text-red-400">{error ?? "Enseigne introuvable."}</p>
+        </div>
+      </>
     );
   }
 
@@ -196,7 +203,9 @@ export default function RestaurantPage() {
     .slice(0, 4);
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-50 px-4 py-10">
+    <>
+      <MobileHeader title={restaurant.name} />
+      <div className="min-h-screen bg-slate-950 text-slate-50 px-4 py-10">
       <div className="max-w-5xl mx-auto">
         {/* Header enseigne */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
@@ -209,7 +218,7 @@ export default function RestaurantPage() {
               />
             )}
             <div>
-              <h1 className="text-2xl font-bold">{restaurant.name}</h1>
+              <h1 className="text-2xl font-bold hidden md:block">{restaurant.name}</h1>
               {restaurant.description && (
                 <p className="text-sm text-slate-300 mt-1">
                   {restaurant.description}
@@ -398,6 +407,7 @@ export default function RestaurantPage() {
         presetRestaurantId={restaurant.id}
         presetRestaurantName={restaurant.name}
       />
-    </main>
+    </div>
+    </>
   );
 }
