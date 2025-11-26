@@ -273,13 +273,13 @@ export default function AddNotePage() {
           </div>
 
           {/* Date */}
-          <div className="space-y-2">
+          <div className="space-y-2 w-full">
             <label className="text-sm text-slate-300 font-medium">Date de visite</label>
             <input
               type="date"
               value={visitedAt}
               onChange={(e) => setVisitedAt(e.target.value)}
-              className="w-full rounded-lg bg-slate-900 border border-slate-700 px-4 py-3 text-sm outline-none focus:border-bitebox transition"
+              className="w-full max-w-full box-border rounded-lg bg-slate-900 border border-slate-700 px-4 py-3 text-sm outline-none focus:border-bitebox transition"
             />
           </div>
 
