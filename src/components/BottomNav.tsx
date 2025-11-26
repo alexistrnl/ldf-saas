@@ -39,11 +39,11 @@ export default function BottomNav() {
   return (
     <>
       <nav className="fixed inset-x-0 bottom-4 z-40 flex justify-center md:hidden">
-        <div className="mx-auto flex max-w-xs flex-1 items-center justify-between rounded-full bg-[#020617] px-6 py-2 shadow-[0_8px_30px_rgba(0,0,0,0.8)] border border-white/10">
+        <div className="mx-auto flex w-full max-w-sm items-center rounded-full bg-[#020617] px-4 py-2 shadow-[0_8px_30px_rgba(0,0,0,0.8)] border border-white/10">
           {/* Home */}
           <button
             onClick={() => router.push('/home')}
-            className={`flex flex-col items-center gap-0.5 text-[11px] transition-colors ${
+            className={`flex flex-1 flex-col items-center gap-0.5 py-1.5 min-w-[64px] transition-colors ${
               homeActive ? 'text-white' : 'text-slate-300'
             }`}
             aria-label="Home"
@@ -56,22 +56,24 @@ export default function BottomNav() {
             >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
             </svg>
-            <span>Home</span>
+            <span className="text-[11px]">Home</span>
           </button>
 
           {/* Bouton central + */}
-          <button
-            onClick={handleAddClick}
-            className="flex h-11 w-11 items-center justify-center rounded-full bg-orange-500 text-black shadow-lg shadow-orange-500/40 translate-y-[-6px] transition-transform hover:scale-105"
-            aria-label="Ajouter une note"
-          >
-            <span className="text-2xl leading-none font-bold">+</span>
-          </button>
+          <div className="flex flex-1 justify-center">
+            <button
+              onClick={handleAddClick}
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-bitebox text-white shadow-lg shadow-bitebox/40 translate-y-[-6px] transition-transform hover:scale-105 hover:bg-bitebox-dark"
+              aria-label="Ajouter une note"
+            >
+              <span className="text-2xl leading-none font-bold">+</span>
+            </button>
+          </div>
 
           {/* Profil */}
           <button
             onClick={handleProfileClick}
-            className={`flex flex-col items-center gap-0.5 text-[11px] transition-colors ${
+            className={`flex flex-1 flex-col items-center gap-0.5 py-1.5 min-w-[64px] transition-colors ${
               profileActive ? 'text-white' : 'text-slate-300'
             }`}
             aria-label="Profil"
@@ -84,7 +86,7 @@ export default function BottomNav() {
             >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
             </svg>
-            <span>Profil</span>
+            <span className="text-[11px]">Profil</span>
           </button>
         </div>
       </nav>

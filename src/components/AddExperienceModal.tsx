@@ -256,7 +256,7 @@ export default function AddExperienceModal({
                       setShowSuggestions(true);
                     }
                   }}
-                  className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-amber-500"
+                  className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
                   placeholder="Tape le nom de l’enseigne…"
                 />
                 {showSuggestions &&
@@ -299,7 +299,7 @@ export default function AddExperienceModal({
               type="date"
               value={visitedAt}
               onChange={(e) => setVisitedAt(e.target.value)}
-              className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-amber-500"
+              className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
             />
           </div>
 
@@ -322,7 +322,7 @@ export default function AddExperienceModal({
                     >
                       <span
                         className={
-                          isActive ? "text-amber-400" : "text-slate-600"
+                          isActive ? "text-bitebox-light" : "text-slate-600"
                         }
                       >
                         ★
@@ -361,7 +361,7 @@ export default function AddExperienceModal({
                           {dish.name}
                         </p>
                         {value > 0 && (
-                          <span className="text-[10px] text-amber-300">
+                          <span className="text-[10px] text-bitebox-light">
                             {value}/5
                           </span>
                         )}
@@ -378,7 +378,7 @@ export default function AddExperienceModal({
                             >
                               <span
                                 className={
-                                  active ? "text-amber-400" : "text-slate-700"
+                                  active ? "text-bitebox-light" : "text-slate-700"
                                 }
                               >
                                 ★
@@ -403,7 +403,7 @@ export default function AddExperienceModal({
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               rows={3}
-              className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-amber-500 resize-none"
+              className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox resize-none"
               placeholder="Raconte un peu ton expérience globale…"
             />
           </div>
@@ -421,7 +421,7 @@ export default function AddExperienceModal({
             <button
               type="submit"
               disabled={loading || !userId}
-              className="text-xs px-4 py-2 rounded-md bg-amber-500 text-black font-semibold hover:bg-amber-400 disabled:opacity-60"
+              className="text-xs px-4 py-2 rounded-md bg-bitebox text-white font-semibold hover:bg-bitebox-dark disabled:opacity-60"
             >
               {loading ? "Enregistrement…" : "Enregistrer"}
             </button>

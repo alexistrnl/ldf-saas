@@ -36,7 +36,7 @@ export default function Navbar() {
           <div className="flex items-center gap-2 sm:gap-3">
             <button
               onClick={() => setIsAddExperienceOpen(true)}
-              className="inline-flex items-center rounded-full bg-[#f97316] px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium text-white shadow hover:bg-[#ea580c] transition"
+              className="inline-flex items-center rounded-full bg-bitebox px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium text-white shadow hover:bg-bitebox-dark transition"
             >
               Ajouter une note
             </button>

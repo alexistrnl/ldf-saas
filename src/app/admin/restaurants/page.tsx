@@ -561,7 +561,7 @@ export default function AdminRestaurantsPage() {
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-amber-500"
+                className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
                 placeholder="Ex : Black & White Burger"
               />
             </div>
@@ -571,7 +571,7 @@ export default function AdminRestaurantsPage() {
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-amber-500"
+                className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
                 rows={3}
                 placeholder="Quelques mots sur l’enseigne..."
               />
@@ -593,7 +593,7 @@ export default function AdminRestaurantsPage() {
             <button
               type="submit"
               disabled={saving}
-              className="inline-flex items-center justify-center rounded-md bg-amber-500 px-4 py-2 text-sm font-semibold text-black shadow hover:bg-amber-400 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="inline-flex items-center justify-center rounded-md bg-bitebox px-4 py-2 text-sm font-semibold text-white shadow hover:bg-bitebox-dark disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {saving ? "Création en cours..." : "Créer l’enseigne"}
             </button>
@@ -644,7 +644,7 @@ export default function AdminRestaurantsPage() {
                     <button
                       type="button"
                       onClick={() => startEditRestaurant(r)}
-                      className="text-xs rounded-md border border-amber-500/60 px-3 py-1 hover:bg-amber-500/10"
+                      className="text-xs rounded-md border border-bitebox/60 px-3 py-1 hover:bg-bitebox/10"
                     >
                       Modifier
                     </button>
@@ -685,7 +685,7 @@ export default function AdminRestaurantsPage() {
                   type="text"
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-amber-500"
+                  className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
                 />
               </div>
 
@@ -694,7 +694,7 @@ export default function AdminRestaurantsPage() {
                 <textarea
                   value={editDescription}
                   onChange={(e) => setEditDescription(e.target.value)}
-                  className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-amber-500"
+                  className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
                   rows={3}
                 />
               </div>
@@ -777,7 +777,7 @@ export default function AdminRestaurantsPage() {
                             </p>
                           )}
                           {dish.is_signature && (
-                            <span className="inline-flex items-center rounded-full bg-amber-500/90 text-black text-[9px] font-semibold px-2 py-[1px] mt-1">
+                            <span className="inline-flex items-center rounded-full bg-bitebox/90 text-white text-[9px] font-semibold px-2 py-[1px] mt-1">
                               Plat signature
                             </span>
                           )}
@@ -802,7 +802,7 @@ export default function AdminRestaurantsPage() {
                         <button
                           type="button"
                           onClick={() => startEditDish(dish)}
-                          className="text-[11px] rounded-md border border-amber-500/60 px-3 py-1 hover:bg-amber-500/10"
+                          className="text-[11px] rounded-md border border-bitebox/60 px-3 py-1 hover:bg-bitebox/10"
                         >
                           Modifier
                         </button>
@@ -824,7 +824,7 @@ export default function AdminRestaurantsPage() {
                             type="text"
                             value={editDishName}
                             onChange={(e) => setEditDishName(e.target.value)}
-                            className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-amber-500"
+                            className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
                           />
                         </div>
 
@@ -836,7 +836,7 @@ export default function AdminRestaurantsPage() {
                             type="text"
                             value={editDishDescription}
                             onChange={(e) => setEditDishDescription(e.target.value)}
-                            className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-amber-500"
+                            className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
                           />
                         </div>
 
@@ -868,7 +868,7 @@ export default function AdminRestaurantsPage() {
                           <div className="flex items-center gap-2">
                             <button
                               type="submit"
-                              className="inline-flex items-center justify-center rounded-md bg-amber-500 px-4 py-2 text-xs font-semibold text-black shadow hover:bg-amber-400 transition"
+                              className="inline-flex items-center justify-center rounded-md bg-bitebox px-4 py-2 text-xs font-semibold text-white shadow hover:bg-bitebox-dark transition"
                             >
                               Enregistrer
                             </button>
@@ -896,7 +896,7 @@ export default function AdminRestaurantsPage() {
                   type="text"
                   value={dishName}
                   onChange={(e) => setDishName(e.target.value)}
-                  className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-amber-500"
+                  className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
                   placeholder="Ex : Whopper"
                 />
               </div>
@@ -907,7 +907,7 @@ export default function AdminRestaurantsPage() {
                   type="text"
                   value={dishDescription}
                   onChange={(e) => setDishDescription(e.target.value)}
-                  className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-amber-500"
+                  className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
                   placeholder="Burger signature..."
                 />
               </div>

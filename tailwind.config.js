@@ -5,7 +5,15 @@ module.exports = {
     "./src/components/**/*.{ts,tsx}",
   ],
   theme: {
-    extend: {},
+    extend: {
+      colors: {
+        bitebox: {
+          DEFAULT: "#6A24A4",
+          light: "#8550C0",
+          dark: "#4A1774",
+        },
+      },
+    },
   },
   plugins: [],
 }

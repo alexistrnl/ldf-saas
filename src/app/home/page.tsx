@@ -122,7 +122,7 @@ export default function HomePage() {
         <header className="flex flex-col gap-4">
           <div className="space-y-2">
             <h1 className="text-2xl sm:text-3xl font-bold">
-              Bienvenue sur <span className="text-amber-400">BiteBox</span>
+              Bienvenue sur <span className="text-bitebox-light">BiteBox</span>
             </h1>
             <p className="text-sm text-slate-300">
               Explore les enseignes du moment et ajoute celles que tu as goûtées à ton profil.
@@ -138,7 +138,7 @@ export default function HomePage() {
               placeholder="Rechercher une enseigne..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 pr-10 text-slate-50 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition"
+              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 pr-10 text-slate-50 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-bitebox focus:border-transparent transition"
             />
             <svg
               className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400"
@@ -180,7 +180,7 @@ export default function HomePage() {
                 <Link
                   key={restaurant.id}
                   href={getRestaurantUrl(restaurant)}
-                  className="group block bg-slate-900/80 rounded-2xl shadow-md hover:shadow-xl border border-slate-800/70 hover:border-amber-500/60 transition overflow-hidden"
+                  className="group block bg-slate-900/80 rounded-2xl shadow-md hover:shadow-xl border border-slate-800/70 hover:border-bitebox/60 transition overflow-hidden"
                 >
                   <div className="aspect-[16/9] flex items-center justify-center bg-slate-950">
                     {restaurant.logo_url ? (
@@ -196,7 +196,7 @@ export default function HomePage() {
                     )}
                   </div>
                   <div className="px-3 py-3 space-y-1">
-                    <p className="text-sm font-semibold truncate group-hover:text-amber-400">
+                    <p className="text-sm font-semibold truncate group-hover:text-bitebox-light">
                       {restaurant.name}
                     </p>
                     <div className="mt-2 flex items-center justify-between text-xs text-slate-300">
@@ -210,7 +210,7 @@ export default function HomePage() {
                                 key={star}
                                 className={
                                   restaurant.ratingStats.avg >= star
-                                    ? "text-amber-400"
+                                    ? "text-bitebox-light"
                                     : "text-slate-700"
                                 }
                               >

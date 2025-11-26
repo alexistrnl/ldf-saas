@@ -287,7 +287,7 @@ export default function ProfilePage() {
             </p>
             <Link
               href="/login"
-              className="inline-flex items-center justify-center rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-black shadow hover:bg-amber-400 transition"
+              className="inline-flex items-center justify-center rounded-full bg-bitebox px-4 py-2 text-sm font-semibold text-black shadow hover:bg-bitebox-dark transition"
             >
               Me connecter
             </Link>
@@ -323,7 +323,7 @@ export default function ProfilePage() {
                 <Link
                   key={r.restaurantId}
                   href={r.slug ? `/restaurants/${r.slug}` : "#"}
-                  className={`group block bg-slate-900/80 rounded-2xl shadow-md hover:shadow-xl border border-slate-800/70 hover:border-amber-500/60 transition overflow-hidden ${
+                  className={`group block bg-slate-900/80 rounded-2xl shadow-md hover:shadow-xl border border-slate-800/70 hover:border-bitebox/60 transition overflow-hidden ${
                     !r.slug ? "pointer-events-none opacity-60" : ""
                   }`}
                 >
@@ -341,7 +341,7 @@ export default function ProfilePage() {
                     )}
                   </div>
                   <div className="px-3 py-3 space-y-1">
-                    <p className="text-sm font-semibold truncate group-hover:text-amber-400">
+                    <p className="text-sm font-semibold truncate group-hover:text-bitebox-light">
                       {r.restaurantName}
                     </p>
                     <div className="mt-2 flex items-center justify-between text-xs text-slate-300">
@@ -352,7 +352,7 @@ export default function ProfilePage() {
                               key={star}
                               className={
                                 r.avgRating >= star
-                                  ? "text-amber-400"
+                                  ? "text-bitebox-light"
                                   : "text-slate-700"
                               }
                             >
@@ -410,7 +410,7 @@ export default function ProfilePage() {
                         {exp.restaurantSlug ? (
                           <Link
                             href={`/restaurants/${exp.restaurantSlug}`}
-                            className="text-sm font-semibold text-slate-100 hover:text-amber-300 block truncate"
+                            className="text-sm font-semibold text-slate-100 hover:text-bitebox-light block truncate"
                           >
                             {exp.restaurantName}
                           </Link>
@@ -438,7 +438,7 @@ export default function ProfilePage() {
                             key={star}
                             className={
                               exp.rating >= star
-                                ? "text-amber-400"
+                                ? "text-bitebox-light"
                                 : "text-slate-700"
                             }
                           >
@@ -495,7 +495,7 @@ export default function ProfilePage() {
                                       key={star}
                                       className={
                                         dish.rating >= star
-                                          ? "text-amber-400"
+                                          ? "text-bitebox-light"
                                           : "text-slate-700"
                                       }
                                     >

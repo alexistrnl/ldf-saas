@@ -237,7 +237,7 @@ export default function RestaurantPage() {
                           key={star}
                           className={
                             restaurantRatingStats.avg >= star
-                              ? "text-amber-400"
+                              ? "text-bitebox-light"
                               : "text-slate-700"
                           }
                         >
@@ -297,7 +297,7 @@ export default function RestaurantPage() {
                       <p className="text-xs font-semibold text-slate-100 truncate">
                         {dish.name}
                       </p>
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/40">
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-bitebox/10 text-bitebox-light border border-bitebox/40">
                         Top {index + 1}
                       </span>
                     </div>
@@ -310,7 +310,7 @@ export default function RestaurantPage() {
                             key={star}
                             className={
                               dish.ratingStats.avg >= star
-                                ? "text-amber-400"
+                                ? "text-bitebox-light"
                                 : "text-slate-700"
                             }
                           >
@@ -360,7 +360,7 @@ export default function RestaurantPage() {
                   <div className="px-3 py-3 space-y-1">
                     <p className="text-sm font-semibold truncate">{dish.name}</p>
                     {dish.is_signature && (
-                      <span className="inline-flex items-center rounded-full bg-amber-500/90 text-black text-[10px] font-semibold px-2 py-[1px]">
+                      <span className="inline-flex items-center rounded-full bg-bitebox/90 text-white text-[10px] font-semibold px-2 py-[1px]">
                         Plat signature
                       </span>
                     )}
@@ -380,7 +380,7 @@ export default function RestaurantPage() {
                                 key={star}
                                 className={
                                   dish.ratingStats.avg >= star
-                                    ? "text-amber-400"
+                                    ? "text-bitebox-light"
                                     : "text-slate-700"
                                 }
                               >
