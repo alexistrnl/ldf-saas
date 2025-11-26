@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
+import { calculatePublicRating } from "@/lib/ratingUtils";
 
 type Restaurant = {
   id: string;
@@ -47,42 +48,41 @@ export default function HomePage() {
 
         const restaurantsData = (data || []) as Restaurant[];
 
-        // Récupérer les notes de tous les restaurants
+        // Récupérer les notes de tous les restaurants avec user_id pour calculer la note publique (1 utilisateur = 1 voix)
         const { data: ratingRows, error: ratingError } = await supabase
           .from("fastfood_logs")
-          .select("restaurant_id, rating");
+          .select("restaurant_id, user_id, rating");
 
         if (ratingError) {
           console.error("Erreur chargement notes restaurants", ratingError);
         }
 
-        // Construire une map pour calculer moyenne + nombre d'avis par restaurant
-        const ratingMap = new Map<string, RestaurantRatingStats>();
+        // Grouper les logs par restaurant_id
+        const logsByRestaurant = new Map<string, Array<{ user_id: string; rating: number | null }>>();
 
         if (ratingRows) {
           for (const row of ratingRows) {
-            if (!row.restaurant_id || typeof row.rating !== "number") continue;
-            const current = ratingMap.get(row.restaurant_id) ?? {
-              count: 0,
-              sum: 0,
-              avg: 0,
-            };
-            const count = current.count + 1;
-            const sum = current.sum + row.rating;
-            ratingMap.set(row.restaurant_id, {
-              count,
-              sum,
-              avg: sum / count,
+            if (!row.restaurant_id) continue;
+            const restaurantLogs = logsByRestaurant.get(row.restaurant_id) ?? [];
+            restaurantLogs.push({
+              user_id: row.user_id,
+              rating: row.rating,
             });
+            logsByRestaurant.set(row.restaurant_id, restaurantLogs);
           }
         }
 
-        // Enrichir chaque restaurant avec ses stats
+        // Enrichir chaque restaurant avec ses stats (note publique = 1 utilisateur = 1 voix)
         const restaurantsWithStats: RestaurantWithStats[] = restaurantsData.map((r) => {
-          const stats = ratingMap.get(r.id);
+          const logs = logsByRestaurant.get(r.id) ?? [];
+          const { publicRating, uniqueVotersCount } = calculatePublicRating(logs);
           return {
             ...r,
-            ratingStats: stats ?? { count: 0, sum: 0, avg: 0 },
+            ratingStats: {
+              count: uniqueVotersCount,
+              sum: publicRating * uniqueVotersCount,
+              avg: publicRating,
+            },
           };
         });
 

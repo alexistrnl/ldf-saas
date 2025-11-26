@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import AddExperienceModal from "@/components/AddExperienceModal";
 import Image from "next/image";
+import { calculatePublicRating } from "@/lib/ratingUtils";
 
 type Restaurant = {
   id: string;
@@ -66,33 +67,24 @@ export default function RestaurantPage() {
 
         setRestaurant(restaurantData as Restaurant);
 
-        // 2) Charger les logs concernant cette enseigne pour calculer la note moyenne
+        // 2) Charger les logs concernant cette enseigne pour calculer la note publique (1 utilisateur = 1 voix)
         const { data: restaurantLogs, error: restaurantLogsError } = await supabase
           .from("fastfood_logs")
-          .select("rating")
+          .select("user_id, rating")
           .eq("restaurant_id", restaurantData.id);
 
         if (restaurantLogsError) {
           console.error("Erreur chargement logs restaurant", restaurantLogsError);
         }
 
-        // Calculer moyenne + nombre d'avis pour l'enseigne
-        let restaurantRatingStats: { count: number; avg: number } = {
-          count: 0,
-          avg: 0,
-        };
+        // Calculer la note publique avec la règle "1 utilisateur = 1 voix"
+        const logs = (restaurantLogs || []) as Array<{ user_id: string; rating: number | null }>;
+        const { publicRating, uniqueVotersCount } = calculatePublicRating(logs);
 
-        if (restaurantLogs && restaurantLogs.length > 0) {
-          const count = restaurantLogs.length;
-          const sum = restaurantLogs.reduce(
-            (acc, row) => acc + (row.rating ?? 0),
-            0
-          );
-          restaurantRatingStats = {
-            count,
-            avg: sum / count,
-          };
-        }
+        const restaurantRatingStats: { count: number; avg: number } = {
+          count: uniqueVotersCount,
+          avg: publicRating,
+        };
 
         setRestaurantRatingStats(restaurantRatingStats);
 
@@ -197,74 +189,66 @@ export default function RestaurantPage() {
     .slice(0, 4);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-50 px-4 py-6">
-      <div className="max-w-5xl mx-auto">
-        {/* Hero enseigne */}
-        <section className="mx-auto max-w-3xl rounded-3xl bg-[#020617] px-4 py-5 sm:px-6 sm:py-6 mb-6">
-          <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center sm:gap-6">
-            <div className="flex items-center justify-center">
-              {restaurant.logo_url ? (
-                <Image
-                  src={restaurant.logo_url}
-                  alt={restaurant.name}
-                  width={96}
-                  height={96}
-                  className="h-24 w-24 rounded-full object-cover border border-white/10 shadow-lg"
-                />
-              ) : (
-                <div className="h-24 w-24 rounded-full bg-slate-800 border border-white/10 shadow-lg flex items-center justify-center">
-                  <span className="text-xs text-slate-500">Pas de logo</span>
-                </div>
-              )}
+    <div className="min-h-screen bg-slate-950 text-slate-50">
+      <div className="mx-auto w-full max-w-3xl overflow-hidden rounded-b-3xl bg-black/40">
+        {/* Bannière */}
+        <div className="relative h-40 sm:h-52">
+          {restaurant.logo_url ? (
+            <Image
+              src={restaurant.logo_url}
+              alt={restaurant.name}
+              fill
+              className="object-cover"
+              priority
+            />
+          ) : (
+            <div className="w-full h-full bg-slate-800 flex items-center justify-center">
+              <span className="text-sm text-slate-500">Pas de logo</span>
             </div>
+          )}
+          {/* Dégradé en bas pour la lisibilité */}
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#020617] via-transparent to-transparent" />
+        </div>
+      </div>
 
-            <div className="flex flex-1 flex-col items-center sm:items-start gap-2">
-              {/* Bloc note */}
-              {restaurantRatingStats.count === 0 ? (
-                <span className="text-sm text-slate-500">
-                  Cette enseigne n'a pas encore de note publique.
-                </span>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <div className="flex">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <span
-                        key={star}
-                        className={
-                          restaurantRatingStats.avg >= star
-                            ? "text-yellow-400"
-                            : "text-slate-700"
-                        }
-                      >
-                        ★
-                      </span>
-                    ))}
-                  </div>
-                  <span className="text-sm text-slate-300">
-                    {restaurantRatingStats.avg.toFixed(1)} / 5 • {restaurantRatingStats.count} avis
+      <div className="max-w-5xl mx-auto px-4 py-6">
+        {/* Bloc note + bouton */}
+        <section className="mt-4 flex flex-col items-center gap-4 mb-6">
+          {/* Bloc note */}
+          {restaurantRatingStats.count === 0 ? (
+            <span className="text-sm text-slate-500">
+              Cette enseigne n'a pas encore de note publique.
+            </span>
+          ) : (
+            <div className="flex items-center gap-2">
+              <div className="flex">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <span
+                    key={star}
+                    className={
+                      restaurantRatingStats.avg >= star
+                        ? "text-yellow-400"
+                        : "text-slate-700"
+                    }
+                  >
+                    ★
                   </span>
-                </div>
-              )}
-
-              {/* Description si elle existe */}
-              {restaurant.description && (
-                <p className="text-sm text-slate-300 text-center sm:text-left">
-                  {restaurant.description}
-                </p>
-              )}
+                ))}
+              </div>
+              <span className="text-sm text-slate-300">
+                {restaurantRatingStats.avg.toFixed(1)} / 5 • {restaurantRatingStats.count} avis
+              </span>
             </div>
-          </div>
-        </section>
+          )}
 
-        {/* Bouton Ajouter une note */}
-        <div className="flex justify-center mb-6">
+          {/* Bouton Ajouter une note */}
           <button
             onClick={() => setIsAddExperienceOpen(true)}
             className="inline-flex items-center rounded-full bg-bitebox px-6 py-3 text-sm font-semibold text-white shadow hover:bg-bitebox-dark transition"
           >
             Ajouter une note
           </button>
-        </div>
+        </section>
 
         {/* Top 4 plats les mieux notés */}
         {topRatedDishes.length > 0 && (
