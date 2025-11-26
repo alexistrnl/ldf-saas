@@ -118,10 +118,10 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50 px-4 py-6">
-        <div className="max-w-6xl mx-auto space-y-8 mt-6">
+        <div className="max-w-6xl mx-auto space-y-2">
 
         {/* Barre de recherche */}
-        <section className="bg-slate-900/80 rounded-2xl p-5 shadow-lg border border-slate-800/60">
+        <section className="pt-0 pb-2">
           <div className="relative">
             <input
               type="text"
@@ -151,7 +151,7 @@ export default function HomePage() {
           <h2 className="text-lg font-semibold">
             {searchQuery
               ? `Résultats de recherche${filteredRestaurants.length > 0 ? ` (${filteredRestaurants.length})` : ""}`
-              : "Dernières enseignes ajoutées"}
+              : "Tous les spots"}
           </h2>
 
           {loading ? (
@@ -165,14 +165,14 @@ export default function HomePage() {
                 : "Aucune enseigne pour l'instant. Ajoute-en via la page admin."}
             </p>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
               {filteredRestaurants.map((restaurant) => (
                 <Link
                   key={restaurant.id}
                   href={getRestaurantUrl(restaurant)}
-                  className="group block bg-slate-900/80 rounded-2xl shadow-md hover:shadow-xl border border-slate-800/70 hover:border-bitebox/60 transition overflow-hidden"
+                  className="group block bg-slate-900/80 rounded-2xl shadow-md hover:shadow-xl border border-slate-800/70 hover:border-bitebox/60 transition overflow-hidden h-full flex flex-col"
                 >
-                  <div className="aspect-[16/9] flex items-center justify-center bg-slate-950">
+                  <div className="aspect-square flex items-center justify-center bg-slate-950">
                     {restaurant.logo_url ? (
                       <img
                         src={restaurant.logo_url}
