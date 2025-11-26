@@ -237,7 +237,7 @@ export default function RestaurantPage() {
                           key={star}
                           className={
                             restaurantRatingStats.avg >= star
-                              ? "text-bitebox-light"
+                              ? "text-yellow-400"
                               : "text-slate-700"
                           }
                         >
@@ -297,7 +297,7 @@ export default function RestaurantPage() {
                       <p className="text-xs font-semibold text-slate-100 truncate">
                         {dish.name}
                       </p>
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-bitebox/10 text-bitebox-light border border-bitebox/40">
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-bitebox/10 text-yellow-400 border border-bitebox/40">
                         Top {index + 1}
                       </span>
                     </div>
@@ -310,7 +310,7 @@ export default function RestaurantPage() {
                             key={star}
                             className={
                               dish.ratingStats.avg >= star
-                                ? "text-bitebox-light"
+                                ? "text-yellow-400"
                                 : "text-slate-700"
                             }
                           >
@@ -380,7 +380,7 @@ export default function RestaurantPage() {
                                 key={star}
                                 className={
                                   dish.ratingStats.avg >= star
-                                    ? "text-bitebox-light"
+                                    ? "text-yellow-400"
                                     : "text-slate-700"
                                 }
                               >

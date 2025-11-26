@@ -119,16 +119,6 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50 px-4 py-6">
         <div className="max-w-6xl mx-auto space-y-8 mt-6">
-        <header className="flex flex-col gap-4">
-          <div className="space-y-2">
-            <h1 className="text-2xl sm:text-3xl font-bold">
-              Bienvenue sur <span className="text-bitebox-light">BiteBox</span>
-            </h1>
-            <p className="text-sm text-slate-300">
-              Explore les enseignes du moment et ajoute celles que tu as goûtées à ton profil.
-            </p>
-          </div>
-        </header>
 
         {/* Barre de recherche */}
         <section className="bg-slate-900/80 rounded-2xl p-5 shadow-lg border border-slate-800/60">
@@ -210,7 +200,7 @@ export default function HomePage() {
                                 key={star}
                                 className={
                                   restaurant.ratingStats.avg >= star
-                                    ? "text-bitebox-light"
+                                    ? "text-yellow-400"
                                     : "text-slate-700"
                                 }
                               >

@@ -341,7 +341,7 @@ export default function ProfilePage() {
                     )}
                   </div>
                   <div className="px-3 py-3 space-y-1">
-                    <p className="text-sm font-semibold truncate group-hover:text-bitebox-light">
+                    <p className="text-sm font-semibold truncate group-hover:text-yellow-400">
                       {r.restaurantName}
                     </p>
                     <div className="mt-2 flex items-center justify-between text-xs text-slate-300">
@@ -352,7 +352,7 @@ export default function ProfilePage() {
                               key={star}
                               className={
                                 r.avgRating >= star
-                                  ? "text-bitebox-light"
+                                  ? "text-yellow-400"
                                   : "text-slate-700"
                               }
                             >
@@ -410,7 +410,7 @@ export default function ProfilePage() {
                         {exp.restaurantSlug ? (
                           <Link
                             href={`/restaurants/${exp.restaurantSlug}`}
-                            className="text-sm font-semibold text-slate-100 hover:text-bitebox-light block truncate"
+                            className="text-sm font-semibold text-slate-100 hover:text-yellow-400 block truncate"
                           >
                             {exp.restaurantName}
                           </Link>
@@ -438,7 +438,7 @@ export default function ProfilePage() {
                             key={star}
                             className={
                               exp.rating >= star
-                                ? "text-bitebox-light"
+                                ? "text-yellow-400"
                                 : "text-slate-700"
                             }
                           >
@@ -495,7 +495,7 @@ export default function ProfilePage() {
                                       key={star}
                                       className={
                                         dish.rating >= star
-                                          ? "text-bitebox-light"
+                                          ? "text-yellow-400"
                                           : "text-slate-700"
                                       }
                                     >

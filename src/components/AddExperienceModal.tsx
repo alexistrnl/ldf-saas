@@ -322,7 +322,7 @@ export default function AddExperienceModal({
                     >
                       <span
                         className={
-                          isActive ? "text-bitebox-light" : "text-slate-600"
+                          isActive ? "text-yellow-400" : "text-slate-600"
                         }
                       >
                         ★
@@ -378,7 +378,7 @@ export default function AddExperienceModal({
                             >
                               <span
                                 className={
-                                  active ? "text-bitebox-light" : "text-slate-700"
+                                  active ? "text-yellow-400" : "text-slate-700"
                                 }
                               >
                                 ★
