@@ -172,15 +172,15 @@ export default function HomePage() {
                   href={getRestaurantUrl(restaurant)}
                   className="group block bg-slate-900/80 rounded-2xl shadow-md hover:shadow-xl border border-slate-800/70 hover:border-bitebox/60 transition overflow-hidden h-full flex flex-col"
                 >
-                  <div className="aspect-[4/3] sm:aspect-square bg-slate-950 overflow-hidden">
+                  <div className="bg-slate-950 overflow-hidden flex items-center justify-center py-3 sm:aspect-square sm:py-0">
                     {restaurant.logo_url ? (
                       <img
                         src={restaurant.logo_url}
                         alt={restaurant.name}
-                        className="w-full h-full object-contain"
+                        className="w-full h-auto max-h-[140px] object-contain sm:max-h-none sm:w-full sm:h-full"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center">
+                      <div className="w-full flex items-center justify-center py-8 sm:aspect-square sm:py-0">
                         <span className="text-xs text-slate-500">
                           Pas de logo
                         </span>
