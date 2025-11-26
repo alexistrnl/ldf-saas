@@ -340,9 +340,10 @@ export default function ProfilePage() {
         ).toFixed(1)
       : "0.0";
 
-  // Fonction pour obtenir l'initiale de l'email
-  const getInitial = (email: string) => {
-    return email.charAt(0).toUpperCase();
+  // Fonction pour obtenir l'initiale
+  const getInitial = (value?: string | null): string => {
+    if (!value || value.trim().length === 0) return "?";
+    return value.trim().charAt(0).toUpperCase();
   };
 
   // Fonction pour formater la date
@@ -354,6 +355,13 @@ export default function ProfilePage() {
       year: "numeric",
     });
   };
+
+  // Calculer le nom d'affichage et la source de l'initiale
+  const displayName =
+    profile?.username && profile.username.trim().length > 0
+      ? profile.username
+      : user?.email ?? "Utilisateur BiteBox";
+  const initialSource = profile?.username || user?.email;
 
   return (
     <main className="min-h-screen w-full overflow-x-hidden bg-[#020617]">
@@ -368,15 +376,13 @@ export default function ProfilePage() {
         <section className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-bitebox text-white font-semibold text-xl flex-shrink-0">
-              {getInitial(user.email)}
+              {getInitial(initialSource)}
             </div>
             <div className="flex flex-col min-w-0 flex-1">
               <span className="text-base font-semibold text-white truncate">
-                {profile?.username && profile.username.trim().length > 0
-                  ? profile.username
-                  : user.email ?? "Utilisateur BiteBox"}
+                {displayName}
               </span>
-              {user.email && (
+              {user?.email && (
                 <span className="text-xs text-slate-400 truncate">
                   {user.email}
                 </span>
