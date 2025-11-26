@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation'
 import AppHeader from './AppHeader'
-import MobileTabBar from './MobileTabBar'
+import BottomNav from './BottomNav'
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -10,18 +10,18 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const isAuthPage = pathname === '/login' || pathname === '/signup'
   const isAdminPage = pathname?.startsWith('/admin')
 
-  // Masquer header et tab bar sur les pages d'auth
-  // Masquer tab bar sur admin (mais garder le header)
+  // Masquer header et bottom nav sur les pages d'auth
+  // Masquer bottom nav sur admin (mais garder le header)
   const showHeader = !isAuthPage
-  const showTabBar = !isAuthPage && !isAdminPage
+  const showBottomNav = !isAuthPage && !isAdminPage
 
   return (
     <div className="min-h-screen bg-[#020617] text-white">
       {showHeader && <AppHeader />}
-      <main className={`${showTabBar ? 'pb-20' : 'pb-2'} ${showHeader ? 'pt-2' : 'pt-0'}`}>
+      <main className={`${showBottomNav ? 'pb-24' : 'pb-2'} ${showHeader ? 'pt-2' : 'pt-0'}`}>
         {children}
       </main>
-      {showTabBar && <MobileTabBar />}
+      {showBottomNav && <BottomNav />}
     </div>
   )
 }
