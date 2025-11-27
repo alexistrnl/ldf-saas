@@ -16,6 +16,7 @@ import { supabase } from "@/lib/supabaseClient";
 export type UserProfile = {
   id: string;
   username: string | null;
+  avatar_url: string | null;
   created_at?: string;
   updated_at?: string;
 };
@@ -173,6 +174,66 @@ export async function updateUsername(
   }
 
   console.log("[Profile] Username updated successfully:", updatedProfile);
+  return { profile: updatedProfile as UserProfile, error: null };
+}
+
+export async function updateAvatar(
+  avatarUrl: string
+): Promise<{ profile: UserProfile | null; error: any }> {
+  console.log("[Profile] updateAvatar called with:", avatarUrl);
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    console.error("[Profile] getUser error:", userError);
+    return { profile: null, error: userError };
+  }
+
+  // Vérifier d'abord si le profil existe, sinon le créer
+  const { data: existingProfile } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (!existingProfile) {
+    // Créer le profil s'il n'existe pas
+    const { data: newProfile, error: createError } = await supabase
+      .from("profiles")
+      .insert({ id: user.id, avatar_url: avatarUrl })
+      .select("*")
+      .single();
+
+    if (createError) {
+      console.error("[Profile] Create profile error:", createError);
+      return { profile: null, error: createError };
+    }
+
+    return { profile: newProfile as UserProfile, error: null };
+  }
+
+  // Mettre à jour l'avatar
+  const { data: updatedProfile, error } = await supabase
+    .from("profiles")
+    .update({ avatar_url: avatarUrl })
+    .eq("id", user.id)
+    .select("*")
+    .single();
+
+  if (error) {
+    console.error("[Profile] Update avatar error:", {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    });
+    return { profile: null, error };
+  }
+
+  console.log("[Profile] Avatar updated successfully:", updatedProfile);
   return { profile: updatedProfile as UserProfile, error: null };
 }
 
