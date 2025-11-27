@@ -7,6 +7,7 @@ import Image from "next/image";
 import { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
 import { getCurrentUserProfile, UserProfile } from "@/lib/profile";
+import { getAvatarTheme, hexToRgba } from "@/lib/getAvatarTheme";
 import Spinner from "@/components/Spinner";
 
 type ProfileRestaurantSummary = {
@@ -364,6 +365,11 @@ export default function ProfilePage() {
       : user?.email ?? "Utilisateur BiteBox";
   const initialSource = profile?.username || user?.email;
 
+  // Calculer le thème basé sur l'avatar
+  const theme = getAvatarTheme(profile?.avatar_url);
+  const themeColorWithOpacity = hexToRgba(theme.color, 0.4);
+  const themeColorGlow = hexToRgba(theme.color, 0.33); // 55 en hex = 33% en décimal
+
   return (
     <main className="min-h-screen w-full overflow-x-hidden bg-[#020617]">
       <div className="mx-auto flex w-full max-w-xl flex-col gap-6 px-4 pb-28 pt-6">
@@ -376,7 +382,10 @@ export default function ProfilePage() {
         {/* Header profil */}
         <section className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-5 flex-1 min-w-0">
-            <div className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-full">
+            <div 
+              className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-full"
+              style={{ boxShadow: `0 0 20px ${themeColorGlow}` }}
+            >
               {profile?.avatar_url ? (
                 <Image
                   src={profile.avatar_url}
@@ -408,11 +417,21 @@ export default function ProfilePage() {
           </div>
           <button
             onClick={() => router.push("/profile/settings")}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/5 hover:bg-white/10 transition-colors flex-shrink-0"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/5 hover:bg-white/10 transition-all flex-shrink-0 border"
+            style={{ borderColor: themeColorWithOpacity, borderWidth: '1px' }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = theme.color;
+              e.currentTarget.style.backgroundColor = hexToRgba(theme.color, 0.1);
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = themeColorWithOpacity;
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+            }}
             aria-label="Paramètres"
           >
             <svg
-              className="w-5 h-5 text-white"
+              className="w-5 h-5 transition-colors"
+              style={{ color: theme.color }}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -434,7 +453,7 @@ export default function ProfilePage() {
         </section>
 
         {/* Stats rapides */}
-        <section className="grid grid-cols-3 gap-3 rounded-2xl bg-[#020617] border border-white/5 px-4 py-4">
+        <section className="grid grid-cols-3 gap-3 rounded-xl bg-[#0F0F1A] border border-white/5 shadow-md shadow-black/20 px-4 py-4">
           <div className="flex flex-col items-center">
             <span className="text-lg font-semibold text-white">
               {restaurantsCount}
@@ -461,14 +480,16 @@ export default function ProfilePage() {
           </div>
         </section>
 
-
         {/* Restaurants que j'ai testés */}
-        <section className="space-y-3">
+        <section className="mt-6 space-y-4">
           <div>
-            <h2 className="text-lg font-semibold text-white">
+            <h2 
+              className="text-xl font-bold mb-1"
+              style={{ color: theme.color }}
+            >
               Restaurants que j'ai testés
             </h2>
-            <p className="text-xs text-slate-400">
+            <p className="text-sm text-white/50 mb-3">
               Ton top des spots où tu as déjà mis une note.
             </p>
           </div>
@@ -479,14 +500,24 @@ export default function ProfilePage() {
             </p>
           ) : (
             <div className="-mx-4 overflow-x-auto pb-2">
-              <div className="flex gap-3 px-4">
+              <div className="flex gap-4 px-4">
                 {restaurantsSummary.map((r) => (
                   <Link
                     key={r.restaurantId}
                     href={r.slug ? `/restaurants/${r.slug}` : "#"}
-                    className={`w-48 flex-shrink-0 overflow-hidden rounded-2xl bg-[#020617] border border-white/5 transition hover:border-bitebox/40 ${
+                    className={`w-48 flex-shrink-0 overflow-hidden rounded-xl bg-[#0F0F1A] border shadow-md shadow-black/20 transition hover:shadow-lg hover:shadow-black/30 ${
                       !r.slug ? "pointer-events-none opacity-60" : ""
                     }`}
+                    style={{ 
+                      borderColor: themeColorWithOpacity,
+                      borderWidth: '1px'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = theme.color;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = themeColorWithOpacity;
+                    }}
                   >
                     <div className="h-24 w-full overflow-hidden bg-black/60 flex items-center justify-center">
                       {r.logoUrl ? (
@@ -501,8 +532,8 @@ export default function ProfilePage() {
                         </span>
                       )}
                     </div>
-                    <div className="space-y-1 px-3 py-2">
-                      <p className="truncate text-sm font-medium text-white">
+                    <div className="space-y-1 p-4 md:p-5">
+                      <p className="truncate text-lg font-semibold text-white">
                         {r.restaurantName}
                       </p>
                       <p className="text-xs text-slate-400">
@@ -518,10 +549,15 @@ export default function ProfilePage() {
         </section>
 
         {/* Mes expériences */}
-        <section className="space-y-3">
+        <section className="mt-6 space-y-4">
           <div>
-            <h2 className="text-lg font-semibold text-white">Mes expériences</h2>
-            <p className="text-xs text-slate-400">
+            <h2 
+              className="text-xl font-bold mb-1"
+              style={{ color: theme.color }}
+            >
+              Mes expériences
+            </h2>
+            <p className="text-sm text-white/50 mb-3">
               Retrouve toutes tes notes, par date.
             </p>
           </div>
@@ -531,11 +567,21 @@ export default function ProfilePage() {
               Tu n'as pas encore enregistré d'expérience.
             </p>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {experiences.map((exp) => (
                 <div
                   key={exp.id}
-                  className="rounded-2xl bg-[#020617] border border-white/5 px-3 py-3"
+                  className="rounded-xl bg-[#0F0F1A] border shadow-md shadow-black/20 p-4 md:p-5 transition hover:shadow-lg hover:shadow-black/30"
+                  style={{ 
+                    borderColor: themeColorWithOpacity,
+                    borderWidth: '1px'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = theme.color;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = themeColorWithOpacity;
+                  }}
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -556,16 +602,16 @@ export default function ProfilePage() {
                         {exp.restaurantSlug ? (
                           <Link
                             href={`/restaurants/${exp.restaurantSlug}`}
-                            className="text-sm font-medium text-white hover:text-bitebox-light truncate"
+                            className="text-lg font-semibold text-white hover:text-bitebox-light truncate"
                           >
                             {exp.restaurantName}
                           </Link>
                         ) : (
-                          <span className="text-sm font-medium text-white truncate">
+                          <span className="text-lg font-semibold text-white truncate">
                             {exp.restaurantName}
                           </span>
                         )}
-                        <span className="text-xs text-slate-400">
+                        <span className="text-sm text-white/50">
                           {formatDate(exp.visitedAt)}
                         </span>
                       </div>
@@ -585,7 +631,7 @@ export default function ProfilePage() {
                           </span>
                         ))}
                       </div>
-                      <span className="text-xs text-slate-400">
+                      <span className="text-sm text-white font-medium">
                         {exp.rating} / 5
                       </span>
                     </div>
@@ -593,24 +639,24 @@ export default function ProfilePage() {
 
                   {/* Commentaire */}
                   {exp.comment && (
-                    <p className="text-xs text-slate-300 mt-3 px-1">
+                    <p className="text-sm text-slate-300 mt-4 px-1">
                       {exp.comment}
                     </p>
                   )}
 
                   {/* Plats goûtés */}
                   {exp.dishes.length > 0 && (
-                    <div className="mt-3 space-y-1">
-                      <p className="text-xs font-medium text-slate-300">
+                    <div className="mt-4 space-y-3">
+                      <p className="text-sm font-semibold text-white">
                         Plats goûtés :
                       </p>
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-2 gap-3">
                         {exp.dishes.map((dish, idx) => (
                           <div
                             key={dish.dishId ?? `${exp.id}-dish-${idx}`}
-                            className="rounded-lg bg-slate-900/50 border border-slate-800/50 p-2"
+                            className="rounded-lg bg-[#161622] border border-white/5 shadow-sm p-3 flex flex-col gap-1"
                           >
-                            <p className="text-xs font-medium text-slate-100 truncate mb-1">
+                            <p className="text-sm font-semibold text-white truncate">
                               {dish.dishName}
                             </p>
                             <div className="flex items-center gap-1">
@@ -620,15 +666,15 @@ export default function ProfilePage() {
                                     key={star}
                                     className={
                                       dish.rating >= star
-                                        ? "text-yellow-400 text-[10px]"
-                                        : "text-slate-700 text-[10px]"
+                                        ? "text-yellow-400 text-xs"
+                                        : "text-slate-700 text-xs"
                                     }
                                   >
                                     ★
                                   </span>
                                 ))}
                               </div>
-                              <span className="text-[10px] text-slate-400">
+                              <span className="text-xs text-white font-medium">
                                 {dish.rating}/5
                               </span>
                             </div>
