@@ -2,48 +2,62 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabaseClient";
+import Image from "next/image";
 import {
   getCurrentUserProfile,
+  UserProfile,
   checkUsernameAvailability,
   updateUsername,
+  updateAvatar,
 } from "@/lib/profile";
 import Spinner from "@/components/Spinner";
 
 const USERNAME_REGEX = /^[a-zA-Z0-9._]{3,20}$/;
 
+const AVAILABLE_AVATARS = [
+  "/avatar/avatar-bleu.png",
+  "/avatar/avatar-orange.png",
+  "/avatar/avatar-rouge.png",
+  "/avatar/avatar-vert.png",
+  "/avatar/avatar-violet.png",
+];
+
 export default function ProfileSettingsPage() {
   const router = useRouter();
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
   const [username, setUsername] = useState("");
   const [initialUsername, setInitialUsername] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [userId, setUserId] = useState<string | null>(null);
+  const [isSubmittingUsername, setIsSubmittingUsername] = useState(false);
+  const [usernameError, setUsernameError] = useState<string | null>(null);
+  const [usernameSuccess, setUsernameSuccess] = useState<string | null>(null);
+  const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadProfile = async () => {
       try {
         setLoading(true);
-        const { user, profile, error } = await getCurrentUserProfile();
+        const { user, profile: userProfile, error } = await getCurrentUserProfile();
 
         if (error) {
           console.error("[Settings] load profile error", error);
-          setErrorMessage("Impossible de charger ton profil.");
+          setLoading(false);
           return;
         }
 
-        if (user) {
-          setUserId(user.id);
-          if (profile?.username) {
-            setUsername(profile.username);
-            setInitialUsername(profile.username);
+        if (user && userProfile) {
+          setProfile(userProfile);
+          if (userProfile.username) {
+            setUsername(userProfile.username);
+            setInitialUsername(userProfile.username);
+          } else {
+            setUsername("");
+            setInitialUsername(null);
           }
         }
       } catch (err) {
         console.error("[Settings] unexpected error", err);
-        setErrorMessage("Erreur inattendue.");
       } finally {
         setLoading(false);
       }
@@ -56,122 +70,112 @@ export default function ProfileSettingsPage() {
     if (!value.trim()) {
       return "Le nom d'utilisateur est obligatoire.";
     }
-
     if (value.length < 3 || value.length > 20) {
       return "Le nom d'utilisateur doit contenir entre 3 et 20 caractères.";
     }
-
     if (!USERNAME_REGEX.test(value)) {
       return "Le nom d'utilisateur ne peut contenir que des lettres, chiffres, underscores et points.";
     }
-
     return null;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleUsernameSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMessage(null);
-    setSuccessMessage(null);
+    setUsernameError(null);
+    setUsernameSuccess(null);
 
-    // Validation côté client
     const validationError = validateUsername(username);
     if (validationError) {
-      setErrorMessage(validationError);
+      setUsernameError(validationError);
       return;
     }
 
-    // Si le username n'a pas changé, ne rien faire
     if (username === initialUsername) {
-      setSuccessMessage("Aucune modification.");
+      setUsernameSuccess("Aucune modification.");
       return;
     }
 
-    if (!userId) {
-      setErrorMessage("Tu dois être connecté.");
-      return;
-    }
-
-    setIsSubmitting(true);
+    setIsSubmittingUsername(true);
 
     try {
-      // Vérifier l'unicité (optionnel, mais permet de donner un feedback plus rapide)
+      const { profile: currentProfile } = await getCurrentUserProfile();
+      if (!currentProfile?.id) {
+        setUsernameError("Tu dois être connecté.");
+        setIsSubmittingUsername(false);
+        return;
+      }
+
       const { available, error: checkError } = await checkUsernameAvailability(
         username,
-        userId
+        currentProfile.id
       );
 
       if (checkError) {
-        // Si erreur lors de la vérification, on continue quand même
-        // L'update vérifiera aussi l'unicité côté serveur
         console.warn("[Settings] check username error (continuing anyway):", checkError);
       }
 
       if (!checkError && !available) {
-        setErrorMessage("Ce nom d'utilisateur est déjà pris.");
-        setIsSubmitting(false);
+        setUsernameError("Ce nom d'utilisateur est déjà pris.");
+        setIsSubmittingUsername(false);
         return;
       }
 
-      // Mettre à jour le username
       const { profile: updatedProfile, error } = await updateUsername(username);
 
       if (error) {
-        console.error("[Settings] update username error:", {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          fullError: error,
-        });
-
+        console.error("[Settings] update username error:", error);
         let message = "Impossible de mettre à jour ton nom d'utilisateur. Réessaie plus tard.";
-
-        // Contrainte UNIQUE (username déjà pris)
-        // Code PostgreSQL pour violation de contrainte unique
         if (error.code === "23505" || error.code === "PGRST116") {
           message = "Ce nom d'utilisateur est déjà pris. Choisis-en un autre.";
-        }
-        // Erreur RLS (row-level security)
-        else if (
+        } else if (
           error.message?.toLowerCase().includes("row-level security") ||
           error.message?.toLowerCase().includes("policy") ||
           error.code === "42501"
         ) {
-          message =
-            "Tu n'as pas les droits pour modifier ce profil. Vérifie que tu es bien connecté.";
+          message = "Tu n'as pas les droits pour modifier ce profil. Vérifie que tu es bien connecté.";
         }
-        // Erreur de contrainte (générale)
-        else if (error.code === "23503" || error.message?.toLowerCase().includes("foreign key")) {
-          message = "Erreur de référence. Contacte le support.";
-        }
-        // Autres erreurs - afficher le message détaillé en dev
-        else if (error.message) {
-          // En développement, montrer plus de détails
-          if (process.env.NODE_ENV === "development") {
-            message = `Erreur: ${error.message}${error.hint ? ` (${error.hint})` : ""}`;
-          } else {
-            message = `Erreur: ${error.message}`;
-          }
-        }
-
-        setErrorMessage(message);
-        setIsSubmitting(false);
+        setUsernameError(message);
+        setIsSubmittingUsername(false);
         return;
       }
 
-      setInitialUsername(username);
-      setSuccessMessage("Nom d'utilisateur mis à jour ✅");
-
-      // Rafraîchir la page après un court délai pour permettre la visualisation du message
-      setTimeout(() => {
-        router.refresh();
-        router.push("/profile");
-      }, 1000);
+      if (updatedProfile) {
+        setProfile(updatedProfile);
+        setInitialUsername(username);
+        setUsernameSuccess("Nom d'utilisateur mis à jour ✅");
+      }
     } catch (err) {
-      console.error("[Settings] unexpected error", err);
-      setErrorMessage("Erreur inattendue. Réessaie plus tard.");
+      console.error("[Settings] unexpected username error:", err);
+      setUsernameError("Erreur inattendue. Réessaie plus tard.");
     } finally {
-      setIsSubmitting(false);
+      setIsSubmittingUsername(false);
+    }
+  };
+
+  const handleAvatarSelect = async (avatarUrl: string) => {
+    if (isUpdatingAvatar) return;
+
+    setIsUpdatingAvatar(true);
+    setAvatarError(null);
+
+    try {
+      const { profile: updatedProfile, error } = await updateAvatar(avatarUrl);
+
+      if (error) {
+        console.error("[Settings] update avatar error:", error);
+        setAvatarError("Impossible de mettre à jour l'avatar. Réessaie plus tard.");
+        setIsUpdatingAvatar(false);
+        return;
+      }
+
+      if (updatedProfile) {
+        setProfile(updatedProfile);
+      }
+    } catch (err) {
+      console.error("[Settings] unexpected avatar error:", err);
+      setAvatarError("Erreur inattendue lors de la mise à jour de l'avatar.");
+    } finally {
+      setIsUpdatingAvatar(false);
     }
   };
 
@@ -191,48 +195,55 @@ export default function ProfileSettingsPage() {
     <main className="min-h-screen w-full overflow-x-hidden bg-[#020617]">
       <div className="mx-auto flex w-full max-w-xl flex-col gap-6 px-4 pb-28 pt-6">
         {/* Header */}
-        <section className="space-y-1">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-lg font-semibold text-white">
-                Réglages du profil
-              </h1>
-              <p className="text-xs text-slate-400">
-                Modifie ton nom d'utilisateur.
-              </p>
-            </div>
-            <button
-              onClick={() => router.back()}
-              className="rounded-full border border-white/10 px-3 py-1.5 text-xs text-slate-200 hover:bg-white/5 transition"
-            >
-              Retour
-            </button>
+        <section className="flex items-center justify-between">
+          <div>
+            <h1 className="text-lg font-semibold text-white">
+              Paramètres du compte
+            </h1>
+            <p className="text-xs text-slate-400">
+              Personnalise ton profil et tes préférences.
+            </p>
           </div>
+          <button
+            onClick={() => router.back()}
+            className="rounded-full border border-white/10 px-3 py-1.5 text-xs text-slate-200 hover:bg-white/5 transition"
+          >
+            Retour
+          </button>
         </section>
 
-        {/* Formulaire */}
-        <section className="rounded-2xl bg-[#020617] border border-white/5 p-4">
-          <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Édition du nom d'utilisateur */}
+        <section className="rounded-xl bg-[#0e0e1a] border border-white/5 p-4 w-full overflow-x-hidden">
+          <div className="mb-4">
+            <h2 className="text-sm font-medium text-white mb-1">
+              Nom d'utilisateur
+            </h2>
+            <p className="text-xs text-slate-400">
+              Choisis un nom unique pour ton profil.
+            </p>
+          </div>
+
+          <form onSubmit={handleUsernameSubmit} className="space-y-3">
             <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-200">
-                Nom d'utilisateur
-              </label>
               <input
                 type="text"
                 value={username}
                 onChange={(e) => {
                   setUsername(e.target.value);
-                  setErrorMessage(null);
-                  setSuccessMessage(null);
+                  setUsernameError(null);
+                  setUsernameSuccess(null);
                 }}
                 className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-bitebox focus:outline-none focus:ring-1 focus:ring-bitebox transition"
                 placeholder="Ex : alex_bitebox"
                 maxLength={20}
               />
-              {errorMessage && (
-                <p className="text-xs text-red-400">{errorMessage}</p>
+              {usernameError && (
+                <p className="text-xs text-red-400">{usernameError}</p>
               )}
-              {!errorMessage && (
+              {usernameSuccess && (
+                <p className="text-xs text-emerald-400">{usernameSuccess}</p>
+              )}
+              {!usernameError && !usernameSuccess && (
                 <p className="text-xs text-slate-500">
                   3 à 20 caractères (lettres, chiffres, _ et .)
                 </p>
@@ -241,10 +252,10 @@ export default function ProfileSettingsPage() {
 
             <button
               type="submit"
-              disabled={isSubmitting || !username.trim()}
+              disabled={isSubmittingUsername || !username.trim()}
               className="w-full rounded-xl bg-bitebox px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
             >
-              {isSubmitting ? (
+              {isSubmittingUsername ? (
                 <>
                   <Spinner size="sm" />
                   <span>Enregistrement...</span>
@@ -253,16 +264,83 @@ export default function ProfileSettingsPage() {
                 "Enregistrer"
               )}
             </button>
-
-            {successMessage && (
-              <p className="text-xs text-emerald-400 text-center">
-                {successMessage}
-              </p>
-            )}
           </form>
+        </section>
+
+        {/* Sélection de l'avatar */}
+        <section className="rounded-xl bg-[#0e0e1a] border border-white/5 p-4 w-full overflow-x-hidden">
+          <div className="mb-4">
+            <h2 className="text-sm font-medium text-white mb-1">Avatar</h2>
+            <p className="text-xs text-slate-400">
+              Choisis ta couleur de profil.
+            </p>
+          </div>
+
+          {avatarError && (
+            <div className="mb-4 rounded-xl bg-red-500/10 border border-red-500/40 px-3 py-2">
+              <p className="text-xs text-red-400">{avatarError}</p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
+            {AVAILABLE_AVATARS.map((avatarUrl) => {
+              const isSelected = profile?.avatar_url === avatarUrl;
+              return (
+                <button
+                  key={avatarUrl}
+                  onClick={() => handleAvatarSelect(avatarUrl)}
+                  disabled={isUpdatingAvatar}
+                  className={`
+                    relative h-16 w-16 sm:h-14 sm:w-14 rounded-full overflow-hidden border-2 transition-all
+                    ${
+                      isSelected
+                        ? "ring-2 ring-bitebox shadow-lg shadow-bitebox/50 border-bitebox"
+                        : "border-white/10 hover:border-white/30"
+                    }
+                    ${isUpdatingAvatar ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
+                  `}
+                  aria-label={`Sélectionner l'avatar ${avatarUrl}`}
+                >
+                  <Image
+                    src={avatarUrl}
+                    alt={`Avatar ${avatarUrl}`}
+                    fill
+                    className="object-cover"
+                  />
+                  {isSelected && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                      <div className="h-5 w-5 rounded-full bg-bitebox flex items-center justify-center">
+                        <svg
+                          className="w-3 h-3 text-white"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={3}
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                      </div>
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {isUpdatingAvatar && (
+            <div className="mt-4 flex items-center justify-center gap-2">
+              <Spinner size="sm" />
+              <span className="text-xs text-slate-400">
+                Mise à jour de l'avatar...
+              </span>
+            </div>
+          )}
         </section>
       </div>
     </main>
   );
 }
-
