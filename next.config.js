@@ -4,14 +4,27 @@ const supabaseHostname = supabaseUrl ? new URL(supabaseUrl).hostname : null
 
 const nextConfig = {
   images: {
-    remotePatterns: supabaseHostname
-      ? [
-          {
-            protocol: 'https',
-            hostname: supabaseHostname,
-          },
-        ]
-      : [],
+    remotePatterns: [
+      // Supabase Storage
+      ...(supabaseHostname
+        ? [
+            {
+              protocol: 'https',
+              hostname: supabaseHostname,
+            },
+          ]
+        : []),
+      // Images externes (toutes les URLs https)
+      {
+        protocol: 'https',
+        hostname: '**',
+      },
+      // Images externes (toutes les URLs http)
+      {
+        protocol: 'http',
+        hostname: '**',
+      },
+    ],
   },
 }
 

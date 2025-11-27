@@ -40,6 +40,9 @@ export default function AdminRestaurantsPage() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoUrl, setLogoUrl] = useState("");
+  const [logoImageMode, setLogoImageMode] = useState<"upload" | "url">("upload");
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   // édition restaurant
@@ -47,6 +50,9 @@ export default function AdminRestaurantsPage() {
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editLogoFile, setEditLogoFile] = useState<File | null>(null);
+  const [editLogoUrl, setEditLogoUrl] = useState("");
+  const [editLogoImageMode, setEditLogoImageMode] = useState<"upload" | "url">("upload");
+  const [editLogoPreview, setEditLogoPreview] = useState<string | null>(null);
 
   // gestion des plats
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
@@ -56,17 +62,41 @@ export default function AdminRestaurantsPage() {
   const [dishName, setDishName] = useState("");
   const [dishDescription, setDishDescription] = useState("");
   const [dishImageFile, setDishImageFile] = useState<File | null>(null);
+  const [dishImageUrl, setDishImageUrl] = useState("");
+  const [dishImageMode, setDishImageMode] = useState<"upload" | "url">("upload");
+  const [dishImagePreview, setDishImagePreview] = useState<string | null>(null);
   const [dishIsSignature, setDishIsSignature] = useState(false);
 
   const [editingDish, setEditingDish] = useState<Dish | null>(null);
   const [editDishName, setEditDishName] = useState("");
   const [editDishDescription, setEditDishDescription] = useState("");
   const [editDishImageFile, setEditDishImageFile] = useState<File | null>(null);
+  const [editDishImageUrl, setEditDishImageUrl] = useState("");
+  const [editDishImageMode, setEditDishImageMode] = useState<"upload" | "url">("upload");
+  const [editDishImagePreview, setEditDishImagePreview] = useState<string | null>(null);
   const [editDishIsSignature, setEditDishIsSignature] = useState(false);
 
   useEffect(() => {
     fetchRestaurants();
   }, []);
+
+  // Nettoyer les URLs d'aperçu pour éviter les fuites mémoire
+  useEffect(() => {
+    return () => {
+      if (logoPreview && logoPreview.startsWith('blob:')) {
+        URL.revokeObjectURL(logoPreview);
+      }
+      if (editLogoPreview && editLogoPreview.startsWith('blob:')) {
+        URL.revokeObjectURL(editLogoPreview);
+      }
+      if (dishImagePreview && dishImagePreview.startsWith('blob:')) {
+        URL.revokeObjectURL(dishImagePreview);
+      }
+      if (editDishImagePreview && editDishImagePreview.startsWith('blob:')) {
+        URL.revokeObjectURL(editDishImagePreview);
+      }
+    };
+  }, [logoPreview, editLogoPreview, dishImagePreview, editDishImagePreview]);
 
   const fetchRestaurants = async () => {
     try {
@@ -130,13 +160,19 @@ export default function AdminRestaurantsPage() {
   const resetCreateForm = () => {
     setName("");
     setDescription("");
+    if (logoPreview && logoPreview.startsWith('blob:')) {
+      URL.revokeObjectURL(logoPreview);
+    }
     setLogoFile(null);
+    setLogoUrl("");
+    setLogoImageMode("upload");
+    setLogoPreview(null);
   };
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
-      setError("Le nom de l’enseigne est obligatoire.");
+      setError("Le nom de l'enseigne est obligatoire.");
       return;
     }
 
@@ -144,9 +180,17 @@ export default function AdminRestaurantsPage() {
       setSaving(true);
       setError(null);
 
-      let logoUrl: string | null = null;
+      let finalLogoUrl: string | null = null;
 
-      if (logoFile) {
+      // Mode upload : uploader le fichier
+      if (logoImageMode === "upload" && logoFile) {
+        const fileError = validateImageFile(logoFile);
+        if (fileError) {
+          setError(fileError);
+          setSaving(false);
+          return;
+        }
+
         const path = `logos/${Date.now()}-${logoFile.name}`;
         const { error: uploadError } = await supabase
           .storage
@@ -155,13 +199,22 @@ export default function AdminRestaurantsPage() {
 
         if (uploadError) {
           console.error("[Admin] upload logo error", uploadError);
-          setError("Erreur lors de l’upload du logo.");
+          setError("Erreur lors de l'upload du logo.");
           setSaving(false);
           return;
         }
 
         const { data } = supabase.storage.from("fastfood-images").getPublicUrl(path);
-        logoUrl = data.publicUrl;
+        finalLogoUrl = data.publicUrl;
+      }
+      // Mode URL : valider et utiliser l'URL
+      else if (logoImageMode === "url" && logoUrl.trim()) {
+        if (!validateImageUrl(logoUrl)) {
+          setError("URL invalide. L'URL doit commencer par http:// ou https:// et avoir une extension .png, .jpg, .jpeg ou .webp");
+          setSaving(false);
+          return;
+        }
+        finalLogoUrl = logoUrl.trim();
       }
 
       const slug = slugify(name);
@@ -169,13 +222,13 @@ export default function AdminRestaurantsPage() {
       const { error: insertError } = await supabase.from("restaurants").insert({
         name,
         description: description || null,
-        logo_url: logoUrl,
+        logo_url: finalLogoUrl,
         slug,
       });
 
       if (insertError) {
         console.error("[Admin] insert restaurant error", insertError);
-        setError("Erreur lors de la création de l’enseigne.");
+        setError("Erreur lors de la création de l'enseigne.");
         setSaving(false);
         return;
       }
@@ -184,7 +237,7 @@ export default function AdminRestaurantsPage() {
       fetchRestaurants();
     } catch (err) {
       console.error("[Admin] create restaurant unexpected", err);
-      setError("Erreur inattendue lors de la création de l’enseigne.");
+      setError("Erreur inattendue lors de la création de l'enseigne.");
     } finally {
       setSaving(false);
     }
@@ -195,13 +248,22 @@ export default function AdminRestaurantsPage() {
     setEditName(restaurant.name);
     setEditDescription(restaurant.description || "");
     setEditLogoFile(null);
+    setEditLogoUrl("");
+    setEditLogoImageMode("upload");
+    setEditLogoPreview(restaurant.logo_url);
   };
 
   const cancelEditRestaurant = () => {
     setEditingRestaurant(null);
     setEditName("");
     setEditDescription("");
+    if (editLogoPreview && editLogoPreview.startsWith('blob:')) {
+      URL.revokeObjectURL(editLogoPreview);
+    }
     setEditLogoFile(null);
+    setEditLogoUrl("");
+    setEditLogoImageMode("upload");
+    setEditLogoPreview(null);
   };
 
   const handleUpdateRestaurant = async (e: React.FormEvent) => {
@@ -212,13 +274,20 @@ export default function AdminRestaurantsPage() {
       setError(null);
 
       if (!editName.trim()) {
-        setError("Le nom de l’enseigne est obligatoire.");
+        setError("Le nom de l'enseigne est obligatoire.");
         return;
       }
 
-      let logoUrl: string | null = editingRestaurant.logo_url ?? null;
+      let finalLogoUrl: string | null = editingRestaurant.logo_url ?? null;
 
-      if (editLogoFile) {
+      // Mode upload : uploader le fichier
+      if (editLogoImageMode === "upload" && editLogoFile) {
+        const fileError = validateImageFile(editLogoFile);
+        if (fileError) {
+          setError(fileError);
+          return;
+        }
+
         const path = `logos/${editingRestaurant.id}/${Date.now()}-${editLogoFile.name}`;
         const { error: uploadError } = await supabase
           .storage
@@ -227,12 +296,24 @@ export default function AdminRestaurantsPage() {
 
         if (uploadError) {
           console.error("[Admin] upload new logo error", uploadError);
-          setError("Erreur lors de l’upload du nouveau logo.");
+          setError("Erreur lors de l'upload du nouveau logo.");
           return;
         }
 
         const { data } = supabase.storage.from("fastfood-images").getPublicUrl(path);
-        logoUrl = data.publicUrl;
+        finalLogoUrl = data.publicUrl;
+      }
+      // Mode URL : valider et utiliser l'URL
+      else if (editLogoImageMode === "url" && editLogoUrl.trim()) {
+        if (!validateImageUrl(editLogoUrl)) {
+          setError("URL invalide. L'URL doit commencer par http:// ou https:// et avoir une extension .png, .jpg, .jpeg ou .webp");
+          return;
+        }
+        finalLogoUrl = editLogoUrl.trim();
+      }
+      // Si on est en mode URL mais que l'URL est vide, on garde l'ancienne
+      else if (editLogoImageMode === "url" && !editLogoUrl.trim()) {
+        // Garder l'URL existante
       }
 
       const slug = slugify(editName);
@@ -242,14 +323,14 @@ export default function AdminRestaurantsPage() {
         .update({
           name: editName,
           description: editDescription || null,
-          logo_url: logoUrl,
+          logo_url: finalLogoUrl,
           slug,
         })
         .eq("id", editingRestaurant.id);
 
       if (updateError) {
         console.error("[Admin] update restaurant error", updateError);
-        setError("Erreur lors de la mise à jour de l’enseigne.");
+        setError("Erreur lors de la mise à jour de l'enseigne.");
         return;
       }
 
@@ -257,7 +338,7 @@ export default function AdminRestaurantsPage() {
       fetchRestaurants();
     } catch (err) {
       console.error("[Admin] update restaurant unexpected", err);
-      setError("Erreur inattendue lors de la mise à jour de l’enseigne.");
+      setError("Erreur inattendue lors de la mise à jour de l'enseigne.");
     }
   };
 
@@ -309,7 +390,13 @@ export default function AdminRestaurantsPage() {
     setSelectedRestaurant(restaurant);
     setDishName("");
     setDishDescription("");
+    if (dishImagePreview && dishImagePreview.startsWith('blob:')) {
+      URL.revokeObjectURL(dishImagePreview);
+    }
     setDishImageFile(null);
+    setDishImageUrl("");
+    setDishImageMode("upload");
+    setDishImagePreview(null);
     setDishIsSignature(false);
     setEditingDish(null);
     fetchDishes(restaurant);
@@ -333,9 +420,16 @@ export default function AdminRestaurantsPage() {
         return;
       }
 
-      let imageUrl: string | null = null;
+      let finalImageUrl: string | null = null;
 
-      if (dishImageFile) {
+      // Mode upload : uploader le fichier
+      if (dishImageMode === "upload" && dishImageFile) {
+        const fileError = validateImageFile(dishImageFile);
+        if (fileError) {
+          setError(fileError);
+          return;
+        }
+
         const path = `dishes/${selectedRestaurant.id}/${Date.now()}-${dishImageFile.name}`;
         const { error: uploadError } = await supabase
           .storage
@@ -344,12 +438,20 @@ export default function AdminRestaurantsPage() {
 
         if (uploadError) {
           console.error("[Admin] upload dish image error", uploadError);
-          setError("Erreur lors de l’upload de l’image du plat.");
+          setError("Erreur lors de l'upload de l'image du plat.");
           return;
         }
 
         const { data } = supabase.storage.from("fastfood-images").getPublicUrl(path);
-        imageUrl = data.publicUrl;
+        finalImageUrl = data.publicUrl;
+      }
+      // Mode URL : valider et utiliser l'URL
+      else if (dishImageMode === "url" && dishImageUrl.trim()) {
+        if (!validateImageUrl(dishImageUrl)) {
+          setError("URL invalide. L'URL doit commencer par http:// ou https:// et avoir une extension .png, .jpg, .jpeg ou .webp");
+          return;
+        }
+        finalImageUrl = dishImageUrl.trim();
       }
 
       const nextPosition =
@@ -361,26 +463,32 @@ export default function AdminRestaurantsPage() {
         restaurant_id: selectedRestaurant.id,
         name: dishName,
         description: dishDescription || null,
-        image_url: imageUrl,
+        image_url: finalImageUrl,
         is_signature: dishIsSignature,
         position: nextPosition,
       });
 
       if (insertError) {
         console.error("[Admin] insert dish error", insertError);
-        setError("Erreur lors de l’ajout du plat.");
+        setError("Erreur lors de l'ajout du plat.");
         return;
       }
 
       setDishName("");
       setDishDescription("");
+      if (dishImagePreview && dishImagePreview.startsWith('blob:')) {
+        URL.revokeObjectURL(dishImagePreview);
+      }
       setDishImageFile(null);
+      setDishImageUrl("");
+      setDishImageMode("upload");
+      setDishImagePreview(null);
       setDishIsSignature(false);
 
       fetchDishes(selectedRestaurant);
     } catch (err) {
       console.error("[Admin] add dish unexpected", err);
-      setError("Erreur inattendue lors de l’ajout du plat.");
+      setError("Erreur inattendue lors de l'ajout du plat.");
     }
   };
 
@@ -390,6 +498,9 @@ export default function AdminRestaurantsPage() {
     setEditDishDescription(dish.description || "");
     setEditDishIsSignature(dish.is_signature);
     setEditDishImageFile(null);
+    setEditDishImageUrl("");
+    setEditDishImageMode("upload");
+    setEditDishImagePreview(dish.image_url);
   };
 
   const cancelEditDish = () => {
@@ -397,7 +508,13 @@ export default function AdminRestaurantsPage() {
     setEditDishName("");
     setEditDishDescription("");
     setEditDishIsSignature(false);
+    if (editDishImagePreview && editDishImagePreview.startsWith('blob:')) {
+      URL.revokeObjectURL(editDishImagePreview);
+    }
     setEditDishImageFile(null);
+    setEditDishImageUrl("");
+    setEditDishImageMode("upload");
+    setEditDishImagePreview(null);
   };
 
   const handleUpdateDish = async (e: React.FormEvent) => {
@@ -410,9 +527,16 @@ export default function AdminRestaurantsPage() {
         return;
       }
 
-      let imageUrl: string | null = editingDish.image_url ?? null;
+      let finalImageUrl: string | null = editingDish.image_url ?? null;
 
-      if (editDishImageFile) {
+      // Mode upload : uploader le fichier
+      if (editDishImageMode === "upload" && editDishImageFile) {
+        const fileError = validateImageFile(editDishImageFile);
+        if (fileError) {
+          setError(fileError);
+          return;
+        }
+
         const path = `dishes/${selectedRestaurant.id}/${Date.now()}-${editDishImageFile.name}`;
         const { error: uploadError } = await supabase
           .storage
@@ -421,12 +545,24 @@ export default function AdminRestaurantsPage() {
 
         if (uploadError) {
           console.error("[Admin] upload new dish image error", uploadError);
-          setError("Erreur lors de l’upload de la nouvelle image.");
+          setError("Erreur lors de l'upload de la nouvelle image.");
           return;
         }
 
         const { data } = supabase.storage.from("fastfood-images").getPublicUrl(path);
-        imageUrl = data.publicUrl;
+        finalImageUrl = data.publicUrl;
+      }
+      // Mode URL : valider et utiliser l'URL
+      else if (editDishImageMode === "url" && editDishImageUrl.trim()) {
+        if (!validateImageUrl(editDishImageUrl)) {
+          setError("URL invalide. L'URL doit commencer par http:// ou https:// et avoir une extension .png, .jpg, .jpeg ou .webp");
+          return;
+        }
+        finalImageUrl = editDishImageUrl.trim();
+      }
+      // Si on est en mode URL mais que l'URL est vide, on garde l'ancienne
+      else if (editDishImageMode === "url" && !editDishImageUrl.trim()) {
+        // Garder l'URL existante
       }
 
       const { error: updateError } = await supabase
@@ -434,7 +570,7 @@ export default function AdminRestaurantsPage() {
         .update({
           name: editDishName,
           description: editDishDescription || null,
-          image_url: imageUrl,
+          image_url: finalImageUrl,
           is_signature: editDishIsSignature,
         })
         .eq("id", editingDish.id);
@@ -524,15 +660,50 @@ export default function AdminRestaurantsPage() {
 
       if (err1 || err2) {
         console.error("[Admin] move dish down error", err1 || err2);
-        setError("Erreur lors du changement d’ordre du plat.");
+        setError("Erreur lors du changement d'ordre du plat.");
         return;
       }
 
       fetchDishes(selectedRestaurant);
     } catch (err) {
       console.error("[Admin] moveDishDown unexpected", err);
-      setError("Erreur inattendue lors du changement d’ordre du plat.");
+      setError("Erreur inattendue lors du changement d'ordre du plat.");
     }
+  };
+
+  // Fonctions de validation
+  const validateImageUrl = (url: string): boolean => {
+    if (!url.trim()) return true; // URL vide est valide (optionnel)
+    
+    // Vérifier que l'URL commence par http ou https
+    if (!url.match(/^https?:\/\//i)) {
+      return false;
+    }
+
+    // Vérifier l'extension de l'image
+    const validExtensions = ['.png', '.jpg', '.jpeg', '.webp'];
+    const urlLower = url.toLowerCase();
+    const hasValidExtension = validExtensions.some(ext => urlLower.includes(ext));
+    
+    return hasValidExtension;
+  };
+
+  const validateImageFile = (file: File | null): string | null => {
+    if (!file) return null;
+
+    // Vérifier la taille (max 5MB)
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      return "L'image est trop lourde. Taille maximale : 5MB.";
+    }
+
+    // Vérifier le type
+    const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      return "Format d'image non accepté. Formats acceptés : PNG, JPG, JPEG, WEBP.";
+    }
+
+    return null;
   };
 
   return (
@@ -578,17 +749,115 @@ export default function AdminRestaurantsPage() {
               />
             </div>
 
-            <div className="space-y-1">
-              <label className="text-xs text-slate-300">Logo (upload image – optionnel)</label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)}
-                className="text-xs text-slate-300"
-              />
-              <p className="text-[11px] text-slate-500">
-                Laisse vide si tu veux ajouter le logo plus tard.
-              </p>
+            <div className="space-y-2">
+              <label className="text-xs text-slate-300">Logo (optionnel)</label>
+              
+              {/* Tabs pour choisir entre upload et URL */}
+              <div className="flex gap-2 border-b border-slate-700">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (logoPreview && logoPreview.startsWith('blob:')) {
+                        URL.revokeObjectURL(logoPreview);
+                      }
+                      setLogoImageMode("upload");
+                      setLogoUrl("");
+                      setLogoPreview(null);
+                    }}
+                  className={`px-3 py-1.5 text-xs font-medium transition ${
+                    logoImageMode === "upload"
+                      ? "text-bitebox border-b-2 border-bitebox"
+                      : "text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  Télécharger un fichier
+                </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (logoPreview && logoPreview.startsWith('blob:')) {
+                        URL.revokeObjectURL(logoPreview);
+                      }
+                      setLogoImageMode("url");
+                      setLogoFile(null);
+                      setLogoPreview(null);
+                    }}
+                  className={`px-3 py-1.5 text-xs font-medium transition ${
+                    logoImageMode === "url"
+                      ? "text-bitebox border-b-2 border-bitebox"
+                      : "text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  Entrer une URL
+                </button>
+              </div>
+
+              {/* Champ upload */}
+              {logoImageMode === "upload" && (
+                <div className="space-y-2">
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/jpg,image/webp"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] ?? null;
+                      // Nettoyer l'ancienne URL blob si elle existe
+                      if (logoPreview && logoPreview.startsWith('blob:')) {
+                        URL.revokeObjectURL(logoPreview);
+                      }
+                      setLogoFile(file);
+                      setLogoUrl("");
+                      if (file) {
+                        const preview = URL.createObjectURL(file);
+                        setLogoPreview(preview);
+                      } else {
+                        setLogoPreview(null);
+                      }
+                    }}
+                    className="text-xs text-slate-300"
+                  />
+                  <p className="text-[11px] text-slate-500">
+                    Formats acceptés : PNG, JPG, JPEG, WEBP (max 5MB)
+                  </p>
+                </div>
+              )}
+
+              {/* Champ URL */}
+              {logoImageMode === "url" && (
+                <div className="space-y-2">
+                  <input
+                    type="url"
+                    value={logoUrl}
+                    onChange={(e) => {
+                      const url = e.target.value;
+                      setLogoUrl(url);
+                      setLogoFile(null);
+                      if (url && validateImageUrl(url)) {
+                        setLogoPreview(url);
+                      } else {
+                        setLogoPreview(null);
+                      }
+                    }}
+                    placeholder="https://exemple.com/image.png"
+                    className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
+                  />
+                  <p className="text-[11px] text-slate-500">
+                    URL commençant par http:// ou https:// avec extension .png, .jpg, .jpeg ou .webp
+                  </p>
+                </div>
+              )}
+
+              {/* Aperçu de l'image */}
+              {logoPreview && (
+                <div className="mt-3 p-3 bg-slate-950 rounded-lg border border-slate-700">
+                  <p className="text-xs text-slate-400 mb-2">Aperçu :</p>
+                  <img
+                    src={logoPreview}
+                    alt="Aperçu logo"
+                    className="max-w-full h-32 object-contain rounded"
+                    onError={() => setLogoPreview(null)}
+                  />
+                </div>
+              )}
             </div>
 
             <button
@@ -702,17 +971,117 @@ export default function AdminRestaurantsPage() {
                 />
               </div>
 
-              <div className="space-y-1">
+              <div className="space-y-2">
                 <label className="text-xs text-slate-300">Nouveau logo (optionnel)</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => setEditLogoFile(e.target.files?.[0] ?? null)}
-                  className="text-xs text-slate-300"
-                />
-                <p className="text-[11px] text-slate-500">
-                  Laisse vide pour conserver le logo actuel.
-                </p>
+                
+                {/* Tabs pour choisir entre upload et URL */}
+                <div className="flex gap-2 border-b border-slate-700">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (editLogoPreview && editLogoPreview.startsWith('blob:')) {
+                        URL.revokeObjectURL(editLogoPreview);
+                      }
+                      setEditLogoImageMode("upload");
+                      setEditLogoUrl("");
+                      setEditLogoPreview(editingRestaurant?.logo_url ?? null);
+                    }}
+                    className={`px-3 py-1.5 text-xs font-medium transition ${
+                      editLogoImageMode === "upload"
+                        ? "text-bitebox border-b-2 border-bitebox"
+                        : "text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    Télécharger un fichier
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (editLogoPreview && editLogoPreview.startsWith('blob:')) {
+                        URL.revokeObjectURL(editLogoPreview);
+                      }
+                      setEditLogoImageMode("url");
+                      setEditLogoFile(null);
+                      setEditLogoPreview(editingRestaurant?.logo_url ?? null);
+                    }}
+                    className={`px-3 py-1.5 text-xs font-medium transition ${
+                      editLogoImageMode === "url"
+                        ? "text-bitebox border-b-2 border-bitebox"
+                        : "text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    Entrer une URL
+                  </button>
+                </div>
+
+                {/* Champ upload */}
+                {editLogoImageMode === "upload" && (
+                  <div className="space-y-2">
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/jpg,image/webp"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] ?? null;
+                        // Nettoyer l'ancienne URL blob si elle existe
+                        if (editLogoPreview && editLogoPreview.startsWith('blob:')) {
+                          URL.revokeObjectURL(editLogoPreview);
+                        }
+                        setEditLogoFile(file);
+                        setEditLogoUrl("");
+                        if (file) {
+                          const preview = URL.createObjectURL(file);
+                          setEditLogoPreview(preview);
+                        } else {
+                          setEditLogoPreview(editingRestaurant?.logo_url ?? null);
+                        }
+                      }}
+                      className="text-xs text-slate-300"
+                    />
+                    <p className="text-[11px] text-slate-500">
+                      Formats acceptés : PNG, JPG, JPEG, WEBP (max 5MB). Laisse vide pour conserver le logo actuel.
+                    </p>
+                  </div>
+                )}
+
+                {/* Champ URL */}
+                {editLogoImageMode === "url" && (
+                  <div className="space-y-2">
+                    <input
+                      type="url"
+                      value={editLogoUrl}
+                      onChange={(e) => {
+                        const url = e.target.value;
+                        setEditLogoUrl(url);
+                        setEditLogoFile(null);
+                        if (url && validateImageUrl(url)) {
+                          setEditLogoPreview(url);
+                        } else if (!url) {
+                          setEditLogoPreview(editingRestaurant?.logo_url ?? null);
+                        } else {
+                          setEditLogoPreview(null);
+                        }
+                      }}
+                      placeholder="https://exemple.com/image.png"
+                      className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
+                    />
+                    <p className="text-[11px] text-slate-500">
+                      URL commençant par http:// ou https:// avec extension .png, .jpg, .jpeg ou .webp. Laisse vide pour conserver le logo actuel.
+                    </p>
+                  </div>
+                )}
+
+                {/* Aperçu de l'image */}
+                {editLogoPreview && (
+                  <div className="mt-3 p-3 bg-slate-950 rounded-lg border border-slate-700">
+                    <p className="text-xs text-slate-400 mb-2">Aperçu :</p>
+                    <img
+                      src={editLogoPreview}
+                      alt="Aperçu logo"
+                      className="max-w-full h-32 object-contain rounded"
+                      onError={() => setEditLogoPreview(editingRestaurant?.logo_url ?? null)}
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center gap-3">
@@ -845,19 +1214,119 @@ export default function AdminRestaurantsPage() {
                           />
                         </div>
 
-                        <div className="space-y-1">
+                        <div className="space-y-2">
                           <label className="text-xs text-slate-300">
                             Nouvelle image (optionnel)
                           </label>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={(e) => setEditDishImageFile(e.target.files?.[0] ?? null)}
-                            className="text-xs text-slate-300"
-                          />
-                          <p className="text-[11px] text-slate-500">
-                            Laisse vide pour conserver l’image actuelle.
-                          </p>
+                          
+                          {/* Tabs pour choisir entre upload et URL */}
+                          <div className="flex gap-2 border-b border-slate-700">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (editDishImagePreview && editDishImagePreview.startsWith('blob:')) {
+                                  URL.revokeObjectURL(editDishImagePreview);
+                                }
+                                setEditDishImageMode("upload");
+                                setEditDishImageUrl("");
+                                setEditDishImagePreview(editingDish?.image_url ?? null);
+                              }}
+                              className={`px-3 py-1.5 text-xs font-medium transition ${
+                                editDishImageMode === "upload"
+                                  ? "text-bitebox border-b-2 border-bitebox"
+                                  : "text-slate-400 hover:text-slate-200"
+                              }`}
+                            >
+                              Télécharger un fichier
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (editDishImagePreview && editDishImagePreview.startsWith('blob:')) {
+                                  URL.revokeObjectURL(editDishImagePreview);
+                                }
+                                setEditDishImageMode("url");
+                                setEditDishImageFile(null);
+                                setEditDishImagePreview(editingDish?.image_url ?? null);
+                              }}
+                              className={`px-3 py-1.5 text-xs font-medium transition ${
+                                editDishImageMode === "url"
+                                  ? "text-bitebox border-b-2 border-bitebox"
+                                  : "text-slate-400 hover:text-slate-200"
+                              }`}
+                            >
+                              Entrer une URL
+                            </button>
+                          </div>
+
+                          {/* Champ upload */}
+                          {editDishImageMode === "upload" && (
+                            <div className="space-y-2">
+                              <input
+                                type="file"
+                                accept="image/png,image/jpeg,image/jpg,image/webp"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0] ?? null;
+                                  // Nettoyer l'ancienne URL blob si elle existe
+                                  if (editDishImagePreview && editDishImagePreview.startsWith('blob:')) {
+                                    URL.revokeObjectURL(editDishImagePreview);
+                                  }
+                                  setEditDishImageFile(file);
+                                  setEditDishImageUrl("");
+                                  if (file) {
+                                    const preview = URL.createObjectURL(file);
+                                    setEditDishImagePreview(preview);
+                                  } else {
+                                    setEditDishImagePreview(editingDish?.image_url ?? null);
+                                  }
+                                }}
+                                className="text-xs text-slate-300"
+                              />
+                              <p className="text-[11px] text-slate-500">
+                                Formats acceptés : PNG, JPG, JPEG, WEBP (max 5MB). Laisse vide pour conserver l'image actuelle.
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Champ URL */}
+                          {editDishImageMode === "url" && (
+                            <div className="space-y-2">
+                              <input
+                                type="url"
+                                value={editDishImageUrl}
+                                onChange={(e) => {
+                                  const url = e.target.value;
+                                  setEditDishImageUrl(url);
+                                  setEditDishImageFile(null);
+                                  if (url && validateImageUrl(url)) {
+                                    setEditDishImagePreview(url);
+                                  } else if (!url) {
+                                    setEditDishImagePreview(editingDish?.image_url ?? null);
+                                  } else {
+                                    setEditDishImagePreview(null);
+                                  }
+                                }}
+                                placeholder="https://exemple.com/image.png"
+                                className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
+                              />
+                              <p className="text-[11px] text-slate-500">
+                                URL commençant par http:// ou https:// avec extension .png, .jpg, .jpeg ou .webp. Laisse vide pour conserver l'image actuelle.
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Aperçu de l'image */}
+                          {editDishImagePreview && (
+                            <div className="mt-3 p-3 bg-slate-950 rounded-lg border border-slate-700">
+                              <p className="text-xs text-slate-400 mb-2">Aperçu :</p>
+                              <img
+                                src={editDishImagePreview}
+                                alt="Aperçu plat"
+                                className="max-w-full h-32 object-contain rounded"
+                                onError={() => setEditDishImagePreview(editingDish?.image_url ?? null)}
+                              />
+                            </div>
+                          )}
                         </div>
 
                         <div className="space-y-2">
@@ -917,14 +1386,115 @@ export default function AdminRestaurantsPage() {
                 />
               </div>
 
-              <div className="space-y-1">
+              <div className="space-y-2">
                 <label className="text-xs text-slate-300">Image du plat (optionnel)</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => setDishImageFile(e.target.files?.[0] ?? null)}
-                  className="text-xs text-slate-300"
-                />
+                
+                {/* Tabs pour choisir entre upload et URL */}
+                <div className="flex gap-2 border-b border-slate-700">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (dishImagePreview && dishImagePreview.startsWith('blob:')) {
+                        URL.revokeObjectURL(dishImagePreview);
+                      }
+                      setDishImageMode("upload");
+                      setDishImageUrl("");
+                      setDishImagePreview(null);
+                    }}
+                    className={`px-3 py-1.5 text-xs font-medium transition ${
+                      dishImageMode === "upload"
+                        ? "text-bitebox border-b-2 border-bitebox"
+                        : "text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    Télécharger un fichier
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (dishImagePreview && dishImagePreview.startsWith('blob:')) {
+                        URL.revokeObjectURL(dishImagePreview);
+                      }
+                      setDishImageMode("url");
+                      setDishImageFile(null);
+                      setDishImagePreview(null);
+                    }}
+                    className={`px-3 py-1.5 text-xs font-medium transition ${
+                      dishImageMode === "url"
+                        ? "text-bitebox border-b-2 border-bitebox"
+                        : "text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    Entrer une URL
+                  </button>
+                </div>
+
+                {/* Champ upload */}
+                {dishImageMode === "upload" && (
+                  <div className="space-y-2">
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/jpg,image/webp"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] ?? null;
+                        // Nettoyer l'ancienne URL blob si elle existe
+                        if (dishImagePreview && dishImagePreview.startsWith('blob:')) {
+                          URL.revokeObjectURL(dishImagePreview);
+                        }
+                        setDishImageFile(file);
+                        setDishImageUrl("");
+                        if (file) {
+                          const preview = URL.createObjectURL(file);
+                          setDishImagePreview(preview);
+                        } else {
+                          setDishImagePreview(null);
+                        }
+                      }}
+                      className="text-xs text-slate-300"
+                    />
+                    <p className="text-[11px] text-slate-500">
+                      Formats acceptés : PNG, JPG, JPEG, WEBP (max 5MB)
+                    </p>
+                  </div>
+                )}
+
+                {/* Champ URL */}
+                {dishImageMode === "url" && (
+                  <div className="space-y-2">
+                    <input
+                      type="url"
+                      value={dishImageUrl}
+                      onChange={(e) => {
+                        const url = e.target.value;
+                        setDishImageUrl(url);
+                        setDishImageFile(null);
+                        if (url && validateImageUrl(url)) {
+                          setDishImagePreview(url);
+                        } else {
+                          setDishImagePreview(null);
+                        }
+                      }}
+                      placeholder="https://exemple.com/image.png"
+                      className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
+                    />
+                    <p className="text-[11px] text-slate-500">
+                      URL commençant par http:// ou https:// avec extension .png, .jpg, .jpeg ou .webp
+                    </p>
+                  </div>
+                )}
+
+                {/* Aperçu de l'image */}
+                {dishImagePreview && (
+                  <div className="mt-3 p-3 bg-slate-950 rounded-lg border border-slate-700">
+                    <p className="text-xs text-slate-400 mb-2">Aperçu :</p>
+                    <img
+                      src={dishImagePreview}
+                      alt="Aperçu plat"
+                      className="max-w-full h-32 object-contain rounded"
+                      onError={() => setDishImagePreview(null)}
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">

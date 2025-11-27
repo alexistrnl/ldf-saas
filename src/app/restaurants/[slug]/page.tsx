@@ -338,21 +338,21 @@ export default function RestaurantPage() {
               Aucun plat n'a encore été ajouté pour cette enseigne.
             </p>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               {dishes.map((dish) => (
                 <div
                   key={dish.id}
-                  className="bg-slate-900/80 rounded-2xl overflow-hidden border border-slate-800/70 shadow-md"
+                  className="bg-slate-900/80 rounded-2xl overflow-hidden border border-slate-800/70 shadow-md flex flex-col"
                 >
-                  <div className="aspect-[4/3] bg-slate-950 flex items-center justify-center">
+                  <div className="aspect-[4/3] bg-slate-950 flex items-center justify-center overflow-hidden">
                     {dish.image_url ? (
                       <img
                         src={dish.image_url}
                         alt={dish.name}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-contain"
                       />
                     ) : (
-                      <span className="text-xs text-slate-500">Pas d’image</span>
+                      <span className="text-xs text-slate-500">Pas d'image</span>
                     )}
                   </div>
 
