@@ -25,6 +25,14 @@ type Dish = {
   description: string | null;
   is_signature: boolean;
   sort_order: number | null;
+  category_id: string | null;
+};
+
+type DishCategory = {
+  id: string;
+  restaurant_id: string;
+  name: string;
+  order_index: number;
 };
 
 type RatingStats = {
@@ -45,6 +53,7 @@ export default function RestaurantPage() {
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [restaurantRatingStats, setRestaurantRatingStats] = useState<{ count: number; avg: number }>({ count: 0, avg: 0 });
   const [dishes, setDishes] = useState<DishWithStats[]>([]);
+  const [categories, setCategories] = useState<DishCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isAddExperienceOpen, setIsAddExperienceOpen] = useState(false);
@@ -101,13 +110,28 @@ export default function RestaurantPage() {
 
         setRestaurantRatingStats(restaurantRatingStats);
 
-        // 3) Charger les plats de cette enseigne
+        // 3) Charger les sections de menu pour cette enseigne
+        const { data: categoriesData, error: categoriesError } = await supabase
+          .from("dish_categories")
+          .select("*")
+          .eq("restaurant_id", restaurantData.id)
+          .order("order_index", { ascending: true });
+
+        if (categoriesError) {
+          console.error("[RestaurantPage] categories error", categoriesError);
+          // Ne pas bloquer si les catégories n'existent pas encore
+        }
+
+        const categoriesTyped = (categoriesData || []) as DishCategory[];
+        setCategories(categoriesTyped);
+
+        // 4) Charger les plats de cette enseigne
         const { data: dishesData, error: dishesError } = await supabase
           .from("dishes")
           .select("*")
           .eq("restaurant_id", restaurantData.id)
-          .order("sort_order", { ascending: true, nullsFirst: false })
-          .order("created_at", { ascending: true });
+          .order("position", { ascending: true, nullsFirst: false })
+          .order("name", { ascending: true });
 
         if (dishesError) {
           console.error("[RestaurantPage] dishes error", dishesError);
@@ -117,7 +141,7 @@ export default function RestaurantPage() {
 
         const dishesDataTyped = (dishesData || []) as Dish[];
 
-        // 4) Charger les notes des plats depuis fastfood_log_dishes
+        // 5) Charger les notes des plats depuis fastfood_log_dishes
         const dishIds = dishesDataTyped.map((d) => d.id);
 
         let dishRatingMap = new Map<string, { count: number; sum: number; avg: number }>();
@@ -425,7 +449,8 @@ export default function RestaurantPage() {
             <p className="text-sm text-slate-400">
               Aucun plat n'a encore été ajouté pour cette enseigne.
             </p>
-          ) : (
+          ) : categories.length === 0 ? (
+            // Affichage sans sections (comportement par défaut)
             <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               {dishes.map((dish) => (
                 <div
@@ -484,6 +509,154 @@ export default function RestaurantPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          ) : (
+            // Affichage groupé par sections
+            <div className="space-y-6">
+              {categories.map((category) => {
+                const categoryDishes = dishes.filter((d) => d.category_id === category.id);
+                if (categoryDishes.length === 0) return null;
+
+                return (
+                  <div key={category.id} className="space-y-3">
+                    <h3 className="text-base font-semibold text-slate-100 border-b border-slate-800 pb-2">
+                      {category.name}
+                    </h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                      {categoryDishes.map((dish) => (
+                        <div
+                          key={dish.id}
+                          className="bg-slate-900/80 rounded-2xl overflow-hidden border border-slate-800/70 shadow-md flex flex-col"
+                        >
+                          <div className="aspect-[4/3] bg-slate-950 flex items-center justify-center overflow-hidden">
+                            {dish.image_url ? (
+                              <img
+                                src={dish.image_url}
+                                alt={dish.name}
+                                className="w-full h-full object-contain"
+                              />
+                            ) : (
+                              <span className="text-xs text-slate-500">Pas d'image</span>
+                            )}
+                          </div>
+
+                          <div className="px-3 py-3 space-y-1">
+                            <p className="text-sm font-semibold truncate">{dish.name}</p>
+                            {dish.is_signature && (
+                              <span className="inline-flex items-center rounded-full bg-bitebox/90 text-white text-[10px] font-semibold px-2 py-[1px]">
+                                Plat signature
+                              </span>
+                            )}
+                            {dish.description && (
+                              <p className="text-[11px] text-slate-400 line-clamp-2">
+                                {dish.description}
+                              </p>
+                            )}
+                            <div className="mt-2 flex items-center justify-between text-[11px] text-slate-300">
+                              {dish.ratingStats.count === 0 ? (
+                                <span className="text-slate-500">Pas encore noté</span>
+                              ) : (
+                                <>
+                                  <div className="flex">
+                                    {[1, 2, 3, 4, 5].map((star) => (
+                                      <span
+                                        key={star}
+                                        className={
+                                          dish.ratingStats.avg >= star
+                                            ? "text-yellow-400"
+                                            : "text-slate-700"
+                                        }
+                                      >
+                                        ★
+                                      </span>
+                                    ))}
+                                  </div>
+                                  <span className="text-slate-400 ml-1">
+                                    {dish.ratingStats.avg.toFixed(1)} / 5 · {dish.ratingStats.count} avis
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+              
+              {/* Plats sans section */}
+              {(() => {
+                const dishesWithoutCategory = dishes.filter((d) => !d.category_id);
+                if (dishesWithoutCategory.length === 0) return null;
+
+                return (
+                  <div className="space-y-3">
+                    <h3 className="text-base font-semibold text-slate-100 border-b border-slate-800 pb-2">
+                      Autres
+                    </h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                      {dishesWithoutCategory.map((dish) => (
+                        <div
+                          key={dish.id}
+                          className="bg-slate-900/80 rounded-2xl overflow-hidden border border-slate-800/70 shadow-md flex flex-col"
+                        >
+                          <div className="aspect-[4/3] bg-slate-950 flex items-center justify-center overflow-hidden">
+                            {dish.image_url ? (
+                              <img
+                                src={dish.image_url}
+                                alt={dish.name}
+                                className="w-full h-full object-contain"
+                              />
+                            ) : (
+                              <span className="text-xs text-slate-500">Pas d'image</span>
+                            )}
+                          </div>
+
+                          <div className="px-3 py-3 space-y-1">
+                            <p className="text-sm font-semibold truncate">{dish.name}</p>
+                            {dish.is_signature && (
+                              <span className="inline-flex items-center rounded-full bg-bitebox/90 text-white text-[10px] font-semibold px-2 py-[1px]">
+                                Plat signature
+                              </span>
+                            )}
+                            {dish.description && (
+                              <p className="text-[11px] text-slate-400 line-clamp-2">
+                                {dish.description}
+                              </p>
+                            )}
+                            <div className="mt-2 flex items-center justify-between text-[11px] text-slate-300">
+                              {dish.ratingStats.count === 0 ? (
+                                <span className="text-slate-500">Pas encore noté</span>
+                              ) : (
+                                <>
+                                  <div className="flex">
+                                    {[1, 2, 3, 4, 5].map((star) => (
+                                      <span
+                                        key={star}
+                                        className={
+                                          dish.ratingStats.avg >= star
+                                            ? "text-yellow-400"
+                                            : "text-slate-700"
+                                        }
+                                      >
+                                        ★
+                                      </span>
+                                    ))}
+                                  </div>
+                                  <span className="text-slate-400 ml-1">
+                                    {dish.ratingStats.avg.toFixed(1)} / 5 · {dish.ratingStats.count} avis
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
         </section>

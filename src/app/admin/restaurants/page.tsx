@@ -20,6 +20,14 @@ type Dish = {
   description: string | null;
   is_signature: boolean;
   position: number | null;
+  category_id: string | null;
+};
+
+type DishCategory = {
+  id: string;
+  restaurant_id: string;
+  name: string;
+  order_index: number;
 };
 
 function slugify(name: string) {
@@ -59,6 +67,14 @@ export default function AdminRestaurantsPage() {
   const [dishes, setDishes] = useState<Dish[]>([]);
   const [loadingDishes, setLoadingDishes] = useState(false);
 
+  // gestion des sections de menu
+  const [categories, setCategories] = useState<DishCategory[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [editingCategory, setEditingCategory] = useState<DishCategory | null>(null);
+  const [editCategoryName, setEditCategoryName] = useState("");
+  const [showCategoryForm, setShowCategoryForm] = useState(false);
+
   const [dishName, setDishName] = useState("");
   const [dishDescription, setDishDescription] = useState("");
   const [dishImageFile, setDishImageFile] = useState<File | null>(null);
@@ -66,6 +82,7 @@ export default function AdminRestaurantsPage() {
   const [dishImageMode, setDishImageMode] = useState<"upload" | "url">("upload");
   const [dishImagePreview, setDishImagePreview] = useState<string | null>(null);
   const [dishIsSignature, setDishIsSignature] = useState(false);
+  const [dishCategoryId, setDishCategoryId] = useState<string | null>(null);
 
   const [editingDish, setEditingDish] = useState<Dish | null>(null);
   const [editDishName, setEditDishName] = useState("");
@@ -75,6 +92,7 @@ export default function AdminRestaurantsPage() {
   const [editDishImageMode, setEditDishImageMode] = useState<"upload" | "url">("upload");
   const [editDishImagePreview, setEditDishImagePreview] = useState<string | null>(null);
   const [editDishIsSignature, setEditDishIsSignature] = useState(false);
+  const [editDishCategoryId, setEditDishCategoryId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchRestaurants();
@@ -398,14 +416,248 @@ export default function AdminRestaurantsPage() {
     setDishImageMode("upload");
     setDishImagePreview(null);
     setDishIsSignature(false);
+    setDishCategoryId(null);
     setEditingDish(null);
+    setShowCategoryForm(false);
+    setNewCategoryName("");
     fetchDishes(restaurant);
+    fetchCategories(restaurant);
   };
 
   const handleCloseDishes = () => {
     setSelectedRestaurant(null);
     setDishes([]);
+    setCategories([]);
     setEditingDish(null);
+    setShowCategoryForm(false);
+  };
+
+  // Fonctions de gestion des sections de menu
+  const fetchCategories = async (restaurant: Restaurant) => {
+    try {
+      setLoadingCategories(true);
+      const { data, error } = await supabase
+        .from("dish_categories")
+        .select("*")
+        .eq("restaurant_id", restaurant.id)
+        .order("order_index", { ascending: true });
+
+      if (error) {
+        console.error("[Admin] categories error", error);
+        setError("Erreur lors du chargement des sections.");
+        return;
+      }
+
+      setCategories((data || []) as DishCategory[]);
+    } catch (err) {
+      console.error("[Admin] categories unexpected", err);
+      setError("Erreur inattendue lors du chargement des sections.");
+    } finally {
+      setLoadingCategories(false);
+    }
+  };
+
+  const handleCreateCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedRestaurant || !newCategoryName.trim()) return;
+
+    try {
+      setError(null);
+
+      // Calculer le prochain order_index
+      const nextOrderIndex =
+        categories.length === 0
+          ? 0
+          : Math.max(...categories.map((c) => c.order_index)) + 1;
+
+      const { data, error: insertError } = await supabase
+        .from("dish_categories")
+        .insert({
+          restaurant_id: selectedRestaurant.id,
+          name: newCategoryName.trim(),
+          order_index: nextOrderIndex,
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error("[Admin] insert category error", insertError);
+        setError("Erreur lors de la création de la section.");
+        return;
+      }
+
+      // Ajouter la nouvelle catégorie au state
+      if (data) {
+        setCategories([...categories, data as DishCategory]);
+      }
+
+      setNewCategoryName("");
+      setShowCategoryForm(false);
+    } catch (err) {
+      console.error("[Admin] create category unexpected", err);
+      setError("Erreur inattendue lors de la création de la section.");
+    }
+  };
+
+  const startEditCategory = (category: DishCategory) => {
+    setEditingCategory(category);
+    setEditCategoryName(category.name);
+  };
+
+  const cancelEditCategory = () => {
+    setEditingCategory(null);
+    setEditCategoryName("");
+  };
+
+  const handleUpdateCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCategory || !editCategoryName.trim()) return;
+
+    try {
+      setError(null);
+
+      const { error: updateError } = await supabase
+        .from("dish_categories")
+        .update({ name: editCategoryName.trim() })
+        .eq("id", editingCategory.id);
+
+      if (updateError) {
+        console.error("[Admin] update category error", updateError);
+        setError("Erreur lors de la mise à jour de la section.");
+        return;
+      }
+
+      cancelEditCategory();
+      if (selectedRestaurant) {
+        fetchCategories(selectedRestaurant);
+      }
+    } catch (err) {
+      console.error("[Admin] update category unexpected", err);
+      setError("Erreur inattendue lors de la mise à jour de la section.");
+    }
+  };
+
+  const handleDeleteCategory = async (category: DishCategory) => {
+    if (!selectedRestaurant) return;
+
+    // Vérifier si la section contient des plats
+    const dishesInCategory = dishes.filter((d) => d.category_id === category.id);
+    if (dishesInCategory.length > 0) {
+      setError(
+        `Impossible de supprimer la section "${category.name}" car elle contient ${dishesInCategory.length} plat(s). Déplacez d'abord les plats vers une autre section.`
+      );
+      return;
+    }
+
+    if (!confirm(`Supprimer la section "${category.name}" ?`)) return;
+
+    try {
+      setError(null);
+
+      const { error: deleteError } = await supabase
+        .from("dish_categories")
+        .delete()
+        .eq("id", category.id);
+
+      if (deleteError) {
+        console.error("[Admin] delete category error", deleteError);
+        setError("Erreur lors de la suppression de la section.");
+        return;
+      }
+
+      if (selectedRestaurant) {
+        fetchCategories(selectedRestaurant);
+      }
+    } catch (err) {
+      console.error("[Admin] delete category unexpected", err);
+      setError("Erreur inattendue lors de la suppression de la section.");
+    }
+  };
+
+  const moveCategoryUp = async (category: DishCategory) => {
+    if (!selectedRestaurant) return;
+    const index = categories.findIndex((c) => c.id === category.id);
+    if (index <= 0) return;
+    const previous = categories[index - 1];
+
+    try {
+      const { error: err1 } = await supabase
+        .from("dish_categories")
+        .update({ order_index: previous.order_index })
+        .eq("id", category.id);
+      const { error: err2 } = await supabase
+        .from("dish_categories")
+        .update({ order_index: category.order_index })
+        .eq("id", previous.id);
+
+      if (err1 || err2) {
+        console.error("[Admin] move category up error", err1 || err2);
+        setError("Erreur lors du changement d'ordre de la section.");
+        return;
+      }
+
+      fetchCategories(selectedRestaurant);
+    } catch (err) {
+      console.error("[Admin] moveCategoryUp unexpected", err);
+      setError("Erreur inattendue lors du changement d'ordre de la section.");
+    }
+  };
+
+  const moveCategoryDown = async (category: DishCategory) => {
+    if (!selectedRestaurant) return;
+    const index = categories.findIndex((c) => c.id === category.id);
+    if (index === -1 || index >= categories.length - 1) return;
+    const next = categories[index + 1];
+
+    try {
+      const { error: err1 } = await supabase
+        .from("dish_categories")
+        .update({ order_index: next.order_index })
+        .eq("id", category.id);
+      const { error: err2 } = await supabase
+        .from("dish_categories")
+        .update({ order_index: category.order_index })
+        .eq("id", next.id);
+
+      if (err1 || err2) {
+        console.error("[Admin] move category down error", err1 || err2);
+        setError("Erreur lors du changement d'ordre de la section.");
+        return;
+      }
+
+      fetchCategories(selectedRestaurant);
+    } catch (err) {
+      console.error("[Admin] moveCategoryDown unexpected", err);
+      setError("Erreur inattendue lors du changement d'ordre de la section.");
+    }
+  };
+
+  // Fonction pour changer la catégorie d'un plat
+  const handleChangeDishCategory = async (dish: Dish, newCategoryId: string | null) => {
+    if (!selectedRestaurant) return;
+
+    try {
+      setError(null);
+
+      const { error: updateError } = await supabase
+        .from("dishes")
+        .update({ category_id: newCategoryId })
+        .eq("id", dish.id);
+
+      if (updateError) {
+        console.error("[Admin] update dish category error", updateError);
+        setError("Erreur lors de la modification de la section du plat.");
+        return;
+      }
+
+      // Mettre à jour le state local
+      setDishes((prev) =>
+        prev.map((d) => (d.id === dish.id ? { ...d, category_id: newCategoryId } : d))
+      );
+    } catch (err) {
+      console.error("[Admin] changeDishCategory unexpected", err);
+      setError("Erreur inattendue lors de la modification de la section du plat.");
+    }
   };
 
   const handleAddDish = async (e: React.FormEvent) => {
@@ -466,6 +718,7 @@ export default function AdminRestaurantsPage() {
         image_url: finalImageUrl,
         is_signature: dishIsSignature,
         position: nextPosition,
+        category_id: dishCategoryId || null,
       });
 
       if (insertError) {
@@ -484,6 +737,7 @@ export default function AdminRestaurantsPage() {
       setDishImageMode("upload");
       setDishImagePreview(null);
       setDishIsSignature(false);
+      setDishCategoryId(null);
 
       fetchDishes(selectedRestaurant);
     } catch (err) {
@@ -497,6 +751,7 @@ export default function AdminRestaurantsPage() {
     setEditDishName(dish.name);
     setEditDishDescription(dish.description || "");
     setEditDishIsSignature(dish.is_signature);
+    setEditDishCategoryId(dish.category_id);
     setEditDishImageFile(null);
     setEditDishImageUrl("");
     setEditDishImageMode("upload");
@@ -572,6 +827,7 @@ export default function AdminRestaurantsPage() {
           description: editDishDescription || null,
           image_url: finalImageUrl,
           is_signature: editDishIsSignature,
+          category_id: editDishCategoryId || null,
         })
         .eq("id", editingDish.id);
 
@@ -1119,6 +1375,151 @@ export default function AdminRestaurantsPage() {
               </button>
             </div>
 
+            {/* Organisation de la carte - Sections */}
+            <div className="border-t border-slate-800 pt-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-md font-semibold">Organisation de la carte</h3>
+                {!showCategoryForm && (
+                  <button
+                    type="button"
+                    onClick={() => setShowCategoryForm(true)}
+                    className="text-xs rounded-md border border-bitebox/60 px-3 py-1.5 hover:bg-bitebox/10 text-bitebox"
+                  >
+                    ➕ Ajouter une section
+                  </button>
+                )}
+              </div>
+
+              {/* Formulaire d'ajout de section */}
+              {showCategoryForm && (
+                <form onSubmit={handleCreateCategory} className="bg-slate-950/70 rounded-lg p-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      placeholder="Nom de la section (ex: Burgers)"
+                      className="flex-1 rounded-md bg-slate-900 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
+                      autoFocus
+                    />
+                    <button
+                      type="submit"
+                      className="px-3 py-2 rounded-md bg-bitebox text-white text-xs font-semibold hover:bg-bitebox-dark"
+                    >
+                      Créer
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowCategoryForm(false);
+                        setNewCategoryName("");
+                      }}
+                      className="px-3 py-2 rounded-md border border-slate-600 text-slate-300 text-xs hover:bg-slate-800"
+                    >
+                      Annuler
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* Liste des sections */}
+              {loadingCategories ? (
+                <div className="flex items-center justify-center py-4">
+                  <Spinner size="sm" />
+                </div>
+              ) : categories.length === 0 ? (
+                <p className="text-xs text-slate-400">
+                  Aucune section créée. Les plats seront affichés dans un bloc unique.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {categories.map((category) => {
+                    const dishesCount = dishes.filter((d) => d.category_id === category.id).length;
+                    return (
+                      <div
+                        key={category.id}
+                        className="flex items-center justify-between gap-3 bg-slate-950/70 rounded-lg px-3 py-2"
+                      >
+                        <div className="flex items-center gap-2 flex-1">
+                          <div className="flex flex-col gap-1">
+                            <button
+                              type="button"
+                              onClick={() => moveCategoryUp(category)}
+                              disabled={categories.indexOf(category) === 0}
+                              className="text-[10px] border border-slate-600 rounded px-1.5 py-0.5 hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed"
+                            >
+                              ↑
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => moveCategoryDown(category)}
+                              disabled={categories.indexOf(category) === categories.length - 1}
+                              className="text-[10px] border border-slate-600 rounded px-1.5 py-0.5 hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed"
+                            >
+                              ↓
+                            </button>
+                          </div>
+                          {editingCategory?.id === category.id ? (
+                            <form
+                              onSubmit={handleUpdateCategory}
+                              className="flex items-center gap-2 flex-1"
+                            >
+                              <input
+                                type="text"
+                                value={editCategoryName}
+                                onChange={(e) => setEditCategoryName(e.target.value)}
+                                className="flex-1 rounded-md bg-slate-900 border border-slate-700 px-2 py-1 text-xs outline-none focus:border-bitebox"
+                                autoFocus
+                              />
+                              <button
+                                type="submit"
+                                className="px-2 py-1 rounded text-xs bg-emerald-500 text-black hover:bg-emerald-400"
+                              >
+                                ✓
+                              </button>
+                              <button
+                                type="button"
+                                onClick={cancelEditCategory}
+                                className="px-2 py-1 rounded text-xs border border-slate-600 hover:bg-slate-800"
+                              >
+                                ✕
+                              </button>
+                            </form>
+                          ) : (
+                            <>
+                              <span className="text-sm font-medium">{category.name}</span>
+                              <span className="text-xs text-slate-400">
+                                ({dishesCount} plat{dishesCount !== 1 ? "s" : ""})
+                              </span>
+                            </>
+                          )}
+                        </div>
+                        {editingCategory?.id !== category.id && (
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => startEditCategory(category)}
+                              className="text-[10px] rounded border border-bitebox/60 px-2 py-1 hover:bg-bitebox/10"
+                            >
+                              Renommer
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCategory(category)}
+                              className="text-[10px] rounded border border-red-500/60 px-2 py-1 text-red-300 hover:bg-red-500/10"
+                            >
+                              Supprimer
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Liste des plats groupés par catégorie */}
             {loadingDishes ? (
               <div className="flex items-center justify-center py-8">
                 <Spinner size="md" />
@@ -1128,237 +1529,558 @@ export default function AdminRestaurantsPage() {
                 Aucun plat enregistré pour cette enseigne.
               </p>
             ) : (
-              <div className="space-y-2">
-                {dishes.map((dish) => (
-                  <div
-                    key={dish.id}
-                    className="bg-slate-950/70 rounded-xl px-3 py-3 space-y-3"
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        {dish.image_url && (
-                          <img
-                            src={dish.image_url}
-                            alt={dish.name}
-                            className="h-12 w-12 rounded object-cover"
-                          />
-                        )}
-                        <div>
-                          <p className="text-sm font-semibold">{dish.name}</p>
-                          {dish.description && (
-                            <p className="text-[11px] text-slate-400">
-                              {dish.description}
-                            </p>
-                          )}
-                          {dish.is_signature && (
-                            <span className="inline-flex items-center rounded-full bg-bitebox/90 text-white text-[9px] font-semibold px-2 py-[1px] mt-1">
-                              Plat signature
-                            </span>
-                          )}
-                        </div>
-                      </div>
+              <div className="space-y-6 border-t border-slate-800 pt-4">
+                {/* Plats groupés par catégorie */}
+                {categories.map((category) => {
+                  const categoryDishes = dishes.filter((d) => d.category_id === category.id);
+                  if (categoryDishes.length === 0) return null;
 
-                      <div className="flex items-center gap-2 self-start sm:self-center">
-                        <button
-                          type="button"
-                          onClick={() => moveDishUp(dish)}
-                          className="text-[11px] border border-slate-600 rounded px-2 py-[1px] hover:bg-slate-800"
-                        >
-                          ↑
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => moveDishDown(dish)}
-                          className="text-[11px] border border-slate-600 rounded px-2 py-[1px] hover:bg-slate-800"
-                        >
-                          ↓
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => startEditDish(dish)}
-                          className="text-[11px] rounded-md border border-bitebox/60 px-3 py-1 hover:bg-bitebox/10"
-                        >
-                          Modifier
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteDish(dish)}
-                          className="text-[11px] rounded-md border border-red-500/60 px-3 py-1 text-red-300 hover:bg-red-500/10"
-                        >
-                          Supprimer
-                        </button>
+                  return (
+                    <div key={category.id} className="space-y-3">
+                      <h3 className="text-sm font-semibold text-slate-200 border-b border-slate-800 pb-2">
+                        {category.name}
+                      </h3>
+                      <div className="space-y-2">
+                        {categoryDishes.map((dish) => (
+                          <div
+                            key={dish.id}
+                            className="bg-slate-950/70 rounded-xl px-3 py-3 space-y-3"
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                              <div className="flex items-center gap-3 flex-1">
+                                {dish.image_url && (
+                                  <img
+                                    src={dish.image_url}
+                                    alt={dish.name}
+                                    className="h-12 w-12 rounded object-cover"
+                                  />
+                                )}
+                                <div className="flex-1">
+                                  <p className="text-sm font-semibold">{dish.name}</p>
+                                  {dish.description && (
+                                    <p className="text-[11px] text-slate-400">
+                                      {dish.description}
+                                    </p>
+                                  )}
+                                  {dish.is_signature && (
+                                    <span className="inline-flex items-center rounded-full bg-bitebox/90 text-white text-[9px] font-semibold px-2 py-[1px] mt-1">
+                                      Plat signature
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 self-start sm:self-center flex-wrap">
+                                {/* Select pour changer la catégorie */}
+                                <select
+                                  value={dish.category_id || ""}
+                                  onChange={(e) =>
+                                    handleChangeDishCategory(dish, e.target.value || null)
+                                  }
+                                  className="text-[11px] rounded-md bg-slate-900 border border-slate-700 px-2 py-1 outline-none focus:border-bitebox"
+                                >
+                                  <option value="">Aucune section</option>
+                                  {categories.map((cat) => (
+                                    <option key={cat.id} value={cat.id}>
+                                      {cat.name}
+                                    </option>
+                                  ))}
+                                </select>
+                                <button
+                                  type="button"
+                                  onClick={() => moveDishUp(dish)}
+                                  className="text-[11px] border border-slate-600 rounded px-2 py-[1px] hover:bg-slate-800"
+                                >
+                                  ↑
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => moveDishDown(dish)}
+                                  className="text-[11px] border border-slate-600 rounded px-2 py-[1px] hover:bg-slate-800"
+                                >
+                                  ↓
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => startEditDish(dish)}
+                                  className="text-[11px] rounded-md border border-bitebox/60 px-3 py-1 hover:bg-bitebox/10"
+                                >
+                                  Modifier
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteDish(dish)}
+                                  className="text-[11px] rounded-md border border-red-500/60 px-3 py-1 text-red-300 hover:bg-red-500/10"
+                                >
+                                  Supprimer
+                                </button>
+                              </div>
+                            </div>
+
+                            {editingDish?.id === dish.id && (
+                              <form onSubmit={handleUpdateDish} className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-slate-800 pt-3">
+                                <div className="space-y-1">
+                                  <label className="text-xs text-slate-300">Nom du plat</label>
+                                  <input
+                                    type="text"
+                                    value={editDishName}
+                                    onChange={(e) => setEditDishName(e.target.value)}
+                                    className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
+                                  />
+                                </div>
+
+                                <div className="space-y-1">
+                                  <label className="text-xs text-slate-300">
+                                    Description (optionnel)
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={editDishDescription}
+                                    onChange={(e) => setEditDishDescription(e.target.value)}
+                                    className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
+                                  />
+                                </div>
+
+                                <div className="space-y-2">
+                                  <label className="text-xs text-slate-300">
+                                    Nouvelle image (optionnel)
+                                  </label>
+                                  
+                                  {/* Tabs pour choisir entre upload et URL */}
+                                  <div className="flex gap-2 border-b border-slate-700">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (editDishImagePreview && editDishImagePreview.startsWith('blob:')) {
+                                          URL.revokeObjectURL(editDishImagePreview);
+                                        }
+                                        setEditDishImageMode("upload");
+                                        setEditDishImageUrl("");
+                                        setEditDishImagePreview(editingDish?.image_url ?? null);
+                                      }}
+                                      className={`px-3 py-1.5 text-xs font-medium transition ${
+                                        editDishImageMode === "upload"
+                                          ? "text-bitebox border-b-2 border-bitebox"
+                                          : "text-slate-400 hover:text-slate-200"
+                                      }`}
+                                    >
+                                      Télécharger un fichier
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (editDishImagePreview && editDishImagePreview.startsWith('blob:')) {
+                                          URL.revokeObjectURL(editDishImagePreview);
+                                        }
+                                        setEditDishImageMode("url");
+                                        setEditDishImageFile(null);
+                                        setEditDishImagePreview(editingDish?.image_url ?? null);
+                                      }}
+                                      className={`px-3 py-1.5 text-xs font-medium transition ${
+                                        editDishImageMode === "url"
+                                          ? "text-bitebox border-b-2 border-bitebox"
+                                          : "text-slate-400 hover:text-slate-200"
+                                      }`}
+                                    >
+                                      Entrer une URL
+                                    </button>
+                                  </div>
+
+                                  {/* Champ upload */}
+                                  {editDishImageMode === "upload" && (
+                                    <div className="space-y-2">
+                                      <input
+                                        type="file"
+                                        accept="image/png,image/jpeg,image/jpg,image/webp"
+                                        onChange={(e) => {
+                                          const file = e.target.files?.[0] ?? null;
+                                          // Nettoyer l'ancienne URL blob si elle existe
+                                          if (editDishImagePreview && editDishImagePreview.startsWith('blob:')) {
+                                            URL.revokeObjectURL(editDishImagePreview);
+                                          }
+                                          setEditDishImageFile(file);
+                                          setEditDishImageUrl("");
+                                          if (file) {
+                                            const preview = URL.createObjectURL(file);
+                                            setEditDishImagePreview(preview);
+                                          } else {
+                                            setEditDishImagePreview(editingDish?.image_url ?? null);
+                                          }
+                                        }}
+                                        className="text-xs text-slate-300"
+                                      />
+                                      <p className="text-[11px] text-slate-500">
+                                        Formats acceptés : PNG, JPG, JPEG, WEBP (max 5MB). Laisse vide pour conserver l'image actuelle.
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  {/* Champ URL */}
+                                  {editDishImageMode === "url" && (
+                                    <div className="space-y-2">
+                                      <input
+                                        type="url"
+                                        value={editDishImageUrl}
+                                        onChange={(e) => {
+                                          const url = e.target.value;
+                                          setEditDishImageUrl(url);
+                                          setEditDishImageFile(null);
+                                          if (url && validateImageUrl(url)) {
+                                            setEditDishImagePreview(url);
+                                          } else if (!url) {
+                                            setEditDishImagePreview(editingDish?.image_url ?? null);
+                                          } else {
+                                            setEditDishImagePreview(null);
+                                          }
+                                        }}
+                                        placeholder="https://exemple.com/image.png"
+                                        className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
+                                      />
+                                      <p className="text-[11px] text-slate-500">
+                                        URL commençant par http:// ou https:// avec extension .png, .jpg, .jpeg ou .webp. Laisse vide pour conserver l'image actuelle.
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  {/* Aperçu de l'image */}
+                                  {editDishImagePreview && (
+                                    <div className="mt-3 p-3 bg-slate-950 rounded-lg border border-slate-700">
+                                      <p className="text-xs text-slate-400 mb-2">Aperçu :</p>
+                                      <img
+                                        src={editDishImagePreview}
+                                        alt="Aperçu plat"
+                                        className="max-w-full h-32 object-contain rounded"
+                                        onError={() => setEditDishImagePreview(editingDish?.image_url ?? null)}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="space-y-2">
+                                  <div className="space-y-1">
+                                    <label className="text-xs text-slate-300">Section (optionnel)</label>
+                                    <select
+                                      value={editDishCategoryId || ""}
+                                      onChange={(e) => setEditDishCategoryId(e.target.value || null)}
+                                      className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
+                                    >
+                                      <option value="">Aucune section</option>
+                                      {categories.map((cat) => (
+                                        <option key={cat.id} value={cat.id}>
+                                          {cat.name}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <label className="flex items-center gap-2 text-xs text-slate-300">
+                                    <input
+                                      type="checkbox"
+                                      checked={editDishIsSignature}
+                                      onChange={(e) => setEditDishIsSignature(e.target.checked)}
+                                      className="h-3 w-3"
+                                    />
+                                    Plat signature
+                                  </label>
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      type="submit"
+                                      className="inline-flex items-center justify-center rounded-md bg-bitebox px-4 py-2 text-xs font-semibold text-white shadow hover:bg-bitebox-dark transition"
+                                    >
+                                      Enregistrer
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={cancelEditDish}
+                                      className="text-[11px] text-slate-300 hover:text-slate-100"
+                                    >
+                                      Annuler
+                                    </button>
+                                  </div>
+                                </div>
+                              </form>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     </div>
+                  );
+                })}
 
-                    {editingDish?.id === dish.id && (
-                      <form onSubmit={handleUpdateDish} className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-slate-800 pt-3">
-                        <div className="space-y-1">
-                          <label className="text-xs text-slate-300">Nom du plat</label>
-                          <input
-                            type="text"
-                            value={editDishName}
-                            onChange={(e) => setEditDishName(e.target.value)}
-                            className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
-                          />
-                        </div>
+                {/* Plats sans catégorie */}
+                {(() => {
+                  const dishesWithoutCategory = dishes.filter((d) => !d.category_id);
+                  if (dishesWithoutCategory.length === 0) return null;
 
-                        <div className="space-y-1">
-                          <label className="text-xs text-slate-300">
-                            Description (optionnel)
-                          </label>
-                          <input
-                            type="text"
-                            value={editDishDescription}
-                            onChange={(e) => setEditDishDescription(e.target.value)}
-                            className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
-                          />
-                        </div>
+                  return (
+                    <div className="space-y-3">
+                      <h3 className="text-sm font-semibold text-slate-200 border-b border-slate-800 pb-2">
+                        Autres plats
+                      </h3>
+                      <div className="space-y-2">
+                        {dishesWithoutCategory.map((dish) => (
+                          <div
+                            key={dish.id}
+                            className="bg-slate-950/70 rounded-xl px-3 py-3 space-y-3"
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                              <div className="flex items-center gap-3 flex-1">
+                                {dish.image_url && (
+                                  <img
+                                    src={dish.image_url}
+                                    alt={dish.name}
+                                    className="h-12 w-12 rounded object-cover"
+                                  />
+                                )}
+                                <div className="flex-1">
+                                  <p className="text-sm font-semibold">{dish.name}</p>
+                                  {dish.description && (
+                                    <p className="text-[11px] text-slate-400">
+                                      {dish.description}
+                                    </p>
+                                  )}
+                                  {dish.is_signature && (
+                                    <span className="inline-flex items-center rounded-full bg-bitebox/90 text-white text-[9px] font-semibold px-2 py-[1px] mt-1">
+                                      Plat signature
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
 
-                        <div className="space-y-2">
-                          <label className="text-xs text-slate-300">
-                            Nouvelle image (optionnel)
-                          </label>
-                          
-                          {/* Tabs pour choisir entre upload et URL */}
-                          <div className="flex gap-2 border-b border-slate-700">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (editDishImagePreview && editDishImagePreview.startsWith('blob:')) {
-                                  URL.revokeObjectURL(editDishImagePreview);
-                                }
-                                setEditDishImageMode("upload");
-                                setEditDishImageUrl("");
-                                setEditDishImagePreview(editingDish?.image_url ?? null);
-                              }}
-                              className={`px-3 py-1.5 text-xs font-medium transition ${
-                                editDishImageMode === "upload"
-                                  ? "text-bitebox border-b-2 border-bitebox"
-                                  : "text-slate-400 hover:text-slate-200"
-                              }`}
-                            >
-                              Télécharger un fichier
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (editDishImagePreview && editDishImagePreview.startsWith('blob:')) {
-                                  URL.revokeObjectURL(editDishImagePreview);
-                                }
-                                setEditDishImageMode("url");
-                                setEditDishImageFile(null);
-                                setEditDishImagePreview(editingDish?.image_url ?? null);
-                              }}
-                              className={`px-3 py-1.5 text-xs font-medium transition ${
-                                editDishImageMode === "url"
-                                  ? "text-bitebox border-b-2 border-bitebox"
-                                  : "text-slate-400 hover:text-slate-200"
-                              }`}
-                            >
-                              Entrer une URL
-                            </button>
+                              <div className="flex items-center gap-2 self-start sm:self-center flex-wrap">
+                                {/* Select pour changer la catégorie */}
+                                <select
+                                  value={dish.category_id || ""}
+                                  onChange={(e) =>
+                                    handleChangeDishCategory(dish, e.target.value || null)
+                                  }
+                                  className="text-[11px] rounded-md bg-slate-900 border border-slate-700 px-2 py-1 outline-none focus:border-bitebox"
+                                >
+                                  <option value="">Aucune section</option>
+                                  {categories.map((cat) => (
+                                    <option key={cat.id} value={cat.id}>
+                                      {cat.name}
+                                    </option>
+                                  ))}
+                                </select>
+                                <button
+                                  type="button"
+                                  onClick={() => moveDishUp(dish)}
+                                  className="text-[11px] border border-slate-600 rounded px-2 py-[1px] hover:bg-slate-800"
+                                >
+                                  ↑
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => moveDishDown(dish)}
+                                  className="text-[11px] border border-slate-600 rounded px-2 py-[1px] hover:bg-slate-800"
+                                >
+                                  ↓
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => startEditDish(dish)}
+                                  className="text-[11px] rounded-md border border-bitebox/60 px-3 py-1 hover:bg-bitebox/10"
+                                >
+                                  Modifier
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteDish(dish)}
+                                  className="text-[11px] rounded-md border border-red-500/60 px-3 py-1 text-red-300 hover:bg-red-500/10"
+                                >
+                                  Supprimer
+                                </button>
+                              </div>
+                            </div>
+
+                            {editingDish?.id === dish.id && (
+                              <form onSubmit={handleUpdateDish} className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-slate-800 pt-3">
+                                <div className="space-y-1">
+                                  <label className="text-xs text-slate-300">Nom du plat</label>
+                                  <input
+                                    type="text"
+                                    value={editDishName}
+                                    onChange={(e) => setEditDishName(e.target.value)}
+                                    className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
+                                  />
+                                </div>
+
+                                <div className="space-y-1">
+                                  <label className="text-xs text-slate-300">
+                                    Description (optionnel)
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={editDishDescription}
+                                    onChange={(e) => setEditDishDescription(e.target.value)}
+                                    className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
+                                  />
+                                </div>
+
+                                <div className="space-y-2">
+                                  <label className="text-xs text-slate-300">
+                                    Nouvelle image (optionnel)
+                                  </label>
+                                  
+                                  {/* Tabs pour choisir entre upload et URL */}
+                                  <div className="flex gap-2 border-b border-slate-700">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (editDishImagePreview && editDishImagePreview.startsWith('blob:')) {
+                                          URL.revokeObjectURL(editDishImagePreview);
+                                        }
+                                        setEditDishImageMode("upload");
+                                        setEditDishImageUrl("");
+                                        setEditDishImagePreview(editingDish?.image_url ?? null);
+                                      }}
+                                      className={`px-3 py-1.5 text-xs font-medium transition ${
+                                        editDishImageMode === "upload"
+                                          ? "text-bitebox border-b-2 border-bitebox"
+                                          : "text-slate-400 hover:text-slate-200"
+                                      }`}
+                                    >
+                                      Télécharger un fichier
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (editDishImagePreview && editDishImagePreview.startsWith('blob:')) {
+                                          URL.revokeObjectURL(editDishImagePreview);
+                                        }
+                                        setEditDishImageMode("url");
+                                        setEditDishImageFile(null);
+                                        setEditDishImagePreview(editingDish?.image_url ?? null);
+                                      }}
+                                      className={`px-3 py-1.5 text-xs font-medium transition ${
+                                        editDishImageMode === "url"
+                                          ? "text-bitebox border-b-2 border-bitebox"
+                                          : "text-slate-400 hover:text-slate-200"
+                                      }`}
+                                    >
+                                      Entrer une URL
+                                    </button>
+                                  </div>
+
+                                  {/* Champ upload */}
+                                  {editDishImageMode === "upload" && (
+                                    <div className="space-y-2">
+                                      <input
+                                        type="file"
+                                        accept="image/png,image/jpeg,image/jpg,image/webp"
+                                        onChange={(e) => {
+                                          const file = e.target.files?.[0] ?? null;
+                                          // Nettoyer l'ancienne URL blob si elle existe
+                                          if (editDishImagePreview && editDishImagePreview.startsWith('blob:')) {
+                                            URL.revokeObjectURL(editDishImagePreview);
+                                          }
+                                          setEditDishImageFile(file);
+                                          setEditDishImageUrl("");
+                                          if (file) {
+                                            const preview = URL.createObjectURL(file);
+                                            setEditDishImagePreview(preview);
+                                          } else {
+                                            setEditDishImagePreview(editingDish?.image_url ?? null);
+                                          }
+                                        }}
+                                        className="text-xs text-slate-300"
+                                      />
+                                      <p className="text-[11px] text-slate-500">
+                                        Formats acceptés : PNG, JPG, JPEG, WEBP (max 5MB). Laisse vide pour conserver l'image actuelle.
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  {/* Champ URL */}
+                                  {editDishImageMode === "url" && (
+                                    <div className="space-y-2">
+                                      <input
+                                        type="url"
+                                        value={editDishImageUrl}
+                                        onChange={(e) => {
+                                          const url = e.target.value;
+                                          setEditDishImageUrl(url);
+                                          setEditDishImageFile(null);
+                                          if (url && validateImageUrl(url)) {
+                                            setEditDishImagePreview(url);
+                                          } else if (!url) {
+                                            setEditDishImagePreview(editingDish?.image_url ?? null);
+                                          } else {
+                                            setEditDishImagePreview(null);
+                                          }
+                                        }}
+                                        placeholder="https://exemple.com/image.png"
+                                        className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
+                                      />
+                                      <p className="text-[11px] text-slate-500">
+                                        URL commençant par http:// ou https:// avec extension .png, .jpg, .jpeg ou .webp. Laisse vide pour conserver l'image actuelle.
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  {/* Aperçu de l'image */}
+                                  {editDishImagePreview && (
+                                    <div className="mt-3 p-3 bg-slate-950 rounded-lg border border-slate-700">
+                                      <p className="text-xs text-slate-400 mb-2">Aperçu :</p>
+                                      <img
+                                        src={editDishImagePreview}
+                                        alt="Aperçu plat"
+                                        className="max-w-full h-32 object-contain rounded"
+                                        onError={() => setEditDishImagePreview(editingDish?.image_url ?? null)}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="space-y-2">
+                                  <div className="space-y-1">
+                                    <label className="text-xs text-slate-300">Section (optionnel)</label>
+                                    <select
+                                      value={editDishCategoryId || ""}
+                                      onChange={(e) => setEditDishCategoryId(e.target.value || null)}
+                                      className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
+                                    >
+                                      <option value="">Aucune section</option>
+                                      {categories.map((cat) => (
+                                        <option key={cat.id} value={cat.id}>
+                                          {cat.name}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <label className="flex items-center gap-2 text-xs text-slate-300">
+                                    <input
+                                      type="checkbox"
+                                      checked={editDishIsSignature}
+                                      onChange={(e) => setEditDishIsSignature(e.target.checked)}
+                                      className="h-3 w-3"
+                                    />
+                                    Plat signature
+                                  </label>
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      type="submit"
+                                      className="inline-flex items-center justify-center rounded-md bg-bitebox px-4 py-2 text-xs font-semibold text-white shadow hover:bg-bitebox-dark transition"
+                                    >
+                                      Enregistrer
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={cancelEditDish}
+                                      className="text-[11px] text-slate-300 hover:text-slate-100"
+                                    >
+                                      Annuler
+                                    </button>
+                                  </div>
+                                </div>
+                              </form>
+                            )}
                           </div>
-
-                          {/* Champ upload */}
-                          {editDishImageMode === "upload" && (
-                            <div className="space-y-2">
-                              <input
-                                type="file"
-                                accept="image/png,image/jpeg,image/jpg,image/webp"
-                                onChange={(e) => {
-                                  const file = e.target.files?.[0] ?? null;
-                                  // Nettoyer l'ancienne URL blob si elle existe
-                                  if (editDishImagePreview && editDishImagePreview.startsWith('blob:')) {
-                                    URL.revokeObjectURL(editDishImagePreview);
-                                  }
-                                  setEditDishImageFile(file);
-                                  setEditDishImageUrl("");
-                                  if (file) {
-                                    const preview = URL.createObjectURL(file);
-                                    setEditDishImagePreview(preview);
-                                  } else {
-                                    setEditDishImagePreview(editingDish?.image_url ?? null);
-                                  }
-                                }}
-                                className="text-xs text-slate-300"
-                              />
-                              <p className="text-[11px] text-slate-500">
-                                Formats acceptés : PNG, JPG, JPEG, WEBP (max 5MB). Laisse vide pour conserver l'image actuelle.
-                              </p>
-                            </div>
-                          )}
-
-                          {/* Champ URL */}
-                          {editDishImageMode === "url" && (
-                            <div className="space-y-2">
-                              <input
-                                type="url"
-                                value={editDishImageUrl}
-                                onChange={(e) => {
-                                  const url = e.target.value;
-                                  setEditDishImageUrl(url);
-                                  setEditDishImageFile(null);
-                                  if (url && validateImageUrl(url)) {
-                                    setEditDishImagePreview(url);
-                                  } else if (!url) {
-                                    setEditDishImagePreview(editingDish?.image_url ?? null);
-                                  } else {
-                                    setEditDishImagePreview(null);
-                                  }
-                                }}
-                                placeholder="https://exemple.com/image.png"
-                                className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
-                              />
-                              <p className="text-[11px] text-slate-500">
-                                URL commençant par http:// ou https:// avec extension .png, .jpg, .jpeg ou .webp. Laisse vide pour conserver l'image actuelle.
-                              </p>
-                            </div>
-                          )}
-
-                          {/* Aperçu de l'image */}
-                          {editDishImagePreview && (
-                            <div className="mt-3 p-3 bg-slate-950 rounded-lg border border-slate-700">
-                              <p className="text-xs text-slate-400 mb-2">Aperçu :</p>
-                              <img
-                                src={editDishImagePreview}
-                                alt="Aperçu plat"
-                                className="max-w-full h-32 object-contain rounded"
-                                onError={() => setEditDishImagePreview(editingDish?.image_url ?? null)}
-                              />
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="space-y-2">
-                          <label className="flex items-center gap-2 text-xs text-slate-300">
-                            <input
-                              type="checkbox"
-                              checked={editDishIsSignature}
-                              onChange={(e) => setEditDishIsSignature(e.target.checked)}
-                              className="h-3 w-3"
-                            />
-                            Plat signature
-                          </label>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="submit"
-                              className="inline-flex items-center justify-center rounded-md bg-bitebox px-4 py-2 text-xs font-semibold text-white shadow hover:bg-bitebox-dark transition"
-                            >
-                              Enregistrer
-                            </button>
-                            <button
-                              type="button"
-                              onClick={cancelEditDish}
-                              className="text-[11px] text-slate-300 hover:text-slate-100"
-                            >
-                              Annuler
-                            </button>
-                          </div>
-                        </div>
-                      </form>
-                    )}
-                  </div>
-                ))}
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             )}
 
@@ -1498,6 +2220,21 @@ export default function AdminRestaurantsPage() {
               </div>
 
               <div className="space-y-2">
+                <div className="space-y-1">
+                  <label className="text-xs text-slate-300">Section (optionnel)</label>
+                  <select
+                    value={dishCategoryId || ""}
+                    onChange={(e) => setDishCategoryId(e.target.value || null)}
+                    className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
+                  >
+                    <option value="">Aucune section</option>
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <label className="flex items-center gap-2 text-xs text-slate-300">
                   <input
                     type="checkbox"
