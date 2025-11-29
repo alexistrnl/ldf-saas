@@ -74,6 +74,7 @@ export default function AdminRestaurantsPage() {
   const [editingCategory, setEditingCategory] = useState<DishCategory | null>(null);
   const [editCategoryName, setEditCategoryName] = useState("");
   const [showCategoryForm, setShowCategoryForm] = useState(false);
+  const [categoryError, setCategoryError] = useState<string | null>(null);
 
   const [dishName, setDishName] = useState("");
   const [dishDescription, setDishDescription] = useState("");
@@ -420,6 +421,7 @@ export default function AdminRestaurantsPage() {
     setEditingDish(null);
     setShowCategoryForm(false);
     setNewCategoryName("");
+    setCategoryError(null);
     fetchDishes(restaurant);
     fetchCategories(restaurant);
   };
@@ -459,16 +461,36 @@ export default function AdminRestaurantsPage() {
 
   const handleCreateCategory = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedRestaurant || !newCategoryName.trim()) return;
+    
+    console.log("[Admin] handleCreateCategory appelé");
+    console.log("[Admin] selectedRestaurant:", selectedRestaurant);
+    console.log("[Admin] newCategoryName:", newCategoryName);
+    
+    if (!selectedRestaurant) {
+      console.error("[Admin] Pas de restaurant sélectionné");
+      setCategoryError("Aucun restaurant sélectionné.");
+      return;
+    }
+    
+    if (!newCategoryName.trim()) {
+      console.log("[Admin] Nom de catégorie vide, on ignore");
+      return;
+    }
 
     try {
+      setCategoryError(null);
       setError(null);
 
-      // Calculer le prochain order_index
+      // Calculer le prochain order_index de manière plus robuste
       const nextOrderIndex =
         categories.length === 0
           ? 0
-          : Math.max(...categories.map((c) => c.order_index)) + 1;
+          : (categories.reduce((max, c) => Math.max(max, c.order_index ?? 0), 0) ?? 0) + 1;
+
+      console.log("[Admin] Restaurant ID:", selectedRestaurant.id);
+      console.log("[Admin] Nom de la catégorie:", newCategoryName.trim());
+      console.log("[Admin] Order index calculé:", nextOrderIndex);
+      console.log("[Admin] Catégories existantes:", categories);
 
       const { data, error: insertError } = await supabase
         .from("dish_categories")
@@ -477,25 +499,32 @@ export default function AdminRestaurantsPage() {
           name: newCategoryName.trim(),
           order_index: nextOrderIndex,
         })
-        .select()
+        .select("*")
         .single();
 
+      console.log("[Admin] Résultat Supabase - data:", data);
+      console.log("[Admin] Résultat Supabase - error:", insertError);
+
       if (insertError) {
-        console.error("[Admin] insert category error", insertError);
-        setError("Erreur lors de la création de la section.");
+        console.error("[Admin] Erreur création catégorie :", insertError);
+        setCategoryError(insertError.message || "Erreur lors de la création de la section.");
         return;
       }
 
       // Ajouter la nouvelle catégorie au state
       if (data) {
-        setCategories([...categories, data as DishCategory]);
+        console.log("[Admin] Catégorie créée avec succès, ajout au state");
+        setCategories((prev) => [...prev, data as DishCategory]);
+        setNewCategoryName("");
+        setShowCategoryForm(false);
+        setCategoryError(null);
+      } else {
+        console.error("[Admin] Aucune donnée retournée par Supabase");
+        setCategoryError("Aucune donnée retournée après la création.");
       }
-
-      setNewCategoryName("");
-      setShowCategoryForm(false);
     } catch (err) {
-      console.error("[Admin] create category unexpected", err);
-      setError("Erreur inattendue lors de la création de la section.");
+      console.error("[Admin] Erreur inattendue création catégorie :", err);
+      setCategoryError("Une erreur inattendue est survenue lors de la création de la section.");
     }
   };
 
@@ -1397,7 +1426,10 @@ export default function AdminRestaurantsPage() {
                     <input
                       type="text"
                       value={newCategoryName}
-                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      onChange={(e) => {
+                        setNewCategoryName(e.target.value);
+                        setCategoryError(null);
+                      }}
                       placeholder="Nom de la section (ex: Burgers)"
                       className="flex-1 rounded-md bg-slate-900 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
                       autoFocus
@@ -1413,12 +1445,18 @@ export default function AdminRestaurantsPage() {
                       onClick={() => {
                         setShowCategoryForm(false);
                         setNewCategoryName("");
+                        setCategoryError(null);
                       }}
                       className="px-3 py-2 rounded-md border border-slate-600 text-slate-300 text-xs hover:bg-slate-800"
                     >
                       Annuler
                     </button>
                   </div>
+                  {categoryError && (
+                    <p className="mt-2 text-sm text-red-400">
+                      {categoryError}
+                    </p>
+                  )}
                 </form>
               )}
 
