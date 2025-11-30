@@ -1591,7 +1591,7 @@ export default function AdminRestaurantsPage() {
                                     <img
                                       src={dish.image_url}
                                       alt={dish.name}
-                                      className="absolute inset-0 w-full h-full object-cover object-center scale-95"
+                                      className="absolute inset-0 w-full h-full object-cover object-center scale-90"
                                     />
                                   </div>
                                 )}
@@ -1790,7 +1790,7 @@ export default function AdminRestaurantsPage() {
                                         <img
                                           src={editDishImagePreview}
                                           alt="Aperçu plat"
-                                          className="absolute inset-0 w-full h-full object-cover object-center scale-95"
+                                          className="absolute inset-0 w-full h-full object-cover object-center scale-90"
                                           onError={() => setEditDishImagePreview(editingDish?.image_url ?? null)}
                                         />
                                       </div>
@@ -1871,7 +1871,7 @@ export default function AdminRestaurantsPage() {
                                     <img
                                       src={dish.image_url}
                                       alt={dish.name}
-                                      className="absolute inset-0 w-full h-full object-cover object-center scale-95"
+                                      className="absolute inset-0 w-full h-full object-cover object-center scale-90"
                                     />
                                   </div>
                                 )}
@@ -2070,7 +2070,7 @@ export default function AdminRestaurantsPage() {
                                         <img
                                           src={editDishImagePreview}
                                           alt="Aperçu plat"
-                                          className="absolute inset-0 w-full h-full object-cover object-center scale-95"
+                                          className="absolute inset-0 w-full h-full object-cover object-center scale-90"
                                           onError={() => setEditDishImagePreview(editingDish?.image_url ?? null)}
                                         />
                                       </div>
