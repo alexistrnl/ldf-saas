@@ -457,15 +457,17 @@ export default function RestaurantPage() {
                   key={dish.id}
                   className="bg-slate-900/80 rounded-2xl overflow-hidden border border-slate-800/70 shadow-md flex flex-col"
                 >
-                  <div className="aspect-[4/3] bg-slate-950 flex items-center justify-center overflow-hidden">
+                  <div className="relative aspect-[4/3] overflow-hidden rounded-t-2xl bg-[#0d0d12]">
                     {dish.image_url ? (
                       <img
                         src={dish.image_url}
                         alt={dish.name}
-                        className="w-full h-full object-contain"
+                        className="absolute inset-0 w-full h-full object-cover object-center"
                       />
                     ) : (
-                      <span className="text-xs text-slate-500">Pas d'image</span>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-xs text-slate-500">Pas d'image</span>
+                      </div>
                     )}
                   </div>
 
@@ -528,15 +530,17 @@ export default function RestaurantPage() {
                           key={dish.id}
                           className="bg-slate-900/80 rounded-2xl overflow-hidden border border-slate-800/70 shadow-md flex flex-col"
                         >
-                          <div className="aspect-[4/3] bg-slate-950 flex items-center justify-center overflow-hidden">
+                          <div className="relative aspect-[4/3] overflow-hidden rounded-t-2xl bg-[#0d0d12]">
                             {dish.image_url ? (
                               <img
                                 src={dish.image_url}
                                 alt={dish.name}
-                                className="w-full h-full object-contain"
+                                className="absolute inset-0 w-full h-full object-cover object-center"
                               />
                             ) : (
-                              <span className="text-xs text-slate-500">Pas d'image</span>
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <span className="text-xs text-slate-500">Pas d'image</span>
+                              </div>
                             )}
                           </div>
 
