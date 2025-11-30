@@ -24,6 +24,7 @@ type Dish = {
   image_url: string | null;
   description: string | null;
   is_signature: boolean;
+  is_limited_edition: boolean;
   sort_order: number | null;
   category_id: string | null;
 };
@@ -584,10 +585,19 @@ export default function RestaurantPage() {
 
                   <div className="px-3 py-3 space-y-1">
                     <p className="text-sm font-semibold truncate">{dish.name}</p>
-                    {dish.is_signature && (
-                      <span className="inline-flex items-center rounded-full bg-bitebox/90 text-white text-[10px] font-semibold px-2 py-[1px]">
-                        Plat signature
-                      </span>
+                    {(dish.is_signature || dish.is_limited_edition) && (
+                      <div className="flex gap-2 flex-wrap">
+                        {dish.is_signature && (
+                          <span className="inline-flex items-center rounded-full bg-bitebox/90 text-white text-[10px] font-semibold px-2 py-[1px]">
+                            Plat signature
+                          </span>
+                        )}
+                        {dish.is_limited_edition && (
+                          <span className="inline-flex items-center rounded-full bg-bitebox/60 text-white text-[10px] font-semibold px-2 py-[1px]">
+                            Édition limitée
+                          </span>
+                        )}
+                      </div>
                     )}
                     {dish.description && (
                       <p className="text-[11px] text-slate-400 line-clamp-2">
@@ -659,10 +669,19 @@ export default function RestaurantPage() {
 
                           <div className="px-3 py-3 space-y-1">
                             <p className="text-sm font-semibold truncate">{dish.name}</p>
-                            {dish.is_signature && (
-                              <span className="inline-flex items-center rounded-full bg-bitebox/90 text-white text-[10px] font-semibold px-2 py-[1px]">
-                                Plat signature
-                              </span>
+                            {(dish.is_signature || dish.is_limited_edition) && (
+                              <div className="flex gap-2 flex-wrap">
+                                {dish.is_signature && (
+                                  <span className="inline-flex items-center rounded-full bg-bitebox/90 text-white text-[10px] font-semibold px-2 py-[1px]">
+                                    Plat signature
+                                  </span>
+                                )}
+                                {dish.is_limited_edition && (
+                                  <span className="inline-flex items-center rounded-full bg-bitebox/60 text-white text-[10px] font-semibold px-2 py-[1px]">
+                                    Édition limitée
+                                  </span>
+                                )}
+                              </div>
                             )}
                             {dish.description && (
                               <p className="text-[11px] text-slate-400 line-clamp-2">
@@ -732,10 +751,19 @@ export default function RestaurantPage() {
 
                           <div className="px-3 py-3 space-y-1">
                             <p className="text-sm font-semibold truncate">{dish.name}</p>
-                            {dish.is_signature && (
-                              <span className="inline-flex items-center rounded-full bg-bitebox/90 text-white text-[10px] font-semibold px-2 py-[1px]">
-                                Plat signature
-                              </span>
+                            {(dish.is_signature || dish.is_limited_edition) && (
+                              <div className="flex gap-2 flex-wrap">
+                                {dish.is_signature && (
+                                  <span className="inline-flex items-center rounded-full bg-bitebox/90 text-white text-[10px] font-semibold px-2 py-[1px]">
+                                    Plat signature
+                                  </span>
+                                )}
+                                {dish.is_limited_edition && (
+                                  <span className="inline-flex items-center rounded-full bg-bitebox/60 text-white text-[10px] font-semibold px-2 py-[1px]">
+                                    Édition limitée
+                                  </span>
+                                )}
+                              </div>
                             )}
                             {dish.description && (
                               <p className="text-[11px] text-slate-400 line-clamp-2">
