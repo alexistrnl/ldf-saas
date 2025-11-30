@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import AddExperienceModal from "@/components/AddExperienceModal";
@@ -66,6 +66,7 @@ export default function RestaurantPage() {
   const [error, setError] = useState<string | null>(null);
   const [isAddExperienceOpen, setIsAddExperienceOpen] = useState(false);
   const [topDishIndex, setTopDishIndex] = useState(0);
+  const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
 
   const handleAddNoteClick = () => {
     if (isMobile) {
@@ -206,6 +207,72 @@ export default function RestaurantPage() {
     }
   }, [params?.slug]);
 
+  // Filtrer les catégories qui ont des plats (calculé avec useMemo)
+  const categoriesWithDishes = useMemo(() => {
+    if (!categories || !dishes) return [];
+    return categories.filter((cat) => {
+      return dishes.some((d) => d.category_id === cat.id);
+    });
+  }, [categories, dishes]);
+
+  // Créer une dépendance stable basée sur les IDs pour l'observer
+  const categoryIdsString = useMemo(() => {
+    return categoriesWithDishes.map((cat) => cat.id).join(",");
+  }, [categoriesWithDishes]);
+
+  // Observer pour détecter la section visible lors du scroll
+  useEffect(() => {
+    if (categoriesWithDishes.length === 0 || loading) return;
+
+    let observer: IntersectionObserver | null = null;
+    const categoryIds = categoriesWithDishes.map((cat) => cat.id);
+
+    // Petit délai pour s'assurer que les éléments DOM sont rendus
+    const timeoutId = setTimeout(() => {
+      const observerOptions = {
+        root: null,
+        rootMargin: "-20% 0px -60% 0px",
+        threshold: 0,
+      };
+
+      observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            const categoryId = entry.target.id.replace("section-", "");
+            setActiveCategoryId(categoryId);
+          }
+        });
+      }, observerOptions);
+
+      // Observer toutes les sections de catégories
+      categoryIds.forEach((categoryId) => {
+        const element = document.getElementById(`section-${categoryId}`);
+        if (element) {
+          observer?.observe(element);
+        }
+      });
+    }, 100);
+
+    return () => {
+      clearTimeout(timeoutId);
+      if (observer) {
+        categoryIds.forEach((categoryId) => {
+          const element = document.getElementById(`section-${categoryId}`);
+          if (element) {
+            observer.unobserve(element);
+          }
+        });
+      }
+    };
+  }, [categoryIdsString, loading, categoriesWithDishes.length]);
+
+  // Définir la première catégorie comme active par défaut
+  useEffect(() => {
+    if (categoriesWithDishes.length > 0 && activeCategoryId === null && !loading) {
+      setActiveCategoryId(categoriesWithDishes[0].id);
+    }
+  }, [categoriesWithDishes, loading, activeCategoryId]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-50 flex items-center justify-center">
@@ -246,6 +313,14 @@ export default function RestaurantPage() {
     setTopDishIndex(index);
   };
 
+  // Fonction de scroll fluide vers une section
+  const scrollToSection = (categoryId: string) => {
+    const el = document.getElementById(`section-${categoryId}`);
+    if (!el) return;
+    setActiveCategoryId(categoryId);
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50">
       <div className="mx-auto w-full max-w-3xl overflow-hidden rounded-b-3xl bg-black/40">
@@ -270,6 +345,31 @@ export default function RestaurantPage() {
       </div>
 
       <div className="max-w-5xl mx-auto px-4 py-6">
+        {/* Menu d'ancrage des catégories */}
+        {categoriesWithDishes.length > 0 && (
+          <div className="mb-6 -mt-2">
+            <div className="overflow-x-auto no-scrollbar">
+              <div className="flex gap-2 sm:gap-3 justify-center">
+                {categoriesWithDishes.map((cat) => {
+                  const isActive = activeCategoryId === cat.id;
+                  return (
+                    <button
+                      key={cat.id}
+                      onClick={() => scrollToSection(cat.id)}
+                      className={`px-4 py-1.5 rounded-full text-sm font-medium transition whitespace-nowrap ${
+                        isActive
+                          ? "bg-bitebox text-white"
+                          : "bg-white/5 text-slate-300 hover:bg-white/10"
+                      }`}
+                    >
+                      {cat.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
         {/* Bloc note + bouton */}
         <section className="mt-4 flex flex-col items-center gap-4 mb-6">
           {/* Bloc note */}
@@ -530,7 +630,7 @@ export default function RestaurantPage() {
                 if (categoryDishes.length === 0) return null;
 
                 return (
-                  <div key={category.id} className="space-y-3">
+                  <div key={category.id} id={`section-${category.id}`} className="space-y-3 pt-4">
                     <h3 className="text-base font-semibold text-slate-100 border-b border-slate-800 pb-2">
                       {category.name}
                     </h3>
