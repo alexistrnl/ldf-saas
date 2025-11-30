@@ -1587,11 +1587,13 @@ export default function AdminRestaurantsPage() {
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                               <div className="flex items-center gap-3 flex-1">
                                 {dish.image_url && (
-                                  <img
-                                    src={dish.image_url}
-                                    alt={dish.name}
-                                    className="h-12 w-12 rounded object-cover"
-                                  />
+                                  <div className="relative h-12 w-12 overflow-hidden rounded-xl bg-[#0d0d12]">
+                                    <img
+                                      src={dish.image_url}
+                                      alt={dish.name}
+                                      className="absolute inset-0 w-full h-full object-cover object-center scale-95"
+                                    />
+                                  </div>
                                 )}
                                 <div className="flex-1">
                                   <p className="text-sm font-semibold">{dish.name}</p>
@@ -1784,12 +1786,14 @@ export default function AdminRestaurantsPage() {
                                   {editDishImagePreview && (
                                     <div className="mt-3 p-3 bg-slate-950 rounded-lg border border-slate-700">
                                       <p className="text-xs text-slate-400 mb-2">Aperçu :</p>
-                                      <img
-                                        src={editDishImagePreview}
-                                        alt="Aperçu plat"
-                                        className="max-w-full h-32 object-contain rounded"
-                                        onError={() => setEditDishImagePreview(editingDish?.image_url ?? null)}
-                                      />
+                                      <div className="relative h-32 w-full overflow-hidden rounded-xl bg-[#0d0d12]">
+                                        <img
+                                          src={editDishImagePreview}
+                                          alt="Aperçu plat"
+                                          className="absolute inset-0 w-full h-full object-cover object-center scale-95"
+                                          onError={() => setEditDishImagePreview(editingDish?.image_url ?? null)}
+                                        />
+                                      </div>
                                     </div>
                                   )}
                                 </div>
@@ -1863,11 +1867,13 @@ export default function AdminRestaurantsPage() {
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                               <div className="flex items-center gap-3 flex-1">
                                 {dish.image_url && (
-                                  <img
-                                    src={dish.image_url}
-                                    alt={dish.name}
-                                    className="h-12 w-12 rounded object-cover"
-                                  />
+                                  <div className="relative h-12 w-12 overflow-hidden rounded-xl bg-[#0d0d12]">
+                                    <img
+                                      src={dish.image_url}
+                                      alt={dish.name}
+                                      className="absolute inset-0 w-full h-full object-cover object-center scale-95"
+                                    />
+                                  </div>
                                 )}
                                 <div className="flex-1">
                                   <p className="text-sm font-semibold">{dish.name}</p>
@@ -2060,12 +2066,14 @@ export default function AdminRestaurantsPage() {
                                   {editDishImagePreview && (
                                     <div className="mt-3 p-3 bg-slate-950 rounded-lg border border-slate-700">
                                       <p className="text-xs text-slate-400 mb-2">Aperçu :</p>
-                                      <img
-                                        src={editDishImagePreview}
-                                        alt="Aperçu plat"
-                                        className="max-w-full h-32 object-contain rounded"
-                                        onError={() => setEditDishImagePreview(editingDish?.image_url ?? null)}
-                                      />
+                                      <div className="relative h-32 w-full overflow-hidden rounded-xl bg-[#0d0d12]">
+                                        <img
+                                          src={editDishImagePreview}
+                                          alt="Aperçu plat"
+                                          className="absolute inset-0 w-full h-full object-cover object-center scale-95"
+                                          onError={() => setEditDishImagePreview(editingDish?.image_url ?? null)}
+                                        />
+                                      </div>
                                     </div>
                                   )}
                                 </div>
@@ -2247,12 +2255,14 @@ export default function AdminRestaurantsPage() {
                 {dishImagePreview && (
                   <div className="mt-3 p-3 bg-slate-950 rounded-lg border border-slate-700">
                     <p className="text-xs text-slate-400 mb-2">Aperçu :</p>
-                    <img
-                      src={dishImagePreview}
-                      alt="Aperçu plat"
-                      className="max-w-full h-32 object-contain rounded"
-                      onError={() => setDishImagePreview(null)}
-                    />
+                    <div className="relative h-32 w-full overflow-hidden rounded-xl bg-[#0d0d12]">
+                      <img
+                        src={dishImagePreview}
+                        alt="Aperçu plat"
+                        className="absolute inset-0 w-full h-full object-cover object-center scale-95"
+                        onError={() => setDishImagePreview(null)}
+                      />
+                    </div>
                   </div>
                 )}
               </div>
