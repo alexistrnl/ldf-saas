@@ -45,6 +45,14 @@ type DishWithStats = Dish & {
   ratingStats: RatingStats;
 };
 
+// Fonction helper pour détecter si une image est un PNG
+const isPngImage = (url: string | null): boolean => {
+  if (!url) return false;
+  // Extraire le chemin sans paramètres de requête ni fragments
+  const path = url.split('?')[0].split('#')[0];
+  return path.toLowerCase().endsWith('.png');
+};
+
 export default function RestaurantPage() {
   const params = useParams<{ slug: string }>();
   const router = useRouter();
@@ -462,7 +470,9 @@ export default function RestaurantPage() {
                       <img
                         src={dish.image_url}
                         alt={dish.name}
-                        className="absolute inset-0 w-full h-full object-cover object-center"
+                        className={`absolute inset-0 w-full h-full object-cover object-center ${
+                          isPngImage(dish.image_url) ? 'scale-90' : ''
+                        }`}
                       />
                     ) : (
                       <div className="absolute inset-0 flex items-center justify-center">
@@ -535,7 +545,9 @@ export default function RestaurantPage() {
                               <img
                                 src={dish.image_url}
                                 alt={dish.name}
-                                className="absolute inset-0 w-full h-full object-cover object-center"
+                                className={`absolute inset-0 w-full h-full object-cover object-center ${
+                                  dish.image_url.toLowerCase().endsWith('.png') ? 'scale-90' : ''
+                                }`}
                               />
                             ) : (
                               <div className="absolute inset-0 flex items-center justify-center">
