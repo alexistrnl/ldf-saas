@@ -259,9 +259,10 @@ export default function RestaurantPage() {
         categoryIds.forEach((categoryId) => {
           const element = document.getElementById(`section-${categoryId}`);
           if (element) {
-            observer.unobserve(element);
+            observer?.unobserve(element);
           }
         });
+        observer?.disconnect();
       }
     };
   }, [categoryIdsString, loading, categoriesWithDishes.length]);
