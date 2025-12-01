@@ -79,9 +79,7 @@ export default function AdminRestaurantsPage() {
 
   const [dishName, setDishName] = useState("");
   const [dishDescription, setDishDescription] = useState("");
-  const [dishImageFile, setDishImageFile] = useState<File | null>(null);
   const [dishImageUrl, setDishImageUrl] = useState("");
-  const [dishImageMode, setDishImageMode] = useState<"upload" | "url">("upload");
   const [dishImagePreview, setDishImagePreview] = useState<string | null>(null);
   const [dishIsSignature, setDishIsSignature] = useState(false);
   const [dishIsLimitedEdition, setDishIsLimitedEdition] = useState(false);
@@ -90,9 +88,7 @@ export default function AdminRestaurantsPage() {
   const [editingDish, setEditingDish] = useState<Dish | null>(null);
   const [editDishName, setEditDishName] = useState("");
   const [editDishDescription, setEditDishDescription] = useState("");
-  const [editDishImageFile, setEditDishImageFile] = useState<File | null>(null);
   const [editDishImageUrl, setEditDishImageUrl] = useState("");
-  const [editDishImageMode, setEditDishImageMode] = useState<"upload" | "url">("upload");
   const [editDishImagePreview, setEditDishImagePreview] = useState<string | null>(null);
   const [editDishIsSignature, setEditDishIsSignature] = useState(false);
   const [editDishIsLimitedEdition, setEditDishIsLimitedEdition] = useState(false);
@@ -707,31 +703,8 @@ export default function AdminRestaurantsPage() {
 
       let finalImageUrl: string | null = null;
 
-      // Mode upload : uploader le fichier
-      if (dishImageMode === "upload" && dishImageFile) {
-        const fileError = validateImageFile(dishImageFile);
-        if (fileError) {
-          setError(fileError);
-          return;
-        }
-
-        const path = `dishes/${selectedRestaurant.id}/${Date.now()}-${dishImageFile.name}`;
-        const { error: uploadError } = await supabase
-          .storage
-          .from("fastfood-images")
-          .upload(path, dishImageFile);
-
-        if (uploadError) {
-          console.error("[Admin] upload dish image error", uploadError);
-          setError("Erreur lors de l'upload de l'image du plat.");
-          return;
-        }
-
-        const { data } = supabase.storage.from("fastfood-images").getPublicUrl(path);
-        finalImageUrl = data.publicUrl;
-      }
-      // Mode URL : valider et utiliser l'URL
-      else if (dishImageMode === "url" && dishImageUrl.trim()) {
+      // Valider et utiliser l'URL si fournie
+      if (dishImageUrl.trim()) {
         if (!validateImageUrl(dishImageUrl)) {
           setError("URL invalide. L'URL doit commencer par http:// ou https:// et avoir une extension .png, .jpg, .jpeg ou .webp");
           return;
@@ -763,12 +736,7 @@ export default function AdminRestaurantsPage() {
 
       setDishName("");
       setDishDescription("");
-      if (dishImagePreview && dishImagePreview.startsWith('blob:')) {
-        URL.revokeObjectURL(dishImagePreview);
-      }
-      setDishImageFile(null);
       setDishImageUrl("");
-      setDishImageMode("upload");
       setDishImagePreview(null);
       setDishIsSignature(false);
       setDishIsLimitedEdition(false);
@@ -788,25 +756,18 @@ export default function AdminRestaurantsPage() {
     setEditDishIsSignature(dish.is_signature);
     setEditDishIsLimitedEdition(dish.is_limited_edition ?? false);
     setEditDishCategoryId(dish.category_id);
-    setEditDishImageFile(null);
-    setEditDishImageUrl("");
-    setEditDishImageMode("upload");
+    setEditDishImageUrl(dish.image_url || "");
     setEditDishImagePreview(dish.image_url);
   };
 
   const cancelEditDish = () => {
     setEditingDish(null);
-    setEditDishName("");
-    setEditDishDescription("");
-    setEditDishIsSignature(false);
-    setEditDishIsLimitedEdition(false);
-    if (editDishImagePreview && editDishImagePreview.startsWith('blob:')) {
-      URL.revokeObjectURL(editDishImagePreview);
-    }
-    setEditDishImageFile(null);
-    setEditDishImageUrl("");
-    setEditDishImageMode("upload");
-    setEditDishImagePreview(null);
+      setEditDishName("");
+      setEditDishDescription("");
+      setEditDishIsSignature(false);
+      setEditDishIsLimitedEdition(false);
+      setEditDishImageUrl("");
+      setEditDishImagePreview(null);
   };
 
   const handleUpdateDish = async (e: React.FormEvent) => {
@@ -821,40 +782,13 @@ export default function AdminRestaurantsPage() {
 
       let finalImageUrl: string | null = editingDish.image_url ?? null;
 
-      // Mode upload : uploader le fichier
-      if (editDishImageMode === "upload" && editDishImageFile) {
-        const fileError = validateImageFile(editDishImageFile);
-        if (fileError) {
-          setError(fileError);
-          return;
-        }
-
-        const path = `dishes/${selectedRestaurant.id}/${Date.now()}-${editDishImageFile.name}`;
-        const { error: uploadError } = await supabase
-          .storage
-          .from("fastfood-images")
-          .upload(path, editDishImageFile);
-
-        if (uploadError) {
-          console.error("[Admin] upload new dish image error", uploadError);
-          setError("Erreur lors de l'upload de la nouvelle image.");
-          return;
-        }
-
-        const { data } = supabase.storage.from("fastfood-images").getPublicUrl(path);
-        finalImageUrl = data.publicUrl;
-      }
-      // Mode URL : valider et utiliser l'URL
-      else if (editDishImageMode === "url" && editDishImageUrl.trim()) {
+      // Valider et utiliser l'URL si fournie, sinon garder l'ancienne
+      if (editDishImageUrl.trim()) {
         if (!validateImageUrl(editDishImageUrl)) {
           setError("URL invalide. L'URL doit commencer par http:// ou https:// et avoir une extension .png, .jpg, .jpeg ou .webp");
           return;
         }
         finalImageUrl = editDishImageUrl.trim();
-      }
-      // Si on est en mode URL mais que l'URL est vide, on garde l'ancienne
-      else if (editDishImageMode === "url" && !editDishImageUrl.trim()) {
-        // Garder l'URL existante
       }
 
       const { error: updateError } = await supabase
@@ -1672,202 +1606,151 @@ export default function AdminRestaurantsPage() {
                             </div>
 
                             {editingDish?.id === dish.id && (
-                              <form onSubmit={handleUpdateDish} className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-slate-800 pt-3">
-                                <div className="space-y-1">
-                                  <label className="text-xs text-slate-300">Nom du plat</label>
-                                  <input
-                                    type="text"
-                                    value={editDishName}
-                                    onChange={(e) => setEditDishName(e.target.value)}
-                                    className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
-                                  />
-                                </div>
-
-                                <div className="space-y-1">
-                                  <label className="text-xs text-slate-300">
-                                    Description (optionnel)
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={editDishDescription}
-                                    onChange={(e) => setEditDishDescription(e.target.value)}
-                                    className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
-                                  />
-                                </div>
-
-                                <div className="space-y-2">
-                                  <label className="text-xs text-slate-300">
-                                    Nouvelle image (optionnel)
-                                  </label>
-                                  
-                                  {/* Tabs pour choisir entre upload et URL */}
-                                  <div className="flex gap-2 border-b border-slate-700">
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        if (editDishImagePreview && editDishImagePreview.startsWith('blob:')) {
-                                          URL.revokeObjectURL(editDishImagePreview);
-                                        }
-                                        setEditDishImageMode("upload");
-                                        setEditDishImageUrl("");
-                                        setEditDishImagePreview(editingDish?.image_url ?? null);
-                                      }}
-                                      className={`px-3 py-1.5 text-xs font-medium transition ${
-                                        editDishImageMode === "upload"
-                                          ? "text-bitebox border-b-2 border-bitebox"
-                                          : "text-slate-400 hover:text-slate-200"
-                                      }`}
-                                    >
-                                      Télécharger un fichier
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        if (editDishImagePreview && editDishImagePreview.startsWith('blob:')) {
-                                          URL.revokeObjectURL(editDishImagePreview);
-                                        }
-                                        setEditDishImageMode("url");
-                                        setEditDishImageFile(null);
-                                        setEditDishImagePreview(editingDish?.image_url ?? null);
-                                      }}
-                                      className={`px-3 py-1.5 text-xs font-medium transition ${
-                                        editDishImageMode === "url"
-                                          ? "text-bitebox border-b-2 border-bitebox"
-                                          : "text-slate-400 hover:text-slate-200"
-                                      }`}
-                                    >
-                                      Entrer une URL
-                                    </button>
-                                  </div>
-
-                                  {/* Champ upload */}
-                                  {editDishImageMode === "upload" && (
-                                    <div className="space-y-2">
-                                      <input
-                                        type="file"
-                                        accept="image/png,image/jpeg,image/jpg,image/webp"
-                                        onChange={(e) => {
-                                          const file = e.target.files?.[0] ?? null;
-                                          // Nettoyer l'ancienne URL blob si elle existe
-                                          if (editDishImagePreview && editDishImagePreview.startsWith('blob:')) {
-                                            URL.revokeObjectURL(editDishImagePreview);
-                                          }
-                                          setEditDishImageFile(file);
-                                          setEditDishImageUrl("");
-                                          if (file) {
-                                            const preview = URL.createObjectURL(file);
-                                            setEditDishImagePreview(preview);
-                                          } else {
-                                            setEditDishImagePreview(editingDish?.image_url ?? null);
-                                          }
-                                        }}
-                                        className="text-xs text-slate-300"
-                                      />
-                                      <p className="text-[11px] text-slate-500">
-                                        Formats acceptés : PNG, JPG, JPEG, WEBP (max 5MB). Laisse vide pour conserver l'image actuelle.
-                                      </p>
-                                    </div>
-                                  )}
-
-                                  {/* Champ URL */}
-                                  {editDishImageMode === "url" && (
-                                    <div className="space-y-2">
-                                      <input
-                                        type="url"
-                                        value={editDishImageUrl}
-                                        onChange={(e) => {
-                                          const url = e.target.value;
-                                          setEditDishImageUrl(url);
-                                          setEditDishImageFile(null);
-                                          if (url && validateImageUrl(url)) {
-                                            setEditDishImagePreview(url);
-                                          } else if (!url) {
-                                            setEditDishImagePreview(editingDish?.image_url ?? null);
-                                          } else {
-                                            setEditDishImagePreview(null);
-                                          }
-                                        }}
-                                        placeholder="https://exemple.com/image.png"
-                                        className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
-                                      />
-                                      <p className="text-[11px] text-slate-500">
-                                        URL commençant par http:// ou https:// avec extension .png, .jpg, .jpeg ou .webp. Laisse vide pour conserver l'image actuelle.
-                                      </p>
-                                    </div>
-                                  )}
-
-                                  {/* Aperçu de l'image */}
-                                  {editDishImagePreview && (
-                                    <div className="mt-3 p-3 bg-slate-950 rounded-lg border border-slate-700">
-                                      <p className="text-xs text-slate-400 mb-2">Aperçu :</p>
-                                      <div className="relative h-32 w-full overflow-hidden rounded-xl bg-[#0d0d12]">
-                                        <img
-                                          src={editDishImagePreview}
-                                          alt="Aperçu plat"
-                                          className="absolute inset-0 w-full h-full object-cover object-center scale-90"
-                                          onError={() => setEditDishImagePreview(editingDish?.image_url ?? null)}
-                                        />
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-
-                                <div className="space-y-2">
-                                  <div className="space-y-1">
-                                    <label className="text-xs text-slate-300">Section (optionnel)</label>
-                                    <select
-                                      value={editDishCategoryId || ""}
-                                      onChange={(e) => setEditDishCategoryId(e.target.value || null)}
-                                      className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
-                                    >
-                                      <option value="">Aucune section</option>
-                                      {categories.map((cat) => (
-                                        <option key={cat.id} value={cat.id}>
-                                          {cat.name}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  </div>
-                                  <label className="flex items-center gap-2 text-xs text-slate-300">
-                                    <input
-                                      type="checkbox"
-                                      checked={editDishIsSignature}
-                                      onChange={(e) => setEditDishIsSignature(e.target.checked)}
-                                      className="h-3 w-3"
-                                    />
-                                    Plat signature
-                                  </label>
-                                  <div className="flex flex-col gap-1">
-                                    <label className="flex items-center gap-2 text-xs text-slate-300">
-                                      <input
-                                        type="checkbox"
-                                        checked={editDishIsLimitedEdition}
-                                        onChange={(e) => setEditDishIsLimitedEdition(e.target.checked)}
-                                        className="h-3 w-3"
-                                      />
-                                      Édition limitée
-                                    </label>
-                                    <p className="text-[10px] text-slate-500 ml-5">
-                                      Plat disponible pour une durée limitée / collab spéciale, peut ne plus être au menu plus tard.
+                              <div className="border-t border-slate-800 pt-4 mt-4">
+                                <div className="bg-slate-900/50 rounded-xl border border-slate-800 p-6">
+                                  <div className="mb-6">
+                                    <h3 className="text-lg font-semibold text-gray-200 mb-1">Modifier le plat</h3>
+                                    <p className="text-xs text-gray-400">
+                                      Modifie les informations de ce plat.
                                     </p>
                                   </div>
-                                  <div className="flex items-center gap-2">
-                                    <button
-                                      type="submit"
-                                      className="inline-flex items-center justify-center rounded-md bg-bitebox px-4 py-2 text-xs font-semibold text-white shadow hover:bg-bitebox-dark transition"
-                                    >
-                                      Enregistrer
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={cancelEditDish}
-                                      className="text-[11px] text-slate-300 hover:text-slate-100"
-                                    >
-                                      Annuler
-                                    </button>
-                                  </div>
+
+                                  <form onSubmit={handleUpdateDish} className="space-y-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                      {/* Colonne gauche */}
+                                      <div className="space-y-4">
+                                        <div className="space-y-2">
+                                          <label className="text-sm font-medium text-gray-200">Nom du plat</label>
+                                          <input
+                                            type="text"
+                                            value={editDishName}
+                                            onChange={(e) => setEditDishName(e.target.value)}
+                                            className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-gray-200 outline-none focus:border-bitebox"
+                                            required
+                                          />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                          <label className="text-sm font-medium text-gray-200">
+                                            Description <span className="text-xs text-gray-400">(optionnel)</span>
+                                          </label>
+                                          <input
+                                            type="text"
+                                            value={editDishDescription}
+                                            onChange={(e) => setEditDishDescription(e.target.value)}
+                                            className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-gray-200 outline-none focus:border-bitebox"
+                                          />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                          <label className="text-sm font-medium text-gray-200">
+                                            URL de l'image <span className="text-xs text-gray-400">(optionnel)</span>
+                                          </label>
+                                          <input
+                                            type="url"
+                                            value={editDishImageUrl}
+                                            onChange={(e) => {
+                                              const url = e.target.value;
+                                              setEditDishImageUrl(url);
+                                              if (url && validateImageUrl(url)) {
+                                                setEditDishImagePreview(url);
+                                              } else if (!url) {
+                                                setEditDishImagePreview(editingDish?.image_url ?? null);
+                                              } else {
+                                                setEditDishImagePreview(null);
+                                              }
+                                            }}
+                                            placeholder="https://..."
+                                            className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-gray-200 outline-none focus:border-bitebox"
+                                          />
+                                          <p className="text-xs text-gray-400">
+                                            URL commençant par http:// ou https:// avec extension .png, .jpg, .jpeg ou .webp. Laisse vide pour conserver l'image actuelle.
+                                          </p>
+                                          {editDishImagePreview && (
+                                            <div className="mt-3 p-3 bg-slate-950 rounded-lg border border-slate-700">
+                                              <p className="text-xs text-gray-400 mb-2">Aperçu :</p>
+                                              <div className="relative h-32 w-full overflow-hidden rounded-xl bg-[#0d0d12]">
+                                                <img
+                                                  src={editDishImagePreview}
+                                                  alt="Aperçu plat"
+                                                  className="absolute inset-0 w-full h-full object-cover object-center scale-95"
+                                                  onError={() => setEditDishImagePreview(editingDish?.image_url ?? null)}
+                                                />
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      {/* Colonne droite */}
+                                      <div className="space-y-4">
+                                        <div className="space-y-2">
+                                          <label className="text-sm font-medium text-gray-200">
+                                            Section <span className="text-xs text-gray-400">(optionnel)</span>
+                                          </label>
+                                          <select
+                                            value={editDishCategoryId || ""}
+                                            onChange={(e) => setEditDishCategoryId(e.target.value || null)}
+                                            className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-gray-200 outline-none focus:border-bitebox"
+                                          >
+                                            <option value="">Aucune section</option>
+                                            {categories.map((cat) => (
+                                              <option key={cat.id} value={cat.id}>
+                                                {cat.name}
+                                              </option>
+                                            ))}
+                                          </select>
+                                        </div>
+
+                                        <div className="space-y-3">
+                                          <h4 className="text-sm font-medium text-gray-200">Options du plat</h4>
+                                          <div className="space-y-3 pl-1">
+                                            <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                                              <input
+                                                type="checkbox"
+                                                checked={editDishIsSignature}
+                                                onChange={(e) => setEditDishIsSignature(e.target.checked)}
+                                                className="h-4 w-4 rounded border-slate-600 text-bitebox focus:ring-bitebox"
+                                              />
+                                              <span>Plat signature</span>
+                                            </label>
+                                            <div className="space-y-1">
+                                              <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                                                <input
+                                                  type="checkbox"
+                                                  checked={editDishIsLimitedEdition}
+                                                  onChange={(e) => setEditDishIsLimitedEdition(e.target.checked)}
+                                                  className="h-4 w-4 rounded border-slate-600 text-amber-500 focus:ring-amber-500"
+                                                />
+                                                <span>Édition limitée</span>
+                                              </label>
+                                              <p className="text-xs text-gray-400 ml-6">
+                                                Plat disponible pour une durée limitée / collab spéciale, peut ne plus être au menu plus tard.
+                                              </p>
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-3 pt-2">
+                                          <button
+                                            type="submit"
+                                            className="rounded-full bg-[#6A24A4] hover:bg-[#581c87] px-6 py-2 text-sm font-semibold text-white transition"
+                                          >
+                                            Enregistrer
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={cancelEditDish}
+                                            className="text-sm text-gray-400 hover:text-gray-200 transition"
+                                          >
+                                            Annuler
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </form>
                                 </div>
-                              </form>
+                              </div>
                             )}
                           </div>
                         ))}
@@ -1971,202 +1854,151 @@ export default function AdminRestaurantsPage() {
                             </div>
 
                             {editingDish?.id === dish.id && (
-                              <form onSubmit={handleUpdateDish} className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-slate-800 pt-3">
-                                <div className="space-y-1">
-                                  <label className="text-xs text-slate-300">Nom du plat</label>
-                                  <input
-                                    type="text"
-                                    value={editDishName}
-                                    onChange={(e) => setEditDishName(e.target.value)}
-                                    className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
-                                  />
-                                </div>
-
-                                <div className="space-y-1">
-                                  <label className="text-xs text-slate-300">
-                                    Description (optionnel)
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={editDishDescription}
-                                    onChange={(e) => setEditDishDescription(e.target.value)}
-                                    className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
-                                  />
-                                </div>
-
-                                <div className="space-y-2">
-                                  <label className="text-xs text-slate-300">
-                                    Nouvelle image (optionnel)
-                                  </label>
-                                  
-                                  {/* Tabs pour choisir entre upload et URL */}
-                                  <div className="flex gap-2 border-b border-slate-700">
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        if (editDishImagePreview && editDishImagePreview.startsWith('blob:')) {
-                                          URL.revokeObjectURL(editDishImagePreview);
-                                        }
-                                        setEditDishImageMode("upload");
-                                        setEditDishImageUrl("");
-                                        setEditDishImagePreview(editingDish?.image_url ?? null);
-                                      }}
-                                      className={`px-3 py-1.5 text-xs font-medium transition ${
-                                        editDishImageMode === "upload"
-                                          ? "text-bitebox border-b-2 border-bitebox"
-                                          : "text-slate-400 hover:text-slate-200"
-                                      }`}
-                                    >
-                                      Télécharger un fichier
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        if (editDishImagePreview && editDishImagePreview.startsWith('blob:')) {
-                                          URL.revokeObjectURL(editDishImagePreview);
-                                        }
-                                        setEditDishImageMode("url");
-                                        setEditDishImageFile(null);
-                                        setEditDishImagePreview(editingDish?.image_url ?? null);
-                                      }}
-                                      className={`px-3 py-1.5 text-xs font-medium transition ${
-                                        editDishImageMode === "url"
-                                          ? "text-bitebox border-b-2 border-bitebox"
-                                          : "text-slate-400 hover:text-slate-200"
-                                      }`}
-                                    >
-                                      Entrer une URL
-                                    </button>
-                                  </div>
-
-                                  {/* Champ upload */}
-                                  {editDishImageMode === "upload" && (
-                                    <div className="space-y-2">
-                                      <input
-                                        type="file"
-                                        accept="image/png,image/jpeg,image/jpg,image/webp"
-                                        onChange={(e) => {
-                                          const file = e.target.files?.[0] ?? null;
-                                          // Nettoyer l'ancienne URL blob si elle existe
-                                          if (editDishImagePreview && editDishImagePreview.startsWith('blob:')) {
-                                            URL.revokeObjectURL(editDishImagePreview);
-                                          }
-                                          setEditDishImageFile(file);
-                                          setEditDishImageUrl("");
-                                          if (file) {
-                                            const preview = URL.createObjectURL(file);
-                                            setEditDishImagePreview(preview);
-                                          } else {
-                                            setEditDishImagePreview(editingDish?.image_url ?? null);
-                                          }
-                                        }}
-                                        className="text-xs text-slate-300"
-                                      />
-                                      <p className="text-[11px] text-slate-500">
-                                        Formats acceptés : PNG, JPG, JPEG, WEBP (max 5MB). Laisse vide pour conserver l'image actuelle.
-                                      </p>
-                                    </div>
-                                  )}
-
-                                  {/* Champ URL */}
-                                  {editDishImageMode === "url" && (
-                                    <div className="space-y-2">
-                                      <input
-                                        type="url"
-                                        value={editDishImageUrl}
-                                        onChange={(e) => {
-                                          const url = e.target.value;
-                                          setEditDishImageUrl(url);
-                                          setEditDishImageFile(null);
-                                          if (url && validateImageUrl(url)) {
-                                            setEditDishImagePreview(url);
-                                          } else if (!url) {
-                                            setEditDishImagePreview(editingDish?.image_url ?? null);
-                                          } else {
-                                            setEditDishImagePreview(null);
-                                          }
-                                        }}
-                                        placeholder="https://exemple.com/image.png"
-                                        className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
-                                      />
-                                      <p className="text-[11px] text-slate-500">
-                                        URL commençant par http:// ou https:// avec extension .png, .jpg, .jpeg ou .webp. Laisse vide pour conserver l'image actuelle.
-                                      </p>
-                                    </div>
-                                  )}
-
-                                  {/* Aperçu de l'image */}
-                                  {editDishImagePreview && (
-                                    <div className="mt-3 p-3 bg-slate-950 rounded-lg border border-slate-700">
-                                      <p className="text-xs text-slate-400 mb-2">Aperçu :</p>
-                                      <div className="relative h-32 w-full overflow-hidden rounded-xl bg-[#0d0d12]">
-                                        <img
-                                          src={editDishImagePreview}
-                                          alt="Aperçu plat"
-                                          className="absolute inset-0 w-full h-full object-cover object-center scale-90"
-                                          onError={() => setEditDishImagePreview(editingDish?.image_url ?? null)}
-                                        />
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-
-                                <div className="space-y-2">
-                                  <div className="space-y-1">
-                                    <label className="text-xs text-slate-300">Section (optionnel)</label>
-                                    <select
-                                      value={editDishCategoryId || ""}
-                                      onChange={(e) => setEditDishCategoryId(e.target.value || null)}
-                                      className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
-                                    >
-                                      <option value="">Aucune section</option>
-                                      {categories.map((cat) => (
-                                        <option key={cat.id} value={cat.id}>
-                                          {cat.name}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  </div>
-                                  <label className="flex items-center gap-2 text-xs text-slate-300">
-                                    <input
-                                      type="checkbox"
-                                      checked={editDishIsSignature}
-                                      onChange={(e) => setEditDishIsSignature(e.target.checked)}
-                                      className="h-3 w-3"
-                                    />
-                                    Plat signature
-                                  </label>
-                                  <div className="flex flex-col gap-1">
-                                    <label className="flex items-center gap-2 text-xs text-slate-300">
-                                      <input
-                                        type="checkbox"
-                                        checked={editDishIsLimitedEdition}
-                                        onChange={(e) => setEditDishIsLimitedEdition(e.target.checked)}
-                                        className="h-3 w-3"
-                                      />
-                                      Édition limitée
-                                    </label>
-                                    <p className="text-[10px] text-slate-500 ml-5">
-                                      Plat disponible pour une durée limitée / collab spéciale, peut ne plus être au menu plus tard.
+                              <div className="border-t border-slate-800 pt-4 mt-4">
+                                <div className="bg-slate-900/50 rounded-xl border border-slate-800 p-6">
+                                  <div className="mb-6">
+                                    <h3 className="text-lg font-semibold text-gray-200 mb-1">Modifier le plat</h3>
+                                    <p className="text-xs text-gray-400">
+                                      Modifie les informations de ce plat.
                                     </p>
                                   </div>
-                                  <div className="flex items-center gap-2">
-                                    <button
-                                      type="submit"
-                                      className="inline-flex items-center justify-center rounded-md bg-bitebox px-4 py-2 text-xs font-semibold text-white shadow hover:bg-bitebox-dark transition"
-                                    >
-                                      Enregistrer
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={cancelEditDish}
-                                      className="text-[11px] text-slate-300 hover:text-slate-100"
-                                    >
-                                      Annuler
-                                    </button>
-                                  </div>
+
+                                  <form onSubmit={handleUpdateDish} className="space-y-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                      {/* Colonne gauche */}
+                                      <div className="space-y-4">
+                                        <div className="space-y-2">
+                                          <label className="text-sm font-medium text-gray-200">Nom du plat</label>
+                                          <input
+                                            type="text"
+                                            value={editDishName}
+                                            onChange={(e) => setEditDishName(e.target.value)}
+                                            className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-gray-200 outline-none focus:border-bitebox"
+                                            required
+                                          />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                          <label className="text-sm font-medium text-gray-200">
+                                            Description <span className="text-xs text-gray-400">(optionnel)</span>
+                                          </label>
+                                          <input
+                                            type="text"
+                                            value={editDishDescription}
+                                            onChange={(e) => setEditDishDescription(e.target.value)}
+                                            className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-gray-200 outline-none focus:border-bitebox"
+                                          />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                          <label className="text-sm font-medium text-gray-200">
+                                            URL de l'image <span className="text-xs text-gray-400">(optionnel)</span>
+                                          </label>
+                                          <input
+                                            type="url"
+                                            value={editDishImageUrl}
+                                            onChange={(e) => {
+                                              const url = e.target.value;
+                                              setEditDishImageUrl(url);
+                                              if (url && validateImageUrl(url)) {
+                                                setEditDishImagePreview(url);
+                                              } else if (!url) {
+                                                setEditDishImagePreview(editingDish?.image_url ?? null);
+                                              } else {
+                                                setEditDishImagePreview(null);
+                                              }
+                                            }}
+                                            placeholder="https://..."
+                                            className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-gray-200 outline-none focus:border-bitebox"
+                                          />
+                                          <p className="text-xs text-gray-400">
+                                            URL commençant par http:// ou https:// avec extension .png, .jpg, .jpeg ou .webp. Laisse vide pour conserver l'image actuelle.
+                                          </p>
+                                          {editDishImagePreview && (
+                                            <div className="mt-3 p-3 bg-slate-950 rounded-lg border border-slate-700">
+                                              <p className="text-xs text-gray-400 mb-2">Aperçu :</p>
+                                              <div className="relative h-32 w-full overflow-hidden rounded-xl bg-[#0d0d12]">
+                                                <img
+                                                  src={editDishImagePreview}
+                                                  alt="Aperçu plat"
+                                                  className="absolute inset-0 w-full h-full object-cover object-center scale-95"
+                                                  onError={() => setEditDishImagePreview(editingDish?.image_url ?? null)}
+                                                />
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      {/* Colonne droite */}
+                                      <div className="space-y-4">
+                                        <div className="space-y-2">
+                                          <label className="text-sm font-medium text-gray-200">
+                                            Section <span className="text-xs text-gray-400">(optionnel)</span>
+                                          </label>
+                                          <select
+                                            value={editDishCategoryId || ""}
+                                            onChange={(e) => setEditDishCategoryId(e.target.value || null)}
+                                            className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-gray-200 outline-none focus:border-bitebox"
+                                          >
+                                            <option value="">Aucune section</option>
+                                            {categories.map((cat) => (
+                                              <option key={cat.id} value={cat.id}>
+                                                {cat.name}
+                                              </option>
+                                            ))}
+                                          </select>
+                                        </div>
+
+                                        <div className="space-y-3">
+                                          <h4 className="text-sm font-medium text-gray-200">Options du plat</h4>
+                                          <div className="space-y-3 pl-1">
+                                            <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                                              <input
+                                                type="checkbox"
+                                                checked={editDishIsSignature}
+                                                onChange={(e) => setEditDishIsSignature(e.target.checked)}
+                                                className="h-4 w-4 rounded border-slate-600 text-bitebox focus:ring-bitebox"
+                                              />
+                                              <span>Plat signature</span>
+                                            </label>
+                                            <div className="space-y-1">
+                                              <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                                                <input
+                                                  type="checkbox"
+                                                  checked={editDishIsLimitedEdition}
+                                                  onChange={(e) => setEditDishIsLimitedEdition(e.target.checked)}
+                                                  className="h-4 w-4 rounded border-slate-600 text-amber-500 focus:ring-amber-500"
+                                                />
+                                                <span>Édition limitée</span>
+                                              </label>
+                                              <p className="text-xs text-gray-400 ml-6">
+                                                Plat disponible pour une durée limitée / collab spéciale, peut ne plus être au menu plus tard.
+                                              </p>
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-3 pt-2">
+                                          <button
+                                            type="submit"
+                                            className="rounded-full bg-[#6A24A4] hover:bg-[#581c87] px-6 py-2 text-sm font-semibold text-white transition"
+                                          >
+                                            Enregistrer
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={cancelEditDish}
+                                            className="text-sm text-gray-400 hover:text-gray-200 transition"
+                                          >
+                                            Annuler
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </form>
                                 </div>
-                              </form>
+                              </div>
                             )}
                           </div>
                         ))}
@@ -2178,189 +2010,144 @@ export default function AdminRestaurantsPage() {
             )}
 
             {/* Ajout de plat */}
-            <form onSubmit={handleAddDish} className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-slate-800 pt-4">
-              <div className="space-y-1">
-                <label className="text-xs text-slate-300">Nom du plat</label>
-                <input
-                  type="text"
-                  value={dishName}
-                  onChange={(e) => setDishName(e.target.value)}
-                  className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
-                  placeholder="Ex : Whopper"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs text-slate-300">Description (optionnel)</label>
-                <input
-                  type="text"
-                  value={dishDescription}
-                  onChange={(e) => setDishDescription(e.target.value)}
-                  className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
-                  placeholder="Burger signature..."
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs text-slate-300">Image du plat (optionnel)</label>
-                
-                {/* Tabs pour choisir entre upload et URL */}
-                <div className="flex gap-2 border-b border-slate-700">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (dishImagePreview && dishImagePreview.startsWith('blob:')) {
-                        URL.revokeObjectURL(dishImagePreview);
-                      }
-                      setDishImageMode("upload");
-                      setDishImageUrl("");
-                      setDishImagePreview(null);
-                    }}
-                    className={`px-3 py-1.5 text-xs font-medium transition ${
-                      dishImageMode === "upload"
-                        ? "text-bitebox border-b-2 border-bitebox"
-                        : "text-slate-400 hover:text-slate-200"
-                    }`}
-                  >
-                    Télécharger un fichier
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (dishImagePreview && dishImagePreview.startsWith('blob:')) {
-                        URL.revokeObjectURL(dishImagePreview);
-                      }
-                      setDishImageMode("url");
-                      setDishImageFile(null);
-                      setDishImagePreview(null);
-                    }}
-                    className={`px-3 py-1.5 text-xs font-medium transition ${
-                      dishImageMode === "url"
-                        ? "text-bitebox border-b-2 border-bitebox"
-                        : "text-slate-400 hover:text-slate-200"
-                    }`}
-                  >
-                    Entrer une URL
-                  </button>
-                </div>
-
-                {/* Champ upload */}
-                {dishImageMode === "upload" && (
-                  <div className="space-y-2">
-                    <input
-                      type="file"
-                      accept="image/png,image/jpeg,image/jpg,image/webp"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0] ?? null;
-                        // Nettoyer l'ancienne URL blob si elle existe
-                        if (dishImagePreview && dishImagePreview.startsWith('blob:')) {
-                          URL.revokeObjectURL(dishImagePreview);
-                        }
-                        setDishImageFile(file);
-                        setDishImageUrl("");
-                        if (file) {
-                          const preview = URL.createObjectURL(file);
-                          setDishImagePreview(preview);
-                        } else {
-                          setDishImagePreview(null);
-                        }
-                      }}
-                      className="text-xs text-slate-300"
-                    />
-                    <p className="text-[11px] text-slate-500">
-                      Formats acceptés : PNG, JPG, JPEG, WEBP (max 5MB)
-                    </p>
-                  </div>
-                )}
-
-                {/* Champ URL */}
-                {dishImageMode === "url" && (
-                  <div className="space-y-2">
-                    <input
-                      type="url"
-                      value={dishImageUrl}
-                      onChange={(e) => {
-                        const url = e.target.value;
-                        setDishImageUrl(url);
-                        setDishImageFile(null);
-                        if (url && validateImageUrl(url)) {
-                          setDishImagePreview(url);
-                        } else {
-                          setDishImagePreview(null);
-                        }
-                      }}
-                      placeholder="https://exemple.com/image.png"
-                      className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
-                    />
-                    <p className="text-[11px] text-slate-500">
-                      URL commençant par http:// ou https:// avec extension .png, .jpg, .jpeg ou .webp
-                    </p>
-                  </div>
-                )}
-
-                {/* Aperçu de l'image */}
-                {dishImagePreview && (
-                  <div className="mt-3 p-3 bg-slate-950 rounded-lg border border-slate-700">
-                    <p className="text-xs text-slate-400 mb-2">Aperçu :</p>
-                    <div className="relative h-32 w-full overflow-hidden rounded-xl bg-[#0d0d12]">
-                      <img
-                        src={dishImagePreview}
-                        alt="Aperçu plat"
-                        className="absolute inset-0 w-full h-full object-cover object-center scale-95"
-                        onError={() => setDishImagePreview(null)}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <div className="space-y-1">
-                  <label className="text-xs text-slate-300">Section (optionnel)</label>
-                  <select
-                    value={dishCategoryId || ""}
-                    onChange={(e) => setDishCategoryId(e.target.value || null)}
-                    className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
-                  >
-                    <option value="">Aucune section</option>
-                    {categories.map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <label className="flex items-center gap-2 text-xs text-slate-300">
-                  <input
-                    type="checkbox"
-                    checked={dishIsSignature}
-                    onChange={(e) => setDishIsSignature(e.target.checked)}
-                    className="h-3 w-3"
-                  />
-                  Plat signature
-                </label>
-                <div className="flex flex-col gap-1">
-                  <label className="flex items-center gap-2 text-xs text-slate-300">
-                    <input
-                      type="checkbox"
-                      checked={dishIsLimitedEdition}
-                      onChange={(e) => setDishIsLimitedEdition(e.target.checked)}
-                      className="h-3 w-3"
-                    />
-                    Édition limitée
-                  </label>
-                  <p className="text-[10px] text-slate-500 ml-5">
-                    Plat disponible pour une durée limitée / collab spéciale, peut ne plus être au menu plus tard.
+            <div className="border-t border-slate-800 pt-6">
+              <div className="bg-slate-900/50 rounded-xl border border-slate-800 p-6">
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold text-gray-200 mb-1">Ajouter un plat</h3>
+                  <p className="text-xs text-gray-400">
+                    Complète les informations de ce plat pour l'ajouter à la carte de l'enseigne.
                   </p>
                 </div>
-                <button
-                  type="submit"
-                  className="inline-flex items-center justify-center rounded-md bg-emerald-500 px-4 py-2 text-xs font-semibold text-black shadow hover:bg-emerald-400 transition"
-                >
-                  Ajouter le plat
-                </button>
+
+                <form onSubmit={handleAddDish} className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Colonne gauche */}
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-200">Nom du plat</label>
+                        <input
+                          type="text"
+                          value={dishName}
+                          onChange={(e) => setDishName(e.target.value)}
+                          className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-gray-200 outline-none focus:border-bitebox"
+                          placeholder="Ex : Whopper"
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-200">
+                          Description <span className="text-xs text-gray-400">(optionnel)</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={dishDescription}
+                          onChange={(e) => setDishDescription(e.target.value)}
+                          className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-gray-200 outline-none focus:border-bitebox"
+                          placeholder="Burger signature..."
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-200">
+                          URL de l'image <span className="text-xs text-gray-400">(optionnel)</span>
+                        </label>
+                        <input
+                          type="url"
+                          value={dishImageUrl}
+                          onChange={(e) => {
+                            const url = e.target.value;
+                            setDishImageUrl(url);
+                            if (url && validateImageUrl(url)) {
+                              setDishImagePreview(url);
+                            } else {
+                              setDishImagePreview(null);
+                            }
+                          }}
+                          placeholder="https://..."
+                          className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-gray-200 outline-none focus:border-bitebox"
+                        />
+                        <p className="text-xs text-gray-400">
+                          URL commençant par http:// ou https:// avec extension .png, .jpg, .jpeg ou .webp
+                        </p>
+                        {dishImagePreview && (
+                          <div className="mt-3 p-3 bg-slate-950 rounded-lg border border-slate-700">
+                            <p className="text-xs text-gray-400 mb-2">Aperçu :</p>
+                            <div className="relative h-32 w-full overflow-hidden rounded-xl bg-[#0d0d12]">
+                              <img
+                                src={dishImagePreview}
+                                alt="Aperçu plat"
+                                className="absolute inset-0 w-full h-full object-cover object-center scale-95"
+                                onError={() => setDishImagePreview(null)}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Colonne droite */}
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-200">
+                          Section <span className="text-xs text-gray-400">(optionnel)</span>
+                        </label>
+                        <select
+                          value={dishCategoryId || ""}
+                          onChange={(e) => setDishCategoryId(e.target.value || null)}
+                          className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-gray-200 outline-none focus:border-bitebox"
+                        >
+                          <option value="">Aucune section</option>
+                          {categories.map((cat) => (
+                            <option key={cat.id} value={cat.id}>
+                              {cat.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-3">
+                        <h4 className="text-sm font-medium text-gray-200">Options du plat</h4>
+                        <div className="space-y-3 pl-1">
+                          <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={dishIsSignature}
+                              onChange={(e) => setDishIsSignature(e.target.checked)}
+                              className="h-4 w-4 rounded border-slate-600 text-bitebox focus:ring-bitebox"
+                            />
+                            <span>Plat signature</span>
+                          </label>
+                          <div className="space-y-1">
+                            <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={dishIsLimitedEdition}
+                                onChange={(e) => setDishIsLimitedEdition(e.target.checked)}
+                                className="h-4 w-4 rounded border-slate-600 text-amber-500 focus:ring-amber-500"
+                              />
+                              <span>Édition limitée</span>
+                            </label>
+                            <p className="text-xs text-gray-400 ml-6">
+                              Plat disponible pour une durée limitée / collab spéciale, peut ne plus être au menu plus tard.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="pt-2">
+                        <button
+                          type="submit"
+                          className="w-full md:w-auto md:ml-auto md:float-right rounded-full bg-[#6A24A4] hover:bg-[#581c87] px-6 py-2 text-sm font-semibold text-white transition"
+                        >
+                          Ajouter le plat
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </form>
               </div>
-            </form>
+            </div>
           </section>
         )}
       </div>

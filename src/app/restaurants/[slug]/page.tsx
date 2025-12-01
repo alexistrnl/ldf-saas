@@ -677,7 +677,7 @@ export default function RestaurantPage() {
                                   </span>
                                 )}
                                 {dish.is_limited_edition && (
-                                  <span className="inline-flex items-center rounded-full bg-bitebox/60 text-white text-[10px] font-semibold px-2 py-[1px]">
+                                  <span className="inline-flex items-center rounded-full bg-amber-500/90 text-white text-[10px] font-semibold px-2 py-[1px]">
                                     Édition limitée
                                   </span>
                                 )}
@@ -759,7 +759,7 @@ export default function RestaurantPage() {
                                   </span>
                                 )}
                                 {dish.is_limited_edition && (
-                                  <span className="inline-flex items-center rounded-full bg-bitebox/60 text-white text-[10px] font-semibold px-2 py-[1px]">
+                                  <span className="inline-flex items-center rounded-full bg-amber-500/90 text-white text-[10px] font-semibold px-2 py-[1px]">
                                     Édition limitée
                                   </span>
                                 )}
