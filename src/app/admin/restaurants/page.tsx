@@ -79,7 +79,9 @@ export default function AdminRestaurantsPage() {
 
   const [dishName, setDishName] = useState("");
   const [dishDescription, setDishDescription] = useState("");
+  const [dishImageFile, setDishImageFile] = useState<File | null>(null);
   const [dishImageUrl, setDishImageUrl] = useState("");
+  const [dishImageMode, setDishImageMode] = useState<"upload" | "url">("url");
   const [dishImagePreview, setDishImagePreview] = useState<string | null>(null);
   const [dishIsSignature, setDishIsSignature] = useState(false);
   const [dishIsLimitedEdition, setDishIsLimitedEdition] = useState(false);
@@ -88,7 +90,9 @@ export default function AdminRestaurantsPage() {
   const [editingDish, setEditingDish] = useState<Dish | null>(null);
   const [editDishName, setEditDishName] = useState("");
   const [editDishDescription, setEditDishDescription] = useState("");
+  const [editDishImageFile, setEditDishImageFile] = useState<File | null>(null);
   const [editDishImageUrl, setEditDishImageUrl] = useState("");
+  const [editDishImageMode, setEditDishImageMode] = useState<"upload" | "url">("url");
   const [editDishImagePreview, setEditDishImagePreview] = useState<string | null>(null);
   const [editDishIsSignature, setEditDishIsSignature] = useState(false);
   const [editDishIsLimitedEdition, setEditDishIsLimitedEdition] = useState(false);
@@ -736,7 +740,9 @@ export default function AdminRestaurantsPage() {
 
       setDishName("");
       setDishDescription("");
+      setDishImageFile(null);
       setDishImageUrl("");
+      setDishImageMode("url");
       setDishImagePreview(null);
       setDishIsSignature(false);
       setDishIsLimitedEdition(false);
@@ -756,18 +762,22 @@ export default function AdminRestaurantsPage() {
     setEditDishIsSignature(dish.is_signature);
     setEditDishIsLimitedEdition(dish.is_limited_edition ?? false);
     setEditDishCategoryId(dish.category_id);
+    setEditDishImageFile(null);
     setEditDishImageUrl(dish.image_url || "");
+    setEditDishImageMode("url");
     setEditDishImagePreview(dish.image_url);
   };
 
   const cancelEditDish = () => {
     setEditingDish(null);
-      setEditDishName("");
-      setEditDishDescription("");
-      setEditDishIsSignature(false);
-      setEditDishIsLimitedEdition(false);
-      setEditDishImageUrl("");
-      setEditDishImagePreview(null);
+    setEditDishName("");
+    setEditDishDescription("");
+    setEditDishIsSignature(false);
+    setEditDishIsLimitedEdition(false);
+    setEditDishImageFile(null);
+    setEditDishImageUrl("");
+    setEditDishImageMode("url");
+    setEditDishImagePreview(null);
   };
 
   const handleUpdateDish = async (e: React.FormEvent) => {
