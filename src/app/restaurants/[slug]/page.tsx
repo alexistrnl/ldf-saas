@@ -346,10 +346,10 @@ export default function RestaurantPage() {
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 py-6">
+      <div className="max-w-5xl mx-auto px-4 py-4">
         {/* Menu d'ancrage des catégories */}
         {categoriesWithDishes.length > 0 && (
-          <div className="mb-6 -mt-2">
+          <div className="mb-3 -mt-2">
             <div className="overflow-x-auto no-scrollbar">
               <div className="flex gap-2 sm:gap-3 justify-center">
                 {categoriesWithDishes.map((cat) => {
@@ -373,7 +373,7 @@ export default function RestaurantPage() {
           </div>
         )}
         {/* Bloc note + bouton */}
-        <section className="mt-4 flex flex-col items-center gap-4 mb-6">
+        <section className="mt-4 flex flex-col items-center gap-4 mb-3">
           {/* Bloc note */}
           {restaurantRatingStats.count === 0 ? (
             <span className="text-sm text-slate-500">
@@ -412,7 +412,7 @@ export default function RestaurantPage() {
 
         {/* Top 3 plats les mieux notés */}
         {topRatedDishes.length > 0 && (
-          <section className="mt-6">
+          <section className="mt-4">
             <h2 className="text-lg font-semibold text-slate-50 mb-3">
               Les plats les mieux notés
             </h2>
@@ -440,7 +440,7 @@ export default function RestaurantPage() {
                         const isPng = dish.image_url?.toLowerCase().includes(".png");
                         const isBurgerKing = restaurant?.name?.toLowerCase().includes("burger king") || restaurant?.slug?.toLowerCase().includes("burger-king");
                         return (
-                          <div className="relative w-full aspect-square rounded-xl overflow-hidden bg-[#0f0f17] border border-white/5 flex items-center justify-center">
+                          <div className={`relative w-full h-48 sm:aspect-square rounded-xl overflow-hidden flex items-center justify-center ${isBurgerKing ? 'bg-amber-50 border border-amber-200' : 'bg-[#0f0f17] border border-white/5'}`}>
                             {dish.image_url ? (
                               isPng ? (
                                 <img
@@ -566,7 +566,7 @@ export default function RestaurantPage() {
         )}
 
         {/* Carte des plats */}
-        <section className="mt-4">
+        <section className="mt-3">
           <h2 className="text-lg font-semibold mb-3">La carte</h2>
 
           {dishes.length === 0 ? (
@@ -585,7 +585,7 @@ export default function RestaurantPage() {
                     const isPng = dish.image_url?.toLowerCase().includes(".png");
                     const isBurgerKing = restaurant?.name?.toLowerCase().includes("burger king") || restaurant?.slug?.toLowerCase().includes("burger-king");
                     return (
-                      <div className="relative w-full aspect-square rounded-xl overflow-hidden bg-[#0f0f17] border border-white/5 flex items-center justify-center">
+                      <div className={`relative w-full h-48 sm:aspect-square rounded-xl overflow-hidden flex items-center justify-center ${isBurgerKing ? 'bg-amber-50 border border-amber-200' : 'bg-[#0f0f17] border border-white/5'}`}>
                         {dish.image_url ? (
                           isPng ? (
                             <img
@@ -665,9 +665,10 @@ export default function RestaurantPage() {
               {categories.map((category) => {
                 const categoryDishes = dishes.filter((d) => d.category_id === category.id);
                 if (categoryDishes.length === 0) return null;
+                const isBurgerKing = restaurant?.name?.toLowerCase().includes("burger king") || restaurant?.slug?.toLowerCase().includes("burger-king");
 
                 return (
-                  <div key={category.id} id={`section-${category.id}`} className="space-y-3 pt-4">
+                  <div key={category.id} id={`section-${category.id}`} className={`${isBurgerKing ? 'space-y-1 pt-1' : 'space-y-3 pt-4'}`}>
                     <h3 className="text-base font-semibold text-slate-100 border-b border-slate-800 pb-2">
                       {category.name}
                     </h3>
@@ -681,7 +682,7 @@ export default function RestaurantPage() {
                             const isPng = dish.image_url?.toLowerCase().includes(".png");
                             const isBurgerKing = restaurant?.name?.toLowerCase().includes("burger king") || restaurant?.slug?.toLowerCase().includes("burger-king");
                             return (
-                              <div className="relative w-full aspect-square rounded-xl overflow-hidden bg-[#0f0f17] border border-white/5 flex items-center justify-center">
+                              <div className={`relative w-full h-48 sm:aspect-square rounded-xl overflow-hidden flex items-center justify-center ${isBurgerKing ? 'bg-amber-50 border border-amber-200' : 'bg-[#0f0f17] border border-white/5'}`}>
                                 {dish.image_url ? (
                                   isPng ? (
                                     <img
@@ -763,9 +764,10 @@ export default function RestaurantPage() {
               {(() => {
                 const dishesWithoutCategory = dishes.filter((d) => !d.category_id);
                 if (dishesWithoutCategory.length === 0) return null;
+                const isBurgerKing = restaurant?.name?.toLowerCase().includes("burger king") || restaurant?.slug?.toLowerCase().includes("burger-king");
 
                 return (
-                  <div className="space-y-3">
+                  <div className={isBurgerKing ? "space-y-1" : "space-y-3"}>
                     <h3 className="text-base font-semibold text-slate-100 border-b border-slate-800 pb-2">
                       Autres
                     </h3>
@@ -779,7 +781,7 @@ export default function RestaurantPage() {
                             const isPng = dish.image_url?.toLowerCase().includes(".png");
                             const isBurgerKing = restaurant?.name?.toLowerCase().includes("burger king") || restaurant?.slug?.toLowerCase().includes("burger-king");
                             return (
-                              <div className="relative w-full aspect-square rounded-xl overflow-hidden bg-[#0f0f17] border border-white/5 flex items-center justify-center">
+                              <div className={`relative w-full h-48 sm:aspect-square rounded-xl overflow-hidden flex items-center justify-center ${isBurgerKing ? 'bg-amber-50 border border-amber-200' : 'bg-[#0f0f17] border border-white/5'}`}>
                                 {dish.image_url ? (
                                   isPng ? (
                                     <img
