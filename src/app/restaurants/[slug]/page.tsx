@@ -68,6 +68,16 @@ export default function RestaurantPage() {
   const [isAddExperienceOpen, setIsAddExperienceOpen] = useState(false);
   const [topDishIndex, setTopDishIndex] = useState(0);
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  useEffect(() => {
+    const checkDesktop = () => {
+      setIsDesktop(window.innerWidth >= 1024);
+    };
+    checkDesktop();
+    window.addEventListener('resize', checkDesktop);
+    return () => window.removeEventListener('resize', checkDesktop);
+  }, []);
 
   const handleAddNoteClick = () => {
     if (isMobile) {
@@ -425,28 +435,29 @@ export default function RestaurantPage() {
               {/* Conteneur du carrousel */}
               <div className="relative overflow-hidden rounded-2xl bg-slate-900 border border-slate-800 shadow-sm">
                 <div
-                  className="flex transition-transform duration-300 ease-in-out"
+                  className="flex transition-transform duration-300 ease-in-out lg:flex-wrap lg:gap-6"
                   style={{
-                    transform: `translateX(-${topDishIndex * 100}%)`,
+                    transform: isDesktop ? 'none' : `translateX(-${topDishIndex * 100}%)`,
                   }}
                 >
                   {topRatedDishes.map((dish, index) => (
                     <div
                       key={dish.id}
-                      className="min-w-full flex flex-col"
+                      className="min-w-full lg:min-w-[calc(33.333%-16px)] lg:flex-1 flex flex-col"
                     >
                       {/* Image */}
                       {(() => {
                         const isPng = dish.image_url?.toLowerCase().includes(".png");
                         const isBurgerKing = restaurant?.name?.toLowerCase().includes("burger king") || restaurant?.slug?.toLowerCase().includes("burger-king");
+                        const isBlackWhite = restaurant?.name?.toLowerCase().includes("black") && restaurant?.name?.toLowerCase().includes("white");
                         return (
-                          <div className={`relative w-full h-48 sm:aspect-square rounded-xl overflow-hidden flex items-center justify-center ${isBurgerKing ? 'bg-amber-50 border border-amber-200' : 'bg-[#0f0f17] border border-white/5'}`}>
+                          <div className="relative w-full aspect-square rounded-xl overflow-hidden flex items-center justify-center bg-amber-50 border border-amber-200">
                             {dish.image_url ? (
                               isPng ? (
                                 <img
                                   src={dish.image_url}
                                   alt={dish.name}
-                                  className={`w-full h-full object-contain object-top scale-95 drop-shadow-xl ${isBurgerKing ? 'pt-0 pb-4 px-4' : 'p-4'}`}
+                                  className={`w-full h-full object-contain object-top ${isBlackWhite ? 'scale-150' : 'scale-95'} drop-shadow-xl ${isBurgerKing ? 'pt-0 pb-4 px-4' : 'p-4'}`}
                                 />
                               ) : (
                                 <img
@@ -504,7 +515,7 @@ export default function RestaurantPage() {
                   <>
                     <button
                       onClick={goToPrevDish}
-                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-slate-900/80 hover:bg-slate-800 border border-slate-700 rounded-full p-2 transition shadow-lg"
+                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-slate-900/80 hover:bg-slate-800 border border-slate-700 rounded-full p-2 transition shadow-lg lg:hidden"
                       aria-label="Plat précédent"
                     >
                       <svg
@@ -523,7 +534,7 @@ export default function RestaurantPage() {
                     </button>
                     <button
                       onClick={goToNextDish}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-slate-900/80 hover:bg-slate-800 border border-slate-700 rounded-full p-2 transition shadow-lg"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-slate-900/80 hover:bg-slate-800 border border-slate-700 rounded-full p-2 transition shadow-lg lg:hidden"
                       aria-label="Plat suivant"
                     >
                       <svg
@@ -546,7 +557,7 @@ export default function RestaurantPage() {
 
               {/* Indicateurs de position */}
               {topRatedDishes.length > 1 && (
-                <div className="flex justify-center gap-2 mt-4">
+                <div className="flex justify-center gap-2 mt-4 lg:hidden">
                   {topRatedDishes.map((_, index) => (
                     <button
                       key={index}
@@ -584,14 +595,15 @@ export default function RestaurantPage() {
                   {(() => {
                     const isPng = dish.image_url?.toLowerCase().includes(".png");
                     const isBurgerKing = restaurant?.name?.toLowerCase().includes("burger king") || restaurant?.slug?.toLowerCase().includes("burger-king");
+                    const isBlackWhite = restaurant?.name?.toLowerCase().includes("black") && restaurant?.name?.toLowerCase().includes("white");
                     return (
-                      <div className={`relative w-full h-48 sm:aspect-square rounded-xl overflow-hidden flex items-center justify-center ${isBurgerKing ? 'bg-amber-50 border border-amber-200' : 'bg-[#0f0f17] border border-white/5'}`}>
+                      <div className="relative w-full aspect-square rounded-xl overflow-hidden flex items-center justify-center bg-amber-50 border border-amber-200">
                         {dish.image_url ? (
                           isPng ? (
                             <img
                               src={dish.image_url}
                               alt={dish.name}
-                              className={`w-full h-full object-contain object-top scale-95 drop-shadow-xl ${isBurgerKing ? 'pt-0 pb-4 px-4' : 'p-4'}`}
+                              className={`w-full h-full object-contain object-top ${isBlackWhite ? 'scale-150' : 'scale-95'} drop-shadow-xl ${isBurgerKing ? 'pt-0 pb-4 px-4' : 'p-4'}`}
                             />
                           ) : (
                             <img
@@ -681,14 +693,15 @@ export default function RestaurantPage() {
                           {(() => {
                             const isPng = dish.image_url?.toLowerCase().includes(".png");
                             const isBurgerKing = restaurant?.name?.toLowerCase().includes("burger king") || restaurant?.slug?.toLowerCase().includes("burger-king");
+                            const isBlackWhite = restaurant?.name?.toLowerCase().includes("black") && restaurant?.name?.toLowerCase().includes("white");
                             return (
-                              <div className={`relative w-full h-48 sm:aspect-square rounded-xl overflow-hidden flex items-center justify-center ${isBurgerKing ? 'bg-amber-50 border border-amber-200' : 'bg-[#0f0f17] border border-white/5'}`}>
+                              <div className="relative w-full aspect-square rounded-xl overflow-hidden flex items-center justify-center bg-amber-50 border border-amber-200">
                                 {dish.image_url ? (
                                   isPng ? (
                                     <img
                                       src={dish.image_url}
                                       alt={dish.name}
-                                      className={`w-full h-full object-contain object-top scale-95 drop-shadow-xl ${isBurgerKing ? 'pt-0 pb-4 px-4' : 'p-4'}`}
+                                      className={`w-full h-full object-contain object-top ${isBlackWhite ? 'scale-150' : 'scale-95'} drop-shadow-xl ${isBurgerKing ? 'pt-0 pb-4 px-4' : 'p-4'}`}
                                     />
                                   ) : (
                                     <img
@@ -780,14 +793,15 @@ export default function RestaurantPage() {
                           {(() => {
                             const isPng = dish.image_url?.toLowerCase().includes(".png");
                             const isBurgerKing = restaurant?.name?.toLowerCase().includes("burger king") || restaurant?.slug?.toLowerCase().includes("burger-king");
+                            const isBlackWhite = restaurant?.name?.toLowerCase().includes("black") && restaurant?.name?.toLowerCase().includes("white");
                             return (
-                              <div className={`relative w-full h-48 sm:aspect-square rounded-xl overflow-hidden flex items-center justify-center ${isBurgerKing ? 'bg-amber-50 border border-amber-200' : 'bg-[#0f0f17] border border-white/5'}`}>
+                              <div className="relative w-full aspect-square rounded-xl overflow-hidden flex items-center justify-center bg-amber-50 border border-amber-200">
                                 {dish.image_url ? (
                                   isPng ? (
                                     <img
                                       src={dish.image_url}
                                       alt={dish.name}
-                                      className={`w-full h-full object-contain object-top scale-95 drop-shadow-xl ${isBurgerKing ? 'pt-0 pb-4 px-4' : 'p-4'}`}
+                                      className={`w-full h-full object-contain object-top ${isBlackWhite ? 'scale-150' : 'scale-95'} drop-shadow-xl ${isBurgerKing ? 'pt-0 pb-4 px-4' : 'p-4'}`}
                                     />
                                   ) : (
                                     <img

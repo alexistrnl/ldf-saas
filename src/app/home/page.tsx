@@ -191,19 +191,19 @@ export default function HomePage() {
             <p className="text-xs text-slate-400 mb-3">
               Les enseignes les plus notées ces 3 derniers jours
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
               {trendingRestaurants.map((restaurant) => (
                 <Link
                   key={restaurant.id}
                   href={getRestaurantUrl(restaurant)}
                   className="group block bg-slate-900/80 rounded-2xl shadow-md hover:shadow-xl border border-slate-800/70 hover:border-bitebox/60 transition overflow-hidden flex flex-col"
                 >
-                  <div className="w-full bg-slate-950 overflow-hidden rounded-t-2xl flex items-center justify-center">
+                  <div className="w-full bg-slate-950 overflow-hidden rounded-t-2xl flex items-center justify-center h-32 sm:h-auto">
                     {restaurant.logo_url ? (
                       <img
                         src={restaurant.logo_url}
                         alt={restaurant.name}
-                        className="w-full h-auto max-h-[240px] sm:max-h-[260px] object-contain"
+                        className="w-full h-full sm:h-auto sm:max-h-[260px] object-contain"
                       />
                     ) : (
                       <div className="w-full min-h-[100px] flex items-center justify-center py-4">
@@ -271,19 +271,19 @@ export default function HomePage() {
                 : "Aucune enseigne pour l'instant. Ajoute-en via la page admin."}
             </p>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
               {filteredRestaurants.map((restaurant) => (
                 <Link
                   key={restaurant.id}
                   href={getRestaurantUrl(restaurant)}
                   className="group block bg-slate-900/80 rounded-2xl shadow-md hover:shadow-xl border border-slate-800/70 hover:border-bitebox/60 transition overflow-hidden flex flex-col"
                 >
-                  <div className="w-full bg-slate-950 overflow-hidden rounded-t-2xl flex items-center justify-center">
+                  <div className="w-full bg-slate-950 overflow-hidden rounded-t-2xl flex items-center justify-center h-32 sm:h-auto">
                     {restaurant.logo_url ? (
                       <img
                         src={restaurant.logo_url}
                         alt={restaurant.name}
-                        className="w-full h-auto max-h-[240px] sm:max-h-[260px] object-contain"
+                        className="w-full h-full sm:h-auto sm:max-h-[260px] object-contain"
                       />
                     ) : (
                       <div className="w-full min-h-[100px] flex items-center justify-center py-4">
