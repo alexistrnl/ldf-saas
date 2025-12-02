@@ -79,10 +79,9 @@ export default function AdminRestaurantsPage() {
 
   const [dishName, setDishName] = useState("");
   const [dishDescription, setDishDescription] = useState("");
-  const [dishImageFile, setDishImageFile] = useState<File | null>(null);
   const [dishImageUrl, setDishImageUrl] = useState("");
-  const [dishImageMode, setDishImageMode] = useState<"upload" | "url">("url");
   const [dishImagePreview, setDishImagePreview] = useState<string | null>(null);
+  const [dishImageError, setDishImageError] = useState<string | null>(null);
   const [dishIsSignature, setDishIsSignature] = useState(false);
   const [dishIsLimitedEdition, setDishIsLimitedEdition] = useState(false);
   const [dishCategoryId, setDishCategoryId] = useState<string | null>(null);
@@ -90,10 +89,9 @@ export default function AdminRestaurantsPage() {
   const [editingDish, setEditingDish] = useState<Dish | null>(null);
   const [editDishName, setEditDishName] = useState("");
   const [editDishDescription, setEditDishDescription] = useState("");
-  const [editDishImageFile, setEditDishImageFile] = useState<File | null>(null);
   const [editDishImageUrl, setEditDishImageUrl] = useState("");
-  const [editDishImageMode, setEditDishImageMode] = useState<"upload" | "url">("url");
   const [editDishImagePreview, setEditDishImagePreview] = useState<string | null>(null);
+  const [editDishImageError, setEditDishImageError] = useState<string | null>(null);
   const [editDishIsSignature, setEditDishIsSignature] = useState(false);
   const [editDishIsLimitedEdition, setEditDishIsLimitedEdition] = useState(false);
   const [editDishCategoryId, setEditDishCategoryId] = useState<string | null>(null);
@@ -412,13 +410,9 @@ export default function AdminRestaurantsPage() {
     setSelectedRestaurant(restaurant);
     setDishName("");
     setDishDescription("");
-    if (dishImagePreview && dishImagePreview.startsWith('blob:')) {
-      URL.revokeObjectURL(dishImagePreview);
-    }
-    setDishImageFile(null);
     setDishImageUrl("");
-    setDishImageMode("upload");
     setDishImagePreview(null);
+    setDishImageError(null);
     setDishIsSignature(false);
     setDishIsLimitedEdition(false);
     setDishCategoryId(null);
@@ -695,25 +689,32 @@ export default function AdminRestaurantsPage() {
 
   const handleAddDish = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedRestaurant) return;
+    console.log("handleAddDish called");
+    
+    if (!selectedRestaurant) {
+      console.error("Erreur ajout plat: aucun restaurant sélectionné");
+      setError("Aucun restaurant sélectionné.");
+      return;
+    }
 
     try {
       setError(null);
+      setDishImageError(null);
 
       if (!dishName.trim()) {
         setError("Le nom du plat est obligatoire.");
         return;
       }
 
+      // Validation simple de l'URL : doit commencer par http:// ou https:// si fournie
       let finalImageUrl: string | null = null;
-
-      // Valider et utiliser l'URL si fournie
       if (dishImageUrl.trim()) {
-        if (!validateImageUrl(dishImageUrl)) {
-          setError("URL invalide. L'URL doit commencer par http:// ou https:// et avoir une extension .png, .jpg, .jpeg ou .webp");
+        const trimmedUrl = dishImageUrl.trim();
+        if (!/^https?:\/\//i.test(trimmedUrl)) {
+          setDishImageError("L'URL de l'image doit commencer par http:// ou https://");
           return;
         }
-        finalImageUrl = dishImageUrl.trim();
+        finalImageUrl = trimmedUrl;
       }
 
       const nextPosition =
@@ -721,36 +722,49 @@ export default function AdminRestaurantsPage() {
           ? 0
           : Math.max(...dishes.map((d) => d.position ?? 0)) + 1;
 
-      const { error: insertError } = await supabase.from("dishes").insert({
+      const payload = {
         restaurant_id: selectedRestaurant.id,
-        name: dishName,
-        description: dishDescription || null,
+        name: dishName.trim(),
+        description: dishDescription.trim() || null,
         image_url: finalImageUrl,
         is_signature: dishIsSignature,
         is_limited_edition: dishIsLimitedEdition,
         position: nextPosition,
         category_id: dishCategoryId || null,
-      });
+      };
+
+      console.log("Ajout plat avec payload:", payload);
+
+      const { data, error: insertError } = await supabase
+        .from("dishes")
+        .insert(payload)
+        .select()
+        .single();
 
       if (insertError) {
-        console.error("[Admin] insert dish error", insertError);
-        setError("Erreur lors de l'ajout du plat.");
+        console.error("Erreur lors de l'ajout du plat :", insertError);
+        setError(`Impossible d'ajouter le plat. ${insertError.message || "Vérifie les infos et réessaie."}`);
         return;
       }
 
+      console.log("Plat ajouté avec succès:", data);
+
+      // Réinitialiser le formulaire
       setDishName("");
       setDishDescription("");
-      setDishImageFile(null);
       setDishImageUrl("");
-      setDishImageMode("url");
       setDishImagePreview(null);
+      setDishImageError(null);
       setDishIsSignature(false);
       setDishIsLimitedEdition(false);
       setDishCategoryId(null);
 
-      fetchDishes(selectedRestaurant);
+      // Recharger la liste des plats
+      await fetchDishes(selectedRestaurant);
+      
+      console.log("Plat ajouté avec succès");
     } catch (err) {
-      console.error("[Admin] add dish unexpected", err);
+      console.error("Erreur ajout plat", err);
       setError("Erreur inattendue lors de l'ajout du plat.");
     }
   };
@@ -762,9 +776,7 @@ export default function AdminRestaurantsPage() {
     setEditDishIsSignature(dish.is_signature);
     setEditDishIsLimitedEdition(dish.is_limited_edition ?? false);
     setEditDishCategoryId(dish.category_id);
-    setEditDishImageFile(null);
     setEditDishImageUrl(dish.image_url || "");
-    setEditDishImageMode("url");
     setEditDishImagePreview(dish.image_url);
   };
 
@@ -774,10 +786,9 @@ export default function AdminRestaurantsPage() {
     setEditDishDescription("");
     setEditDishIsSignature(false);
     setEditDishIsLimitedEdition(false);
-    setEditDishImageFile(null);
     setEditDishImageUrl("");
-    setEditDishImageMode("url");
     setEditDishImagePreview(null);
+    setEditDishImageError(null);
   };
 
   const handleUpdateDish = async (e: React.FormEvent) => {
@@ -785,6 +796,9 @@ export default function AdminRestaurantsPage() {
     if (!editingDish || !selectedRestaurant) return;
 
     try {
+      setError(null);
+      setEditDishImageError(null);
+
       if (!editDishName.trim()) {
         setError("Le nom du plat est obligatoire.");
         return;
@@ -794,56 +808,85 @@ export default function AdminRestaurantsPage() {
 
       // Valider et utiliser l'URL si fournie, sinon garder l'ancienne
       if (editDishImageUrl.trim()) {
-        if (!validateImageUrl(editDishImageUrl)) {
-          setError("URL invalide. L'URL doit commencer par http:// ou https:// et avoir une extension .png, .jpg, .jpeg ou .webp");
+        const trimmedUrl = editDishImageUrl.trim();
+        if (!/^https?:\/\//i.test(trimmedUrl)) {
+          setEditDishImageError("L'URL de l'image doit commencer par http:// ou https://");
           return;
         }
-        finalImageUrl = editDishImageUrl.trim();
+        finalImageUrl = trimmedUrl;
       }
 
-      const { error: updateError } = await supabase
+      const payload = {
+        name: editDishName.trim(),
+        description: editDishDescription.trim() || null,
+        image_url: finalImageUrl,
+        is_signature: editDishIsSignature,
+        is_limited_edition: editDishIsLimitedEdition,
+        category_id: editDishCategoryId || null,
+      };
+
+      console.log("Mise à jour plat avec payload:", payload);
+
+      const { data, error: updateError } = await supabase
         .from("dishes")
-        .update({
-          name: editDishName,
-          description: editDishDescription || null,
-          image_url: finalImageUrl,
-          is_signature: editDishIsSignature,
-          is_limited_edition: editDishIsLimitedEdition,
-          category_id: editDishCategoryId || null,
-        })
-        .eq("id", editingDish.id);
+        .update(payload)
+        .eq("id", editingDish.id)
+        .select()
+        .single();
 
       if (updateError) {
-        console.error("[Admin] update dish error", updateError);
-        setError("Erreur lors de la mise à jour du plat.");
+        console.error("Erreur lors de la mise à jour du plat :", updateError);
+        setError(`Impossible de mettre à jour le plat. ${updateError.message || "Vérifie les infos et réessaie."}`);
         return;
       }
 
+      console.log("Plat mis à jour avec succès:", data);
+
       cancelEditDish();
-      fetchDishes(selectedRestaurant);
+      await fetchDishes(selectedRestaurant);
     } catch (err) {
-      console.error("[Admin] update dish unexpected", err);
+      console.error("Erreur mise à jour plat", err);
       setError("Erreur inattendue lors de la mise à jour du plat.");
     }
   };
 
   const handleDeleteDish = async (dish: Dish) => {
-    if (!confirm(`Supprimer le plat "${dish.name}" ?`)) return;
     if (!selectedRestaurant) return;
 
+    // Confirmation avant suppression
+    const ok = window.confirm(`Voulez-vous vraiment supprimer le plat "${dish.name}" ?`);
+    if (!ok) return;
+
     try {
-      const { error } = await supabase.from("dishes").delete().eq("id", dish.id);
+      setError(null);
+
+      // Suppression en BDD avec filtre restaurant_id pour sécurité
+      const { error } = await supabase
+        .from("dishes")
+        .delete()
+        .eq("id", dish.id)
+        .eq("restaurant_id", selectedRestaurant.id);
 
       if (error) {
         console.error("[Admin] delete dish error", error);
-        setError("Erreur lors de la suppression du plat.");
+        const errorMessage = error.message || "Impossible de supprimer ce plat.";
+        setError(errorMessage);
+        alert(`Erreur lors de la suppression du plat : ${errorMessage}`);
         return;
       }
 
-      fetchDishes(selectedRestaurant);
+      // Mise à jour immédiate de l'état local (optimiste)
+      setDishes((prev) => prev.filter((d) => d.id !== dish.id));
+
+      // Si le plat était en cours d'édition, annuler l'édition
+      if (editingDish?.id === dish.id) {
+        cancelEditDish();
+      }
     } catch (err) {
       console.error("[Admin] delete dish unexpected", err);
-      setError("Erreur inattendue lors de la suppression du plat.");
+      const errorMessage = err instanceof Error ? err.message : "Erreur inattendue lors de la suppression du plat.";
+      setError(errorMessage);
+      alert(`Erreur inattendue lors de la suppression du plat : ${errorMessage}`);
     }
   };
 
@@ -1654,7 +1697,7 @@ export default function AdminRestaurantsPage() {
 
                                         <div className="space-y-2">
                                           <label className="text-sm font-medium text-gray-200">
-                                            URL de l'image <span className="text-xs text-gray-400">(optionnel)</span>
+                                            Image du plat (URL) <span className="text-xs text-gray-400">(optionnel)</span>
                                           </label>
                                           <input
                                             type="url"
@@ -1662,19 +1705,24 @@ export default function AdminRestaurantsPage() {
                                             onChange={(e) => {
                                               const url = e.target.value;
                                               setEditDishImageUrl(url);
-                                              if (url && validateImageUrl(url)) {
-                                                setEditDishImagePreview(url);
+                                              setEditDishImageError(null);
+                                              // Afficher l'aperçu si l'URL semble valide
+                                              if (url && /^https?:\/\//i.test(url.trim())) {
+                                                setEditDishImagePreview(url.trim());
                                               } else if (!url) {
                                                 setEditDishImagePreview(editingDish?.image_url ?? null);
                                               } else {
                                                 setEditDishImagePreview(null);
                                               }
                                             }}
-                                            placeholder="https://..."
+                                            placeholder="https://exemple.com/mon-burger.png"
                                             className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-gray-200 outline-none focus:border-bitebox"
                                           />
+                                          {editDishImageError && (
+                                            <p className="text-xs text-red-400">{editDishImageError}</p>
+                                          )}
                                           <p className="text-xs text-gray-400">
-                                            URL commençant par http:// ou https:// avec extension .png, .jpg, .jpeg ou .webp. Laisse vide pour conserver l'image actuelle.
+                                            URL commençant par http:// ou https://. Laisse vide pour conserver l'image actuelle.
                                           </p>
                                           {editDishImagePreview && (
                                             <div className="mt-3 p-3 bg-slate-950 rounded-lg border border-slate-700">
@@ -1902,7 +1950,7 @@ export default function AdminRestaurantsPage() {
 
                                         <div className="space-y-2">
                                           <label className="text-sm font-medium text-gray-200">
-                                            URL de l'image <span className="text-xs text-gray-400">(optionnel)</span>
+                                            Image du plat (URL) <span className="text-xs text-gray-400">(optionnel)</span>
                                           </label>
                                           <input
                                             type="url"
@@ -1910,19 +1958,24 @@ export default function AdminRestaurantsPage() {
                                             onChange={(e) => {
                                               const url = e.target.value;
                                               setEditDishImageUrl(url);
-                                              if (url && validateImageUrl(url)) {
-                                                setEditDishImagePreview(url);
+                                              setEditDishImageError(null);
+                                              // Afficher l'aperçu si l'URL semble valide
+                                              if (url && /^https?:\/\//i.test(url.trim())) {
+                                                setEditDishImagePreview(url.trim());
                                               } else if (!url) {
                                                 setEditDishImagePreview(editingDish?.image_url ?? null);
                                               } else {
                                                 setEditDishImagePreview(null);
                                               }
                                             }}
-                                            placeholder="https://..."
+                                            placeholder="https://exemple.com/mon-burger.png"
                                             className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-gray-200 outline-none focus:border-bitebox"
                                           />
+                                          {editDishImageError && (
+                                            <p className="text-xs text-red-400">{editDishImageError}</p>
+                                          )}
                                           <p className="text-xs text-gray-400">
-                                            URL commençant par http:// ou https:// avec extension .png, .jpg, .jpeg ou .webp. Laisse vide pour conserver l'image actuelle.
+                                            URL commençant par http:// ou https://. Laisse vide pour conserver l'image actuelle.
                                           </p>
                                           {editDishImagePreview && (
                                             <div className="mt-3 p-3 bg-slate-950 rounded-lg border border-slate-700">
@@ -2060,7 +2113,7 @@ export default function AdminRestaurantsPage() {
 
                       <div className="space-y-2">
                         <label className="text-sm font-medium text-gray-200">
-                          URL de l'image <span className="text-xs text-gray-400">(optionnel)</span>
+                          Image du plat (URL) <span className="text-xs text-gray-400">(optionnel)</span>
                         </label>
                         <input
                           type="url"
@@ -2068,17 +2121,22 @@ export default function AdminRestaurantsPage() {
                           onChange={(e) => {
                             const url = e.target.value;
                             setDishImageUrl(url);
-                            if (url && validateImageUrl(url)) {
-                              setDishImagePreview(url);
+                            setDishImageError(null);
+                            // Afficher l'aperçu si l'URL semble valide
+                            if (url && /^https?:\/\//i.test(url.trim())) {
+                              setDishImagePreview(url.trim());
                             } else {
                               setDishImagePreview(null);
                             }
                           }}
-                          placeholder="https://..."
+                          placeholder="https://exemple.com/mon-burger.png"
                           className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-gray-200 outline-none focus:border-bitebox"
                         />
+                        {dishImageError && (
+                          <p className="text-xs text-red-400">{dishImageError}</p>
+                        )}
                         <p className="text-xs text-gray-400">
-                          URL commençant par http:// ou https:// avec extension .png, .jpg, .jpeg ou .webp
+                          URL commençant par http:// ou https:// (optionnel)
                         </p>
                         {dishImagePreview && (
                           <div className="mt-3 p-3 bg-slate-950 rounded-lg border border-slate-700">

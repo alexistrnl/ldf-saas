@@ -436,17 +436,31 @@ export default function RestaurantPage() {
                       className="min-w-full flex flex-col"
                     >
                       {/* Image */}
-                      <div className="aspect-[4/3] bg-slate-950 flex items-center justify-center overflow-hidden">
-                        {dish.image_url ? (
-                          <img
-                            src={dish.image_url}
-                            alt={dish.name}
-                            className="w-full h-full object-contain"
-                          />
-                        ) : (
-                          <span className="text-xs text-slate-500">Pas d'image</span>
-                        )}
-                      </div>
+                      {(() => {
+                        const isPng = dish.image_url?.toLowerCase().includes(".png");
+                        const isBurgerKing = restaurant?.name?.toLowerCase().includes("burger king") || restaurant?.slug?.toLowerCase().includes("burger-king");
+                        return (
+                          <div className="relative w-full aspect-square rounded-xl overflow-hidden bg-[#0f0f17] border border-white/5 flex items-center justify-center">
+                            {dish.image_url ? (
+                              isPng ? (
+                                <img
+                                  src={dish.image_url}
+                                  alt={dish.name}
+                                  className={`w-full h-full object-contain object-top scale-95 drop-shadow-xl ${isBurgerKing ? 'pt-0 pb-4 px-4' : 'p-4'}`}
+                                />
+                              ) : (
+                                <img
+                                  src={dish.image_url}
+                                  alt={dish.name}
+                                  className="w-full h-full object-cover object-center"
+                                />
+                              )
+                            ) : (
+                              <span className="text-xs text-slate-500">Pas d'image</span>
+                            )}
+                          </div>
+                        );
+                      })()}
 
                       {/* Contenu */}
                       <div className="px-4 py-4 space-y-2">
@@ -561,27 +575,39 @@ export default function RestaurantPage() {
             </p>
           ) : categories.length === 0 ? (
             // Affichage sans sections (comportement par défaut)
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               {dishes.map((dish) => (
                 <div
                   key={dish.id}
                   className="bg-slate-900/80 rounded-2xl overflow-hidden border border-slate-800/70 shadow-md flex flex-col"
                 >
-                  <div className="relative aspect-[4/3] overflow-hidden rounded-t-2xl bg-[#0d0d12]">
-                    {dish.image_url ? (
-                      <img
-                        src={dish.image_url}
-                        alt={dish.name}
-                        className={`absolute inset-0 w-full h-full object-cover object-center ${
-                          isPngImage(dish.image_url) ? 'scale-90' : ''
-                        }`}
-                      />
-                    ) : (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-xs text-slate-500">Pas d'image</span>
+                  {(() => {
+                    const isPng = dish.image_url?.toLowerCase().includes(".png");
+                    const isBurgerKing = restaurant?.name?.toLowerCase().includes("burger king") || restaurant?.slug?.toLowerCase().includes("burger-king");
+                    return (
+                      <div className="relative w-full aspect-square rounded-xl overflow-hidden bg-[#0f0f17] border border-white/5 flex items-center justify-center">
+                        {dish.image_url ? (
+                          isPng ? (
+                            <img
+                              src={dish.image_url}
+                              alt={dish.name}
+                              className={`w-full h-full object-contain object-top scale-95 drop-shadow-xl ${isBurgerKing ? 'pt-0 pb-4 px-4' : 'p-4'}`}
+                            />
+                          ) : (
+                            <img
+                              src={dish.image_url}
+                              alt={dish.name}
+                              className="w-full h-full object-cover object-center"
+                            />
+                          )
+                        ) : (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <span className="text-xs text-slate-500">Pas d'image</span>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
+                    );
+                  })()}
 
                   <div className="px-3 py-3 space-y-1">
                     <p className="text-sm font-semibold truncate">{dish.name}</p>
@@ -645,27 +671,39 @@ export default function RestaurantPage() {
                     <h3 className="text-base font-semibold text-slate-100 border-b border-slate-800 pb-2">
                       {category.name}
                     </h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                       {categoryDishes.map((dish) => (
                         <div
                           key={dish.id}
                           className="bg-slate-900/80 rounded-2xl overflow-hidden border border-slate-800/70 shadow-md flex flex-col"
                         >
-                          <div className="relative aspect-[4/3] overflow-hidden rounded-t-2xl bg-[#0d0d12]">
-                            {dish.image_url ? (
-                              <img
-                                src={dish.image_url}
-                                alt={dish.name}
-                                className={`absolute inset-0 w-full h-full object-cover object-center ${
-                                  dish.image_url.toLowerCase().endsWith('.png') ? 'scale-90' : ''
-                                }`}
-                              />
-                            ) : (
-                              <div className="absolute inset-0 flex items-center justify-center">
-                                <span className="text-xs text-slate-500">Pas d'image</span>
+                          {(() => {
+                            const isPng = dish.image_url?.toLowerCase().includes(".png");
+                            const isBurgerKing = restaurant?.name?.toLowerCase().includes("burger king") || restaurant?.slug?.toLowerCase().includes("burger-king");
+                            return (
+                              <div className="relative w-full aspect-square rounded-xl overflow-hidden bg-[#0f0f17] border border-white/5 flex items-center justify-center">
+                                {dish.image_url ? (
+                                  isPng ? (
+                                    <img
+                                      src={dish.image_url}
+                                      alt={dish.name}
+                                      className={`w-full h-full object-contain object-top scale-95 drop-shadow-xl ${isBurgerKing ? 'pt-0 pb-4 px-4' : 'p-4'}`}
+                                    />
+                                  ) : (
+                                    <img
+                                      src={dish.image_url}
+                                      alt={dish.name}
+                                      className="w-full h-full object-cover object-center"
+                                    />
+                                  )
+                                ) : (
+                                  <div className="absolute inset-0 flex items-center justify-center">
+                                    <span className="text-xs text-slate-500">Pas d'image</span>
+                                  </div>
+                                )}
                               </div>
-                            )}
-                          </div>
+                            );
+                          })()}
 
                           <div className="px-3 py-3 space-y-1">
                             <p className="text-sm font-semibold truncate">{dish.name}</p>
@@ -731,23 +769,37 @@ export default function RestaurantPage() {
                     <h3 className="text-base font-semibold text-slate-100 border-b border-slate-800 pb-2">
                       Autres
                     </h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                       {dishesWithoutCategory.map((dish) => (
                         <div
                           key={dish.id}
                           className="bg-slate-900/80 rounded-2xl overflow-hidden border border-slate-800/70 shadow-md flex flex-col"
                         >
-                          <div className="aspect-[4/3] bg-slate-950 flex items-center justify-center overflow-hidden">
-                            {dish.image_url ? (
-                              <img
-                                src={dish.image_url}
-                                alt={dish.name}
-                                className="w-full h-full object-contain"
-                              />
-                            ) : (
-                              <span className="text-xs text-slate-500">Pas d'image</span>
-                            )}
-                          </div>
+                          {(() => {
+                            const isPng = dish.image_url?.toLowerCase().includes(".png");
+                            const isBurgerKing = restaurant?.name?.toLowerCase().includes("burger king") || restaurant?.slug?.toLowerCase().includes("burger-king");
+                            return (
+                              <div className="relative w-full aspect-square rounded-xl overflow-hidden bg-[#0f0f17] border border-white/5 flex items-center justify-center">
+                                {dish.image_url ? (
+                                  isPng ? (
+                                    <img
+                                      src={dish.image_url}
+                                      alt={dish.name}
+                                      className={`w-full h-full object-contain object-top scale-95 drop-shadow-xl ${isBurgerKing ? 'pt-0 pb-4 px-4' : 'p-4'}`}
+                                    />
+                                  ) : (
+                                    <img
+                                      src={dish.image_url}
+                                      alt={dish.name}
+                                      className="w-full h-full object-cover object-center"
+                                    />
+                                  )
+                                ) : (
+                                  <span className="text-xs text-slate-500">Pas d'image</span>
+                                )}
+                              </div>
+                            );
+                          })()}
 
                           <div className="px-3 py-3 space-y-1">
                             <p className="text-sm font-semibold truncate">{dish.name}</p>
