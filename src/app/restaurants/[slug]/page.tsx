@@ -575,7 +575,7 @@ export default function RestaurantPage() {
             </p>
           ) : categories.length === 0 ? (
             // Affichage sans sections (comportement par défaut)
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               {dishes.map((dish) => (
                 <div
                   key={dish.id}
@@ -671,7 +671,7 @@ export default function RestaurantPage() {
                     <h3 className="text-base font-semibold text-slate-100 border-b border-slate-800 pb-2">
                       {category.name}
                     </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                       {categoryDishes.map((dish) => (
                         <div
                           key={dish.id}
@@ -769,7 +769,7 @@ export default function RestaurantPage() {
                     <h3 className="text-base font-semibold text-slate-100 border-b border-slate-800 pb-2">
                       Autres
                     </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                       {dishesWithoutCategory.map((dish) => (
                         <div
                           key={dish.id}
