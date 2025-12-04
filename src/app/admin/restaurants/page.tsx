@@ -470,8 +470,19 @@ export default function AdminRestaurantsPage() {
       return;
     }
     
-    if (!newCategoryName.trim()) {
+    const trimmedName = newCategoryName.trim();
+    if (!trimmedName) {
       console.log("[Admin] Nom de catégorie vide, on ignore");
+      setCategoryError("Le nom de la section ne peut pas être vide.");
+      return;
+    }
+
+    // Vérifier si une section avec ce nom existe déjà
+    const existingCategory = categories.find(
+      (c) => c.name.toLowerCase() === trimmedName.toLowerCase()
+    );
+    if (existingCategory) {
+      setCategoryError("Une section avec ce nom existe déjà.");
       return;
     }
 
@@ -486,33 +497,31 @@ export default function AdminRestaurantsPage() {
           : (categories.reduce((max, c) => Math.max(max, c.order_index ?? 0), 0) ?? 0) + 1;
 
       console.log("[Admin] Restaurant ID:", selectedRestaurant.id);
-      console.log("[Admin] Nom de la catégorie:", newCategoryName.trim());
+      console.log("[Admin] Nom de la catégorie:", trimmedName);
       console.log("[Admin] Order index calculé:", nextOrderIndex);
-      console.log("[Admin] Catégories existantes:", categories);
 
       const { data, error: insertError } = await supabase
         .from("dish_categories")
         .insert({
           restaurant_id: selectedRestaurant.id,
-          name: newCategoryName.trim(),
+          name: trimmedName,
           order_index: nextOrderIndex,
         })
         .select("*")
         .single();
 
-      console.log("[Admin] Résultat Supabase - data:", data);
-      console.log("[Admin] Résultat Supabase - error:", insertError);
-
       if (insertError) {
         console.error("[Admin] Erreur création catégorie :", insertError);
-        setCategoryError(insertError.message || "Erreur lors de la création de la section.");
+        const errorMessage = insertError.message || "Erreur lors de la création de la section.";
+        setCategoryError(errorMessage);
+        setError(errorMessage);
         return;
       }
 
       // Ajouter la nouvelle catégorie au state
       if (data) {
-        console.log("[Admin] Catégorie créée avec succès, ajout au state");
-        setCategories((prev) => [...prev, data as DishCategory]);
+        console.log("[Admin] Catégorie créée avec succès:", data);
+        setCategories((prev) => [...prev, data as DishCategory].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)));
         setNewCategoryName("");
         setShowCategoryForm(false);
         setCategoryError(null);
@@ -520,9 +529,11 @@ export default function AdminRestaurantsPage() {
         console.error("[Admin] Aucune donnée retournée par Supabase");
         setCategoryError("Aucune donnée retournée après la création.");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("[Admin] Erreur inattendue création catégorie :", err);
-      setCategoryError("Une erreur inattendue est survenue lors de la création de la section.");
+      const errorMessage = err?.message || "Une erreur inattendue est survenue lors de la création de la section.";
+      setCategoryError(errorMessage);
+      setError(errorMessage);
     }
   };
 
@@ -538,37 +549,75 @@ export default function AdminRestaurantsPage() {
 
   const handleUpdateCategory = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingCategory || !editCategoryName.trim()) return;
+    
+    console.log("[Admin] handleUpdateCategory appelé");
+    console.log("[Admin] editingCategory:", editingCategory);
+    console.log("[Admin] editCategoryName:", editCategoryName);
+    
+    if (!editingCategory) {
+      console.error("[Admin] Pas de catégorie en cours d'édition");
+      setCategoryError("Aucune section sélectionnée pour l'édition.");
+      return;
+    }
+
+    const trimmedName = editCategoryName.trim();
+    if (!trimmedName) {
+      console.log("[Admin] Nom de catégorie vide");
+      setCategoryError("Le nom de la section ne peut pas être vide.");
+      return;
+    }
+    
+    // Vérifier si le nom n'a pas changé
+    if (trimmedName === editingCategory.name) {
+      console.log("[Admin] Nom inchangé, annulation");
+      cancelEditCategory();
+      return;
+    }
+
+    // Vérifier si une autre section avec ce nom existe déjà
+    const existingCategory = categories.find(
+      (c) => c.id !== editingCategory.id && c.name.toLowerCase() === trimmedName.toLowerCase()
+    );
+    if (existingCategory) {
+      setCategoryError("Une section avec ce nom existe déjà.");
+      return;
+    }
+
+    if (!selectedRestaurant) {
+      console.error("[Admin] Pas de restaurant sélectionné");
+      setCategoryError("Aucun restaurant sélectionné.");
+      return;
+    }
 
     try {
       setError(null);
       setCategoryError(null);
 
-      const trimmedName = editCategoryName.trim();
-      
-      // Vérifier si le nom n'a pas changé
-      if (trimmedName === editingCategory.name) {
-        cancelEditCategory();
-        return;
-      }
+      console.log("[Admin] Mise à jour catégorie:", editingCategory.id, "->", trimmedName);
 
       const { data, error: updateError } = await supabase
         .from("dish_categories")
         .update({ name: trimmedName })
         .eq("id", editingCategory.id)
+        .eq("restaurant_id", selectedRestaurant.id)
         .select()
         .single();
 
       if (updateError) {
         console.error("[Admin] update category error", updateError);
-        setCategoryError(updateError.message || "Erreur lors de la mise à jour de la section.");
+        const errorMessage = updateError.message || "Erreur lors de la mise à jour de la section.";
+        setCategoryError(errorMessage);
+        setError(errorMessage);
         return;
       }
 
       // Mettre à jour le state local immédiatement
       if (data) {
+        console.log("[Admin] Catégorie mise à jour avec succès:", data);
         setCategories((prev) =>
-          prev.map((cat) => (cat.id === editingCategory.id ? (data as DishCategory) : cat))
+          prev.map((cat) => 
+            cat.id === editingCategory.id ? (data as DishCategory) : cat
+          ).sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
         );
       }
 
@@ -576,11 +625,13 @@ export default function AdminRestaurantsPage() {
       
       // Rafraîchir les catégories pour être sûr
       if (selectedRestaurant) {
-        fetchCategories(selectedRestaurant);
+        await fetchCategories(selectedRestaurant);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("[Admin] update category unexpected", err);
-      setCategoryError("Erreur inattendue lors de la mise à jour de la section.");
+      const errorMessage = err?.message || "Erreur inattendue lors de la mise à jour de la section.";
+      setCategoryError(errorMessage);
+      setError(errorMessage);
     }
   };
 
@@ -1452,7 +1503,8 @@ export default function AdminRestaurantsPage() {
                     />
                     <button
                       type="submit"
-                      className="px-3 py-2 rounded-md bg-bitebox text-white text-xs font-semibold hover:bg-bitebox-dark"
+                      className="px-3 py-2 rounded-md bg-bitebox text-white text-xs font-semibold hover:bg-bitebox-dark disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={!newCategoryName.trim()}
                     >
                       Créer
                     </button>
@@ -1527,7 +1579,8 @@ export default function AdminRestaurantsPage() {
                               />
                               <button
                                 type="submit"
-                                className="px-2 py-1 rounded text-xs bg-emerald-500 text-black hover:bg-emerald-400"
+                                className="px-2 py-1 rounded text-xs bg-emerald-500 text-black hover:bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled={!editCategoryName.trim()}
                               >
                                 ✓
                               </button>
