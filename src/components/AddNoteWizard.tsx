@@ -347,9 +347,6 @@ export default function AddNoteWizard({
               <h2 className="text-2xl font-bold text-white mb-2">
                 1. Quelle enseigne ?
               </h2>
-              <p className="text-sm text-slate-400">
-                Sélectionne l'enseigne où tu as mangé
-              </p>
             </div>
 
             {/* Recherche */}
@@ -364,7 +361,7 @@ export default function AddNoteWizard({
             </div>
 
             {/* Liste des restaurants */}
-            <div className="space-y-2 max-h-[calc(100vh-300px)] overflow-y-auto">
+            <div className="space-y-2">
               {filteredRestaurants.map((restaurant) => {
                 const isSelected =
                   wizardState.selectedRestaurantId === restaurant.id;
@@ -425,10 +422,6 @@ export default function AddNoteWizard({
               <h2 className="text-2xl font-bold text-white mb-2">
                 2. Quels plats as-tu goûtés ?
               </h2>
-              <p className="text-sm text-slate-400">
-                Sélectionne les plats que tu as mangés. Tu peux en sélectionner
-                plusieurs.
-              </p>
             </div>
 
             {/* Résumé enseigne */}
@@ -463,7 +456,7 @@ export default function AddNoteWizard({
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-2 gap-3 max-h-[calc(100vh-350px)] overflow-y-auto">
+                <div className="grid grid-cols-2 gap-3">
                   {filteredDishes.map((dish) => {
                     const isSelected = wizardState.selectedDishIds.includes(
                       dish.id
@@ -543,12 +536,9 @@ export default function AddNoteWizard({
               <h2 className="text-2xl font-bold text-white mb-2">
                 3. Note les plats que tu as goûtés
               </h2>
-              <p className="text-sm text-slate-400">
-                Donne une note à chaque plat (optionnel)
-              </p>
             </div>
 
-            <div className="space-y-4 max-h-[calc(100vh-350px)] overflow-y-auto">
+            <div className="space-y-4">
               {selectedDishes.map((dish) => {
                 const rating = wizardState.dishRatings[dish.id] || 0;
                 return (
@@ -624,9 +614,6 @@ export default function AddNoteWizard({
               <h2 className="text-2xl font-bold text-white mb-2">
                 4. Ton avis global
               </h2>
-              <p className="text-sm text-slate-400">
-                Donne une note globale à cette enseigne
-              </p>
             </div>
 
             {/* Résumé */}
