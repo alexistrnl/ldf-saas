@@ -550,26 +550,19 @@ export default function AdminRestaurantsPage() {
   const handleUpdateCategory = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    console.log("[Admin] handleUpdateCategory appelé");
-    console.log("[Admin] editingCategory:", editingCategory);
-    console.log("[Admin] editCategoryName:", editCategoryName);
-    
     if (!editingCategory) {
-      console.error("[Admin] Pas de catégorie en cours d'édition");
       setCategoryError("Aucune section sélectionnée pour l'édition.");
       return;
     }
 
     const trimmedName = editCategoryName.trim();
     if (!trimmedName) {
-      console.log("[Admin] Nom de catégorie vide");
       setCategoryError("Le nom de la section ne peut pas être vide.");
       return;
     }
     
     // Vérifier si le nom n'a pas changé
     if (trimmedName === editingCategory.name) {
-      console.log("[Admin] Nom inchangé, annulation");
       cancelEditCategory();
       return;
     }
@@ -584,7 +577,6 @@ export default function AdminRestaurantsPage() {
     }
 
     if (!selectedRestaurant) {
-      console.error("[Admin] Pas de restaurant sélectionné");
       setCategoryError("Aucun restaurant sélectionné.");
       return;
     }
@@ -592,8 +584,6 @@ export default function AdminRestaurantsPage() {
     try {
       setError(null);
       setCategoryError(null);
-
-      console.log("[Admin] Mise à jour catégorie:", editingCategory.id, "->", trimmedName);
 
       const { data, error: updateError } = await supabase
         .from("dish_categories")
@@ -613,20 +603,14 @@ export default function AdminRestaurantsPage() {
 
       // Mettre à jour le state local immédiatement
       if (data) {
-        console.log("[Admin] Catégorie mise à jour avec succès:", data);
         setCategories((prev) =>
           prev.map((cat) => 
-            cat.id === editingCategory.id ? (data as DishCategory) : cat
-          ).sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
+            cat.id === editingCategory.id ? { ...cat, name: data.name } : cat
+          )
         );
       }
 
       cancelEditCategory();
-      
-      // Rafraîchir les catégories pour être sûr
-      if (selectedRestaurant) {
-        await fetchCategories(selectedRestaurant);
-      }
     } catch (err: any) {
       console.error("[Admin] update category unexpected", err);
       const errorMessage = err?.message || "Erreur inattendue lors de la mise à jour de la section.";
@@ -672,62 +656,61 @@ export default function AdminRestaurantsPage() {
     }
   };
 
-  const moveCategoryUp = async (category: DishCategory) => {
+  const handleMoveSection = async (categoryId: string, direction: "up" | "down") => {
     if (!selectedRestaurant) return;
-    const index = categories.findIndex((c) => c.id === category.id);
-    if (index <= 0) return;
-    const previous = categories[index - 1];
+
+    const currentIndex = categories.findIndex((c) => c.id === categoryId);
+    if (currentIndex === -1) return;
+
+    const newIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+    if (newIndex < 0 || newIndex >= categories.length) return;
+
+    // Créer un nouveau tableau avec les sections réorganisées
+    const newSections = [...categories];
+    const [moved] = newSections.splice(currentIndex, 1);
+    newSections.splice(newIndex, 0, moved);
+
+    // Mettre à jour immédiatement le state pour un feedback visuel instantané
+    setCategories(newSections);
 
     try {
-      const { error: err1 } = await supabase
-        .from("dish_categories")
-        .update({ order_index: previous.order_index })
-        .eq("id", category.id);
-      const { error: err2 } = await supabase
-        .from("dish_categories")
-        .update({ order_index: category.order_index })
-        .eq("id", previous.id);
+      setError(null);
 
-      if (err1 || err2) {
-        console.error("[Admin] move category up error", err1 || err2);
+      // Recalculer tous les order_index de manière séquentielle (0, 1, 2, 3...)
+      const updatePromises = newSections.map((section, index) =>
+        supabase
+          .from("dish_categories")
+          .update({ order_index: index })
+          .eq("id", section.id)
+          .eq("restaurant_id", selectedRestaurant.id)
+      );
+
+      const results = await Promise.all(updatePromises);
+      
+      // Vérifier s'il y a des erreurs
+      const hasError = results.some((result) => result.error);
+      if (hasError) {
+        const firstError = results.find((result) => result.error)?.error;
+        console.error("[Admin] move section error", firstError);
         setError("Erreur lors du changement d'ordre de la section.");
+        // Recharger les catégories pour restaurer l'état précédent
+        await fetchCategories(selectedRestaurant);
         return;
       }
-
-      fetchCategories(selectedRestaurant);
     } catch (err) {
-      console.error("[Admin] moveCategoryUp unexpected", err);
+      console.error("[Admin] handleMoveSection unexpected", err);
       setError("Erreur inattendue lors du changement d'ordre de la section.");
+      // Recharger les catégories pour restaurer l'état précédent
+      await fetchCategories(selectedRestaurant);
     }
   };
 
-  const moveCategoryDown = async (category: DishCategory) => {
-    if (!selectedRestaurant) return;
-    const index = categories.findIndex((c) => c.id === category.id);
-    if (index === -1 || index >= categories.length - 1) return;
-    const next = categories[index + 1];
+  const moveCategoryUp = (category: DishCategory) => {
+    handleMoveSection(category.id, "up");
+  };
 
-    try {
-      const { error: err1 } = await supabase
-        .from("dish_categories")
-        .update({ order_index: next.order_index })
-        .eq("id", category.id);
-      const { error: err2 } = await supabase
-        .from("dish_categories")
-        .update({ order_index: category.order_index })
-        .eq("id", next.id);
-
-      if (err1 || err2) {
-        console.error("[Admin] move category down error", err1 || err2);
-        setError("Erreur lors du changement d'ordre de la section.");
-        return;
-      }
-
-      fetchCategories(selectedRestaurant);
-    } catch (err) {
-      console.error("[Admin] moveCategoryDown unexpected", err);
-      setError("Erreur inattendue lors du changement d'ordre de la section.");
-    }
+  const moveCategoryDown = (category: DishCategory) => {
+    handleMoveSection(category.id, "down");
   };
 
   // Fonction pour changer la catégorie d'un plat
