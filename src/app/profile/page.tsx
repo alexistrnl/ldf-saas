@@ -520,17 +520,19 @@ export default function ProfilePage() {
                       e.currentTarget.style.borderColor = themeColorWithOpacity;
                     }}
                   >
-                    <div className="h-24 w-full overflow-hidden bg-black/60 flex items-center justify-center">
+                    <div className="w-full aspect-[4/3] overflow-hidden rounded-t-xl bg-slate-950">
                       {r.logoUrl ? (
                         <img
                           src={r.logoUrl}
                           alt={r.restaurantName}
-                          className="h-full w-full object-contain"
+                          className="w-full h-full object-cover scale-110"
                         />
                       ) : (
-                        <span className="text-xs text-slate-500">
-                          Pas de logo
-                        </span>
+                        <div className="w-full h-full flex items-center justify-center">
+                          <span className="text-xs text-slate-500">
+                            Pas de logo
+                          </span>
+                        </div>
                       )}
                     </div>
                     <div className="space-y-1 p-4 md:p-5">

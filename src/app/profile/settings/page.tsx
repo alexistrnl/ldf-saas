@@ -282,7 +282,7 @@ export default function ProfileSettingsPage() {
             </div>
           )}
 
-          <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
+          <div className="flex justify-center gap-3">
             {AVAILABLE_AVATARS.map((avatarUrl) => {
               const isSelected = profile?.avatar_url === avatarUrl;
               return (
@@ -291,7 +291,7 @@ export default function ProfileSettingsPage() {
                   onClick={() => handleAvatarSelect(avatarUrl)}
                   disabled={isUpdatingAvatar}
                   className={`
-                    relative h-16 w-16 sm:h-14 sm:w-14 rounded-full overflow-hidden border-2 transition-all
+                    relative h-14 w-14 flex-shrink-0 rounded-full overflow-hidden border-2 transition-all
                     ${
                       isSelected
                         ? "ring-2 ring-bitebox shadow-lg shadow-bitebox/50 border-bitebox"
