@@ -198,15 +198,15 @@ export default function HomePage() {
                   href={getRestaurantUrl(restaurant)}
                   className="group block bg-slate-900/80 rounded-2xl shadow-md hover:shadow-xl border border-slate-800/70 hover:border-bitebox/60 transition overflow-hidden flex flex-col"
                 >
-                  <div className="w-full bg-slate-950 overflow-hidden rounded-t-2xl flex items-center justify-center h-32 sm:h-auto">
+                  <div className="w-full aspect-[4/3] overflow-hidden rounded-t-2xl bg-slate-950">
                     {restaurant.logo_url ? (
                       <img
                         src={restaurant.logo_url}
                         alt={restaurant.name}
-                        className="w-full h-full sm:h-auto sm:max-h-[260px] object-contain"
+                        className="w-full h-full object-cover"
                       />
                     ) : (
-                      <div className="w-full min-h-[100px] flex items-center justify-center py-4">
+                      <div className="w-full h-full flex items-center justify-center">
                         <span className="text-xs text-slate-500">
                           Pas de logo
                         </span>
@@ -278,15 +278,15 @@ export default function HomePage() {
                   href={getRestaurantUrl(restaurant)}
                   className="group block bg-slate-900/80 rounded-2xl shadow-md hover:shadow-xl border border-slate-800/70 hover:border-bitebox/60 transition overflow-hidden flex flex-col"
                 >
-                  <div className="w-full bg-slate-950 overflow-hidden rounded-t-2xl flex items-center justify-center h-32 sm:h-auto">
+                  <div className="w-full aspect-[4/3] overflow-hidden rounded-t-2xl bg-slate-950">
                     {restaurant.logo_url ? (
                       <img
                         src={restaurant.logo_url}
                         alt={restaurant.name}
-                        className="w-full h-full sm:h-auto sm:max-h-[260px] object-contain"
+                        className="w-full h-full object-cover"
                       />
                     ) : (
-                      <div className="w-full min-h-[100px] flex items-center justify-center py-4">
+                      <div className="w-full h-full flex items-center justify-center">
                         <span className="text-xs text-slate-500">
                           Pas de logo
                         </span>
