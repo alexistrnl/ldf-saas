@@ -45,6 +45,7 @@ export default function ProfilePage() {
     ProfileRestaurantSummary[]
   >([]);
   const [experiences, setExperiences] = useState<ProfileExperience[]>([]);
+  const [expandedExperiences, setExpandedExperiences] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -568,123 +569,172 @@ export default function ProfilePage() {
             </p>
           ) : (
             <div className="space-y-4">
-              {experiences.map((exp) => (
-                <div
-                  key={exp.id}
-                  className="rounded-xl bg-[#0F0F1A] border shadow-md shadow-black/20 p-4 md:p-5 transition hover:shadow-lg hover:shadow-black/30"
-                  style={{ 
-                    borderColor: themeColorWithOpacity,
-                    borderWidth: '1px'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = theme.color;
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = themeColorWithOpacity;
-                  }}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <div className="h-10 w-10 overflow-hidden rounded-full bg-slate-800 flex items-center justify-center flex-shrink-0">
-                        {exp.restaurantLogoUrl ? (
-                          <img
-                            src={exp.restaurantLogoUrl}
-                            alt={exp.restaurantName}
-                            className="h-10 w-10 object-cover"
-                          />
-                        ) : (
-                          <span className="text-xs text-slate-300">
-                            {exp.restaurantName.charAt(0)}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex flex-col min-w-0 flex-1">
-                        {exp.restaurantSlug ? (
-                          <Link
-                            href={`/restaurants/${exp.restaurantSlug}`}
-                            className="text-lg font-semibold text-white hover:text-bitebox-light truncate"
-                          >
-                            {exp.restaurantName}
-                          </Link>
-                        ) : (
-                          <span className="text-lg font-semibold text-white truncate">
-                            {exp.restaurantName}
-                          </span>
-                        )}
-                        <span className="text-sm text-white/50">
-                          {formatDate(exp.visitedAt)}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      <div className="flex justify-end mb-1">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <span
-                            key={star}
-                            className={
-                              exp.rating >= star
-                                ? "text-yellow-400"
-                                : "text-slate-700"
+              {experiences.map((exp) => {
+                const isExpanded = expandedExperiences.has(exp.id);
+                const hasDetails = (exp.comment || exp.dishes.length > 0);
+                
+                return (
+                  <div
+                    key={exp.id}
+                    className="rounded-xl bg-[#0F0F1A] border shadow-md shadow-black/20 transition hover:shadow-lg hover:shadow-black/30"
+                    style={{ 
+                      borderColor: themeColorWithOpacity,
+                      borderWidth: '1px'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = theme.color;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = themeColorWithOpacity;
+                    }}
+                  >
+                    {/* En-tête cliquable */}
+                    <button
+                      onClick={() => {
+                        if (hasDetails) {
+                          setExpandedExperiences((prev) => {
+                            const newSet = new Set(prev);
+                            if (newSet.has(exp.id)) {
+                              newSet.delete(exp.id);
+                            } else {
+                              newSet.add(exp.id);
                             }
-                          >
-                            ★
-                          </span>
-                        ))}
-                      </div>
-                      <span className="text-sm text-white font-medium">
-                        {exp.rating} / 5
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Commentaire */}
-                  {exp.comment && (
-                    <p className="text-sm text-slate-300 mt-4 px-1">
-                      {exp.comment}
-                    </p>
-                  )}
-
-                  {/* Plats goûtés */}
-                  {exp.dishes.length > 0 && (
-                    <div className="mt-4 space-y-3">
-                      <p className="text-sm font-semibold text-white">
-                        Plats goûtés :
-                      </p>
-                      <div className="grid grid-cols-2 gap-3">
-                        {exp.dishes.map((dish, idx) => (
-                          <div
-                            key={dish.dishId ?? `${exp.id}-dish-${idx}`}
-                            className="rounded-lg bg-[#161622] border border-white/5 shadow-sm p-3 flex flex-col gap-1"
-                          >
-                            <p className="text-sm font-semibold text-white truncate">
-                              {dish.dishName}
-                            </p>
-                            <div className="flex items-center gap-1">
-                              <div className="flex">
-                                {[1, 2, 3, 4, 5].map((star) => (
-                                  <span
-                                    key={star}
-                                    className={
-                                      dish.rating >= star
-                                        ? "text-yellow-400 text-xs"
-                                        : "text-slate-700 text-xs"
-                                    }
-                                  >
-                                    ★
-                                  </span>
-                                ))}
-                              </div>
-                              <span className="text-xs text-white font-medium">
-                                {dish.rating}/5
+                            return newSet;
+                          });
+                        }
+                      }}
+                      className={`w-full p-4 md:p-5 ${hasDetails ? 'cursor-pointer' : 'cursor-default'}`}
+                      disabled={!hasDetails}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <div className="h-10 w-10 overflow-hidden rounded-full bg-slate-800 flex items-center justify-center flex-shrink-0">
+                            {exp.restaurantLogoUrl ? (
+                              <img
+                                src={exp.restaurantLogoUrl}
+                                alt={exp.restaurantName}
+                                className="h-10 w-10 object-cover"
+                              />
+                            ) : (
+                              <span className="text-xs text-slate-300">
+                                {exp.restaurantName.charAt(0)}
                               </span>
+                            )}
+                          </div>
+                          <div className="flex flex-col min-w-0 flex-1 text-left">
+                            {exp.restaurantSlug ? (
+                              <Link
+                                href={`/restaurants/${exp.restaurantSlug}`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-lg font-semibold text-white hover:text-bitebox-light truncate"
+                              >
+                                {exp.restaurantName}
+                              </Link>
+                            ) : (
+                              <span className="text-lg font-semibold text-white truncate">
+                                {exp.restaurantName}
+                              </span>
+                            )}
+                            <span className="text-sm text-white/50">
+                              {formatDate(exp.visitedAt)}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 flex-shrink-0">
+                          <div className="text-right">
+                            <div className="flex justify-end mb-1">
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <span
+                                  key={star}
+                                  className={
+                                    exp.rating >= star
+                                      ? "text-yellow-400"
+                                      : "text-slate-700"
+                                  }
+                                >
+                                  ★
+                                </span>
+                              ))}
+                            </div>
+                            <span className="text-sm text-white font-medium">
+                              {exp.rating} / 5
+                            </span>
+                          </div>
+                          {hasDetails && (
+                            <svg
+                              className={`w-5 h-5 text-white/50 transition-transform ${
+                                isExpanded ? 'rotate-180' : ''
+                              }`}
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M19 9l-7 7-7-7"
+                              />
+                            </svg>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+
+                    {/* Contenu déroulant */}
+                    {isExpanded && hasDetails && (
+                      <div className="px-4 md:px-5 pb-4 md:pb-5 pt-0 border-t border-white/5 mt-2">
+                        {/* Commentaire */}
+                        {exp.comment && (
+                          <p className="text-sm text-slate-300 mb-4">
+                            {exp.comment}
+                          </p>
+                        )}
+
+                        {/* Plats goûtés */}
+                        {exp.dishes.length > 0 && (
+                          <div className="space-y-3">
+                            <p className="text-sm font-semibold text-white">
+                              Plats goûtés :
+                            </p>
+                            <div className="grid grid-cols-2 gap-3">
+                              {exp.dishes.map((dish, idx) => (
+                                <div
+                                  key={dish.dishId ?? `${exp.id}-dish-${idx}`}
+                                  className="rounded-lg bg-[#161622] border border-white/5 shadow-sm p-3 flex flex-col gap-1"
+                                >
+                                  <p className="text-sm font-semibold text-white truncate">
+                                    {dish.dishName}
+                                  </p>
+                                  <div className="flex items-center gap-1">
+                                    <div className="flex">
+                                      {[1, 2, 3, 4, 5].map((star) => (
+                                        <span
+                                          key={star}
+                                          className={
+                                            dish.rating >= star
+                                              ? "text-yellow-400 text-xs"
+                                              : "text-slate-700 text-xs"
+                                          }
+                                        >
+                                          ★
+                                        </span>
+                                      ))}
+                                    </div>
+                                    <span className="text-xs text-white font-medium">
+                                      {dish.rating}/5
+                                    </span>
+                                  </div>
+                                </div>
+                              ))}
                             </div>
                           </div>
-                        ))}
+                        )}
                       </div>
-                    </div>
-                  )}
-                </div>
-              ))}
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </section>

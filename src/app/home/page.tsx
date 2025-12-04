@@ -203,7 +203,7 @@ export default function HomePage() {
                       <img
                         src={restaurant.logo_url}
                         alt={restaurant.name}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover scale-110"
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
@@ -237,8 +237,7 @@ export default function HomePage() {
                             ))}
                           </div>
                           <span className="text-[11px] text-slate-400">
-                            {restaurant.ratingStats.avg.toFixed(1)} / 5 ·{" "}
-                            {restaurant.ratingStats.count} avis
+                            {restaurant.ratingStats.avg.toFixed(1)} / 5
                           </span>
                         </div>
                       )}
@@ -283,7 +282,7 @@ export default function HomePage() {
                       <img
                         src={restaurant.logo_url}
                         alt={restaurant.name}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover scale-110"
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
@@ -317,8 +316,7 @@ export default function HomePage() {
                             ))}
                           </div>
                           <span className="text-[11px] text-slate-400">
-                            {restaurant.ratingStats.avg.toFixed(1)} / 5 ·{" "}
-                            {restaurant.ratingStats.count} avis
+                            {restaurant.ratingStats.avg.toFixed(1)} / 5
                           </span>
                         </div>
                       )}
