@@ -542,25 +542,45 @@ export default function AdminRestaurantsPage() {
 
     try {
       setError(null);
+      setCategoryError(null);
 
-      const { error: updateError } = await supabase
-        .from("dish_categories")
-        .update({ name: editCategoryName.trim() })
-        .eq("id", editingCategory.id);
-
-      if (updateError) {
-        console.error("[Admin] update category error", updateError);
-        setError("Erreur lors de la mise à jour de la section.");
+      const trimmedName = editCategoryName.trim();
+      
+      // Vérifier si le nom n'a pas changé
+      if (trimmedName === editingCategory.name) {
+        cancelEditCategory();
         return;
       }
 
+      const { data, error: updateError } = await supabase
+        .from("dish_categories")
+        .update({ name: trimmedName })
+        .eq("id", editingCategory.id)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error("[Admin] update category error", updateError);
+        setCategoryError(updateError.message || "Erreur lors de la mise à jour de la section.");
+        return;
+      }
+
+      // Mettre à jour le state local immédiatement
+      if (data) {
+        setCategories((prev) =>
+          prev.map((cat) => (cat.id === editingCategory.id ? (data as DishCategory) : cat))
+        );
+      }
+
       cancelEditCategory();
+      
+      // Rafraîchir les catégories pour être sûr
       if (selectedRestaurant) {
         fetchCategories(selectedRestaurant);
       }
     } catch (err) {
       console.error("[Admin] update category unexpected", err);
-      setError("Erreur inattendue lors de la mise à jour de la section.");
+      setCategoryError("Erreur inattendue lors de la mise à jour de la section.");
     }
   };
 
