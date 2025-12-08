@@ -538,68 +538,27 @@ export default function AdminRestaurantsPage() {
     }
   };
 
-  const handleSaveSectionName = async (sectionId: string, e?: React.MouseEvent<HTMLButtonElement>) => {
-    // Empêcher tout comportement par défaut et propagation
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-
+  const handleSaveSectionName = async (sectionId: string) => {
     const newName = editingSectionName.trim();
-    if (!newName) {
-      console.warn("handleSaveSectionName: nom vide");
-      return;
-    }
-    if (!sectionId) {
-      console.warn("handleSaveSectionName: sectionId manquant");
-      return;
-    }
-
-    if (!selectedRestaurant) {
-      console.warn("handleSaveSectionName: aucun restaurant sélectionné");
-      setCategoryError("Aucun restaurant sélectionné.");
-      return;
-    }
-
-    // Vérifier si une autre section avec ce nom existe déjà
-    const existingCategory = categories.find(
-      (c) => c.id !== sectionId && c.name.toLowerCase() === newName.toLowerCase()
-    );
-    if (existingCategory) {
-      setCategoryError("Une section avec ce nom existe déjà.");
-      return;
-    }
+    if (!newName) return;
+    if (!sectionId) return;
 
     try {
       setIsSavingSectionName(true);
-      setError(null);
-      setCategoryError(null);
 
-      console.log("Saving section name", { sectionId, newName, restaurantId: selectedRestaurant.id });
+      console.log("Saving section name", { sectionId, newName });
 
       const { data, error } = await supabase
         .from("dish_categories")
         .update({ name: newName })
         .eq("id", sectionId)
-        .eq("restaurant_id", selectedRestaurant.id)
         .select()
         .single();
 
       if (error) {
         console.error("Erreur update section name", error);
-        setCategoryError(error.message || "Erreur lors de la mise à jour de la section.");
-        setError(error.message || "Erreur lors de la mise à jour de la section.");
         return;
       }
-
-      if (!data) {
-        console.error("Aucune donnée retournée par Supabase");
-        setCategoryError("Aucune donnée retournée après la mise à jour.");
-        setError("Aucune donnée retournée après la mise à jour.");
-        return;
-      }
-
-      console.log("Section name updated successfully", data);
 
       // Mets à jour la liste des sections en mémoire
       setCategories((prev) =>
@@ -613,8 +572,6 @@ export default function AdminRestaurantsPage() {
       setEditingSectionName("");
     } catch (e) {
       console.error("Exception handleSaveSectionName", e);
-      setCategoryError("Erreur inattendue lors de la mise à jour de la section.");
-      setError("Erreur inattendue lors de la mise à jour de la section.");
     } finally {
       setIsSavingSectionName(false);
     }
@@ -1553,35 +1510,23 @@ export default function AdminRestaurantsPage() {
                             <div className="flex gap-2 items-center flex-1">
                               <input
                                 type="text"
-                                className="flex-1 rounded-md bg-slate-900 border border-slate-700 px-2 py-1 text-xs outline-none focus:border-bitebox"
+                                className="flex-1 rounded-md bg-bitebox-card px-3 py-1 text-sm text-white outline-none"
                                 value={editingSectionName}
                                 onChange={(e) => setEditingSectionName(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") {
-                                    e.preventDefault();
-                                    handleSaveSectionName(category.id, e as any);
-                                  } else if (e.key === "Escape") {
-                                    e.preventDefault();
-                                    setEditingSectionId(null);
-                                    setEditingSectionName("");
-                                  }
-                                }}
                                 autoFocus
                               />
                               <button
                                 type="button"
-                                className="px-2 py-1 rounded text-xs bg-emerald-500 text-black hover:bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="rounded-md bg-bitebox-purple px-2 py-1 text-xs font-medium text-white disabled:opacity-50"
                                 disabled={isSavingSectionName || editingSectionName.trim().length === 0}
-                                onClick={(e) => handleSaveSectionName(category.id, e)}
+                                onClick={() => handleSaveSectionName(category.id)}
                               >
-                                {isSavingSectionName ? "..." : "Valider"}
+                                Valider
                               </button>
                               <button
                                 type="button"
-                                className="px-2 py-1 rounded text-xs border border-slate-600 hover:bg-slate-800"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
+                                className="rounded-md bg-bitebox-card px-2 py-1 text-xs text-gray-300"
+                                onClick={() => {
                                   setEditingSectionId(null);
                                   setEditingSectionName("");
                                 }}
@@ -1591,7 +1536,7 @@ export default function AdminRestaurantsPage() {
                             </div>
                           ) : (
                             <>
-                              <span className="text-sm font-medium">{category.name}</span>
+                              <span className="text-sm font-medium text-white">{category.name}</span>
                               <span className="text-xs text-slate-400">
                                 ({dishesCount} plat{dishesCount !== 1 ? "s" : ""})
                               </span>
