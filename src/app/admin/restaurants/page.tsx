@@ -72,8 +72,9 @@ export default function AdminRestaurantsPage() {
   const [categories, setCategories] = useState<DishCategory[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
-  const [editingCategory, setEditingCategory] = useState<DishCategory | null>(null);
-  const [editCategoryName, setEditCategoryName] = useState("");
+  const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
+  const [editingSectionName, setEditingSectionName] = useState<string>("");
+  const [isSavingSectionName, setIsSavingSectionName] = useState(false);
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [categoryError, setCategoryError] = useState<string | null>(null);
 
@@ -537,85 +538,65 @@ export default function AdminRestaurantsPage() {
     }
   };
 
-  const startEditCategory = (category: DishCategory) => {
-    setEditingCategory(category);
-    setEditCategoryName(category.name);
-  };
-
-  const cancelEditCategory = () => {
-    setEditingCategory(null);
-    setEditCategoryName("");
-  };
-
-  const handleUpdateCategory = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!editingCategory) {
-      setCategoryError("Aucune section sélectionnée pour l'édition.");
-      return;
-    }
-
-    const trimmedName = editCategoryName.trim();
-    if (!trimmedName) {
-      setCategoryError("Le nom de la section ne peut pas être vide.");
-      return;
-    }
-    
-    // Vérifier si le nom n'a pas changé
-    if (trimmedName === editingCategory.name) {
-      cancelEditCategory();
-      return;
-    }
-
-    // Vérifier si une autre section avec ce nom existe déjà
-    const existingCategory = categories.find(
-      (c) => c.id !== editingCategory.id && c.name.toLowerCase() === trimmedName.toLowerCase()
-    );
-    if (existingCategory) {
-      setCategoryError("Une section avec ce nom existe déjà.");
-      return;
-    }
+  const handleSaveSectionName = async (sectionId: string) => {
+    const newName = editingSectionName.trim();
+    if (!newName) return;
+    if (!sectionId) return;
 
     if (!selectedRestaurant) {
       setCategoryError("Aucun restaurant sélectionné.");
       return;
     }
 
+    // Vérifier si une autre section avec ce nom existe déjà
+    const existingCategory = categories.find(
+      (c) => c.id !== sectionId && c.name.toLowerCase() === newName.toLowerCase()
+    );
+    if (existingCategory) {
+      setCategoryError("Une section avec ce nom existe déjà.");
+      return;
+    }
+
     try {
+      setIsSavingSectionName(true);
       setError(null);
       setCategoryError(null);
 
-      const { data, error: updateError } = await supabase
+      console.log("Saving section name", { sectionId, newName });
+
+      const { data, error } = await supabase
         .from("dish_categories")
-        .update({ name: trimmedName })
-        .eq("id", editingCategory.id)
+        .update({ name: newName })
+        .eq("id", sectionId)
         .eq("restaurant_id", selectedRestaurant.id)
         .select()
         .single();
 
-      if (updateError) {
-        console.error("[Admin] update category error", updateError);
-        const errorMessage = updateError.message || "Erreur lors de la mise à jour de la section.";
-        setCategoryError(errorMessage);
-        setError(errorMessage);
+      if (error) {
+        console.error("Erreur update section name", error);
+        setCategoryError(error.message || "Erreur lors de la mise à jour de la section.");
+        setError(error.message || "Erreur lors de la mise à jour de la section.");
         return;
       }
 
-      // Mettre à jour le state local immédiatement
+      // Mets à jour la liste des sections en mémoire
       if (data) {
         setCategories((prev) =>
-          prev.map((cat) => 
-            cat.id === editingCategory.id ? { ...cat, name: data.name } : cat
+          prev.map((section) =>
+            section.id === sectionId ? { ...section, name: data.name } : section
           )
         );
       }
 
-      cancelEditCategory();
-    } catch (err: any) {
-      console.error("[Admin] update category unexpected", err);
-      const errorMessage = err?.message || "Erreur inattendue lors de la mise à jour de la section.";
-      setCategoryError(errorMessage);
-      setError(errorMessage);
+      // Quitte le mode édition
+      setEditingSectionId(null);
+      setEditingSectionName("");
+    } catch (e) {
+      console.error("Exception handleSaveSectionName", e);
+      setCategoryError("Erreur inattendue lors de la mise à jour de la section.");
+      setError("Erreur inattendue lors de la mise à jour de la section.");
+    } finally {
+      setIsSavingSectionName(false);
     }
   };
 
@@ -1548,33 +1529,34 @@ export default function AdminRestaurantsPage() {
                               ↓
                             </button>
                           </div>
-                          {editingCategory?.id === category.id ? (
-                            <form
-                              onSubmit={handleUpdateCategory}
-                              className="flex items-center gap-2 flex-1"
-                            >
+                          {editingSectionId === category.id ? (
+                            <div className="flex gap-2 items-center flex-1">
                               <input
                                 type="text"
-                                value={editCategoryName}
-                                onChange={(e) => setEditCategoryName(e.target.value)}
                                 className="flex-1 rounded-md bg-slate-900 border border-slate-700 px-2 py-1 text-xs outline-none focus:border-bitebox"
+                                value={editingSectionName}
+                                onChange={(e) => setEditingSectionName(e.target.value)}
                                 autoFocus
                               />
                               <button
-                                type="submit"
+                                type="button"
                                 className="px-2 py-1 rounded text-xs bg-emerald-500 text-black hover:bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed"
-                                disabled={!editCategoryName.trim()}
+                                disabled={isSavingSectionName || editingSectionName.trim().length === 0}
+                                onClick={() => handleSaveSectionName(category.id)}
                               >
-                                ✓
+                                Valider
                               </button>
                               <button
                                 type="button"
-                                onClick={cancelEditCategory}
                                 className="px-2 py-1 rounded text-xs border border-slate-600 hover:bg-slate-800"
+                                onClick={() => {
+                                  setEditingSectionId(null);
+                                  setEditingSectionName("");
+                                }}
                               >
-                                ✕
+                                Annuler
                               </button>
-                            </form>
+                            </div>
                           ) : (
                             <>
                               <span className="text-sm font-medium">{category.name}</span>
@@ -1584,11 +1566,14 @@ export default function AdminRestaurantsPage() {
                             </>
                           )}
                         </div>
-                        {editingCategory?.id !== category.id && (
+                        {editingSectionId !== category.id && (
                           <div className="flex items-center gap-1">
                             <button
                               type="button"
-                              onClick={() => startEditCategory(category)}
+                              onClick={() => {
+                                setEditingSectionId(category.id);
+                                setEditingSectionName(category.name);
+                              }}
                               className="text-[10px] rounded border border-bitebox/60 px-2 py-1 hover:bg-bitebox/10"
                             >
                               Renommer
