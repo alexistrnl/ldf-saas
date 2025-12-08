@@ -538,12 +538,25 @@ export default function AdminRestaurantsPage() {
     }
   };
 
-  const handleSaveSectionName = async (sectionId: string) => {
+  const handleSaveSectionName = async (sectionId: string, e?: React.MouseEvent<HTMLButtonElement>) => {
+    // Empêcher tout comportement par défaut et propagation
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
     const newName = editingSectionName.trim();
-    if (!newName) return;
-    if (!sectionId) return;
+    if (!newName) {
+      console.warn("handleSaveSectionName: nom vide");
+      return;
+    }
+    if (!sectionId) {
+      console.warn("handleSaveSectionName: sectionId manquant");
+      return;
+    }
 
     if (!selectedRestaurant) {
+      console.warn("handleSaveSectionName: aucun restaurant sélectionné");
       setCategoryError("Aucun restaurant sélectionné.");
       return;
     }
@@ -562,7 +575,7 @@ export default function AdminRestaurantsPage() {
       setError(null);
       setCategoryError(null);
 
-      console.log("Saving section name", { sectionId, newName });
+      console.log("Saving section name", { sectionId, newName, restaurantId: selectedRestaurant.id });
 
       const { data, error } = await supabase
         .from("dish_categories")
@@ -579,14 +592,21 @@ export default function AdminRestaurantsPage() {
         return;
       }
 
-      // Mets à jour la liste des sections en mémoire
-      if (data) {
-        setCategories((prev) =>
-          prev.map((section) =>
-            section.id === sectionId ? { ...section, name: data.name } : section
-          )
-        );
+      if (!data) {
+        console.error("Aucune donnée retournée par Supabase");
+        setCategoryError("Aucune donnée retournée après la mise à jour.");
+        setError("Aucune donnée retournée après la mise à jour.");
+        return;
       }
+
+      console.log("Section name updated successfully", data);
+
+      // Mets à jour la liste des sections en mémoire
+      setCategories((prev) =>
+        prev.map((section) =>
+          section.id === sectionId ? { ...section, name: data.name } : section
+        )
+      );
 
       // Quitte le mode édition
       setEditingSectionId(null);
@@ -1536,20 +1556,32 @@ export default function AdminRestaurantsPage() {
                                 className="flex-1 rounded-md bg-slate-900 border border-slate-700 px-2 py-1 text-xs outline-none focus:border-bitebox"
                                 value={editingSectionName}
                                 onChange={(e) => setEditingSectionName(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    handleSaveSectionName(category.id, e as any);
+                                  } else if (e.key === "Escape") {
+                                    e.preventDefault();
+                                    setEditingSectionId(null);
+                                    setEditingSectionName("");
+                                  }
+                                }}
                                 autoFocus
                               />
                               <button
                                 type="button"
                                 className="px-2 py-1 rounded text-xs bg-emerald-500 text-black hover:bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed"
                                 disabled={isSavingSectionName || editingSectionName.trim().length === 0}
-                                onClick={() => handleSaveSectionName(category.id)}
+                                onClick={(e) => handleSaveSectionName(category.id, e)}
                               >
-                                Valider
+                                {isSavingSectionName ? "..." : "Valider"}
                               </button>
                               <button
                                 type="button"
                                 className="px-2 py-1 rounded text-xs border border-slate-600 hover:bg-slate-800"
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
                                   setEditingSectionId(null);
                                   setEditingSectionName("");
                                 }}
