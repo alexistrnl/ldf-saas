@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import Spinner from "@/components/Spinner";
 import Image from "next/image";
+import StarRating from "@/components/StarRating";
 
 type Restaurant = {
   id: string;
@@ -206,8 +207,8 @@ export default function AddNoteWizard({
       return;
     }
 
-    if (wizardState.globalRating < 1 || wizardState.globalRating > 5) {
-      setError("Merci de choisir une note globale entre 1 et 5.");
+    if (wizardState.globalRating <= 0 || wizardState.globalRating > 5) {
+      setError("Merci de choisir une note globale entre 0.5 et 5.");
       return;
     }
 
@@ -574,28 +575,16 @@ export default function AddNoteWizard({
                       <p className="text-sm font-medium text-white mb-2 truncate">
                         {dish.name}
                       </p>
-                      <div className="flex gap-1">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <button
-                            key={star}
-                            type="button"
-                            onClick={() => setDishRating(dish.id, star)}
-                            className="text-xl leading-none transition-transform hover:scale-110"
-                          >
-                            <span
-                              className={
-                                rating >= star
-                                  ? "text-yellow-400"
-                                  : "text-slate-700"
-                              }
-                            >
-                              ★
-                            </span>
-                          </button>
-                        ))}
+                      <div className="flex items-center gap-2">
+                        <StarRating
+                          value={rating}
+                          onChange={(value) => setDishRating(dish.id, value)}
+                          size="md"
+                          allowHalf={true}
+                        />
                         {rating > 0 && (
-                          <span className="text-xs text-slate-400 ml-2">
-                            {rating}/5
+                          <span className="text-xs text-slate-400">
+                            {rating.toFixed(1)}/5
                           </span>
                         )}
                       </div>
@@ -642,34 +631,20 @@ export default function AddNoteWizard({
                 Note globale *
               </label>
               <div className="flex items-center gap-4">
-                <div className="flex gap-2">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                      key={star}
-                      type="button"
-                      onClick={() =>
-                        setWizardState((prev) => ({
-                          ...prev,
-                          globalRating: star,
-                        }))
-                      }
-                      className="text-3xl leading-none transition-transform hover:scale-110"
-                    >
-                      <span
-                        className={
-                          wizardState.globalRating >= star
-                            ? "text-yellow-400"
-                            : "text-slate-600"
-                        }
-                      >
-                        ★
-                      </span>
-                    </button>
-                  ))}
-                </div>
+                <StarRating
+                  value={wizardState.globalRating}
+                  onChange={(value) =>
+                    setWizardState((prev) => ({
+                      ...prev,
+                      globalRating: value,
+                    }))
+                  }
+                  size="lg"
+                  allowHalf={true}
+                />
                 {wizardState.globalRating > 0 && (
                   <span className="text-base text-slate-400 font-medium">
-                    {wizardState.globalRating} / 5
+                    {wizardState.globalRating.toFixed(1)} / 5
                   </span>
                 )}
               </div>
@@ -752,7 +727,7 @@ export default function AddNoteWizard({
               <button
                 onClick={handleSubmit}
                 disabled={
-                  wizardState.globalRating < 1 ||
+                  wizardState.globalRating <= 0 ||
                   wizardState.globalRating > 5 ||
                   submitting
                 }

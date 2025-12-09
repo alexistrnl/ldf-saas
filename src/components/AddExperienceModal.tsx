@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import Spinner from "@/components/Spinner";
+import StarRating from "@/components/StarRating";
 
 type AddExperienceModalProps = {
   isOpen: boolean;
@@ -33,7 +34,6 @@ export default function AddExperienceModal({
 
   // note principale
   const [rating, setRating] = useState<number>(5);
-  const [hoverRating, setHoverRating] = useState<number | null>(null);
 
   // date de visite
   const [visitedAt, setVisitedAt] = useState<string>(() =>
@@ -188,7 +188,6 @@ export default function AddExperienceModal({
 
       // reset et fermeture
       setRating(5);
-      setHoverRating(null);
       setVisitedAt(new Date().toISOString().slice(0, 10));
       setComment("");
       setRestaurantQuery("");
@@ -308,32 +307,14 @@ export default function AddExperienceModal({
           <div className="space-y-1">
             <label className="text-xs text-slate-300">Note globale</label>
             <div className="flex items-center gap-2">
-              <div className="flex gap-1">
-                {[1, 2, 3, 4, 5].map((star) => {
-                  const activeValue = hoverRating ?? rating;
-                  const isActive = activeValue >= star;
-                  return (
-                    <button
-                      key={star}
-                      type="button"
-                      onClick={() => setRating(star)}
-                      onMouseEnter={() => setHoverRating(star)}
-                      onMouseLeave={() => setHoverRating(null)}
-                      className="text-xl leading-none"
-                    >
-                      <span
-                        className={
-                          isActive ? "text-yellow-400" : "text-slate-600"
-                        }
-                      >
-                        ★
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+              <StarRating
+                value={rating}
+                onChange={setRating}
+                size="md"
+                allowHalf={true}
+              />
               <span className="text-xs text-slate-400">
-                {rating} / 5
+                {rating.toFixed(1)} / 5
               </span>
             </div>
           </div>
@@ -363,31 +344,16 @@ export default function AddExperienceModal({
                         </p>
                         {value > 0 && (
                           <span className="text-[10px] text-bitebox-light">
-                            {value}/5
+                            {value.toFixed(1)}/5
                           </span>
                         )}
                       </div>
-                      <div className="flex gap-1">
-                        {[1, 2, 3, 4, 5].map((star) => {
-                          const active = value >= star;
-                          return (
-                            <button
-                              key={star}
-                              type="button"
-                              onClick={() => setValue(star)}
-                              className="text-lg leading-none"
-                            >
-                              <span
-                                className={
-                                  active ? "text-yellow-400" : "text-slate-700"
-                                }
-                              >
-                                ★
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
+                      <StarRating
+                        value={value}
+                        onChange={setValue}
+                        size="sm"
+                        allowHalf={true}
+                      />
                     </div>
                   );
                 })}
