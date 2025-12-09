@@ -67,7 +67,7 @@ export default function StarRating({
     setIsDragging(false);
   };
 
-  const handleTouchMove = (e: TouchEvent) => {
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
     if (disabled) return;
     e.preventDefault();
     const touch = e.touches[0];
@@ -77,7 +77,7 @@ export default function StarRating({
     }
   };
 
-  const handleTouchEnd = (e: TouchEvent) => {
+  const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
     if (disabled) return;
     const touch = e.changedTouches[0];
     if (touch && containerRef.current) {
