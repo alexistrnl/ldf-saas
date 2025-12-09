@@ -538,16 +538,33 @@ export default function AdminRestaurantsPage() {
     }
   };
 
-  const handleSaveSectionName = async (sectionId: string) => {
+  const handleSaveSectionName = async (sectionId: string, e?: React.MouseEvent | React.KeyboardEvent) => {
+    // Empêcher le comportement par défaut si c'est un événement clavier
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
     const newName = editingSectionName.trim();
-    if (!newName) return;
-    if (!sectionId) return;
+    if (!newName) {
+      setCategoryError("Le nom de la section ne peut pas être vide.");
+      return;
+    }
+    if (!sectionId) {
+      setCategoryError("Erreur : identifiant de section manquant.");
+      return;
+    }
+    if (!selectedRestaurant) {
+      setCategoryError("Aucun restaurant sélectionné.");
+      return;
+    }
 
     try {
       setIsSavingSectionName(true);
+      setCategoryError(null);
+      setError(null);
 
-      console.log("Saving section name", { sectionId, newName });
-
+      // Appel Supabase pour mettre à jour le nom de la section
       const { data, error } = await supabase
         .from("dish_categories")
         .update({ name: newName })
@@ -556,22 +573,37 @@ export default function AdminRestaurantsPage() {
         .single();
 
       if (error) {
-        console.error("Erreur update section name", error);
+        console.error("[Admin] Erreur update section name", error);
+        const errorMessage = error.message || "Erreur lors de la sauvegarde du nom de la section.";
+        setCategoryError(errorMessage);
+        setError(errorMessage);
         return;
       }
 
-      // Mets à jour la liste des sections en mémoire
+      if (!data) {
+        console.error("[Admin] Aucune donnée retournée après l'update");
+        setCategoryError("Aucune donnée retournée après la sauvegarde.");
+        return;
+      }
+
+      // Mets à jour la liste des sections en mémoire avec les données retournées
       setCategories((prev) =>
         prev.map((section) =>
           section.id === sectionId ? { ...section, name: data.name } : section
         )
       );
 
+      // Recharger les catégories depuis la base pour être sûr que tout est synchronisé
+      await fetchCategories(selectedRestaurant);
+
       // Quitte le mode édition
       setEditingSectionId(null);
       setEditingSectionName("");
-    } catch (e) {
-      console.error("Exception handleSaveSectionName", e);
+    } catch (e: any) {
+      console.error("[Admin] Exception handleSaveSectionName", e);
+      const errorMessage = e?.message || "Une erreur inattendue est survenue lors de la sauvegarde.";
+      setCategoryError(errorMessage);
+      setError(errorMessage);
     } finally {
       setIsSavingSectionName(false);
     }
@@ -1507,32 +1539,48 @@ export default function AdminRestaurantsPage() {
                             </button>
                           </div>
                           {editingSectionId === category.id ? (
-                            <div className="flex gap-2 items-center flex-1">
-                              <input
-                                type="text"
-                                className="flex-1 rounded-md bg-bitebox-card px-3 py-1 text-sm text-white outline-none"
-                                value={editingSectionName}
-                                onChange={(e) => setEditingSectionName(e.target.value)}
-                                autoFocus
-                              />
-                              <button
-                                type="button"
-                                className="rounded-md bg-bitebox-purple px-2 py-1 text-xs font-medium text-white disabled:opacity-50"
-                                disabled={isSavingSectionName || editingSectionName.trim().length === 0}
-                                onClick={() => handleSaveSectionName(category.id)}
-                              >
-                                Valider
-                              </button>
-                              <button
-                                type="button"
-                                className="rounded-md bg-bitebox-card px-2 py-1 text-xs text-gray-300"
-                                onClick={() => {
-                                  setEditingSectionId(null);
-                                  setEditingSectionName("");
-                                }}
-                              >
-                                Annuler
-                              </button>
+                            <div className="flex flex-col gap-2 flex-1">
+                              <div className="flex gap-2 items-center">
+                                <input
+                                  type="text"
+                                  className="flex-1 rounded-md bg-bitebox-card px-3 py-1 text-sm text-white outline-none"
+                                  value={editingSectionName}
+                                  onChange={(e) => {
+                                    setEditingSectionName(e.target.value);
+                                    setCategoryError(null);
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter" && !isSavingSectionName && editingSectionName.trim().length > 0) {
+                                      handleSaveSectionName(category.id, e);
+                                    }
+                                  }}
+                                  autoFocus
+                                />
+                                <button
+                                  type="button"
+                                  className="rounded-md bg-bitebox-purple px-2 py-1 text-xs font-medium text-white disabled:opacity-50"
+                                  disabled={isSavingSectionName || editingSectionName.trim().length === 0}
+                                  onClick={(e) => handleSaveSectionName(category.id, e)}
+                                >
+                                  {isSavingSectionName ? "..." : "Valider"}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="rounded-md bg-bitebox-card px-2 py-1 text-xs text-gray-300"
+                                  onClick={() => {
+                                    setEditingSectionId(null);
+                                    setEditingSectionName("");
+                                    setCategoryError(null);
+                                  }}
+                                >
+                                  Annuler
+                                </button>
+                              </div>
+                              {categoryError && (
+                                <p className="text-xs text-red-400">
+                                  {categoryError}
+                                </p>
+                              )}
                             </div>
                           ) : (
                             <>
