@@ -566,13 +566,13 @@ export default function AdminRestaurantsPage() {
 
       // Appel Supabase pour mettre à jour le nom de la section
       // On filtre par id ET restaurant_id pour garantir qu'une seule ligne est modifiée
+      // On utilise .select("*") sans .single() pour obtenir un tableau et éviter les problèmes avec RLS
       const { data, error } = await supabase
         .from("dish_categories")
         .update({ name: newName })
         .eq("id", sectionId)
         .eq("restaurant_id", selectedRestaurant.id)
-        .select()
-        .maybeSingle();
+        .select("*");
 
       if (error) {
         console.error("[Admin] Erreur update section name", error);
@@ -582,16 +582,20 @@ export default function AdminRestaurantsPage() {
         return;
       }
 
-      if (!data) {
-        console.error("[Admin] Aucune donnée retournée après l'update");
-        setCategoryError("Aucune donnée retournée après la sauvegarde. Vérifiez que la section existe toujours.");
+      // Vérifier que data est un tableau et qu'il contient au moins une ligne
+      if (!Array.isArray(data) || data.length === 0) {
+        console.error("[Admin] Aucune ligne mise à jour", { data, sectionId, newName });
+        setCategoryError("Aucune ligne n'a été mise à jour. Vérifiez que la section existe toujours et que vous avez les permissions nécessaires.");
         return;
       }
+
+      // Récupérer la première ligne mise à jour (normalement il n'y en a qu'une)
+      const updatedCategory = data[0];
 
       // Mets à jour la liste des sections en mémoire avec les données retournées
       setCategories((prev) =>
         prev.map((section) =>
-          section.id === sectionId ? { ...section, name: data.name } : section
+          section.id === sectionId ? { ...section, name: updatedCategory.name } : section
         )
       );
 
