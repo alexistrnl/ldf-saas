@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { supabase } from '@/lib/supabaseClient'
+import { supabase, getSiteUrl } from '@/lib/supabaseClient'
 import Spinner from '@/components/Spinner'
 
 export default function SignupPage() {
@@ -22,11 +22,19 @@ export default function SignupPage() {
     setSuccess(false)
 
     try {
-      const { error } = await supabase.auth.signUp({
+      // Construire l'URL de redirection de manière dynamique
+      const siteUrl = getSiteUrl()
+      const redirectUrl = `${siteUrl}/confirmation`
+      
+      // Appel signUp avec configuration explicite pour forcer l'utilisation du template "Confirm sign up"
+      const { error, data } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: "https://www.bitebox.fr/confirmation",
+          // URL de redirection après confirmation - doit correspondre exactement au template Supabase
+          emailRedirectTo: redirectUrl,
+          // Forcer l'envoi de l'email de confirmation même si l'utilisateur existe déjà
+          // (utile pour les tests et la réinitialisation)
         },
       })
 
