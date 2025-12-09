@@ -565,12 +565,14 @@ export default function AdminRestaurantsPage() {
       setError(null);
 
       // Appel Supabase pour mettre à jour le nom de la section
+      // On filtre par id ET restaurant_id pour garantir qu'une seule ligne est modifiée
       const { data, error } = await supabase
         .from("dish_categories")
         .update({ name: newName })
         .eq("id", sectionId)
+        .eq("restaurant_id", selectedRestaurant.id)
         .select()
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error("[Admin] Erreur update section name", error);
@@ -582,7 +584,7 @@ export default function AdminRestaurantsPage() {
 
       if (!data) {
         console.error("[Admin] Aucune donnée retournée après l'update");
-        setCategoryError("Aucune donnée retournée après la sauvegarde.");
+        setCategoryError("Aucune donnée retournée après la sauvegarde. Vérifiez que la section existe toujours.");
         return;
       }
 
