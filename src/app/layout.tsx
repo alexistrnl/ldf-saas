@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import AppShell from "@/components/AppShell";
+import ConditionalAppShell from "@/components/ConditionalAppShell";
 
 export const metadata: Metadata = {
   title: "BiteBox",
@@ -37,10 +37,12 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // ConditionalAppShell bypass AppShell pour les pages d'authentification
+  // Pour toutes les autres pages, AppShell est utilisé
   return (
     <html lang="fr">
       <body className="min-h-screen bg-slate-950 text-slate-50">
-        <AppShell>{children}</AppShell>
+        <ConditionalAppShell>{children}</ConditionalAppShell>
       </body>
     </html>
   );

@@ -7,7 +7,11 @@ import BottomNav from './BottomNav'
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
 
-  const isAuthPage = pathname === '/login' || pathname === '/signup'
+  const isAuthPage = 
+    pathname === '/login' || 
+    pathname === '/signup' || 
+    pathname === '/forgot-password' || 
+    pathname === '/reset-password'
   const isAdminPage = pathname?.startsWith('/admin')
   const isDesktopInfoPage = pathname === '/desktop-info'
   

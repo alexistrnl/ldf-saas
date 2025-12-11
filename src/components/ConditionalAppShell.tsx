@@ -1,0 +1,28 @@
+'use client'
+
+import { usePathname } from 'next/navigation'
+import AppShell from './AppShell'
+
+export default function ConditionalAppShell({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const pathname = usePathname()
+  
+  // Routes d'authentification qui ne doivent pas passer par AppShell
+  const isAuthRoute = 
+    pathname === '/login' || 
+    pathname === '/signup' || 
+    pathname === '/forgot-password' || 
+    pathname === '/reset-password'
+
+  // Si c'est une route auth, retourner directement les children sans AppShell
+  if (isAuthRoute) {
+    return <>{children}</>
+  }
+
+  // Sinon, utiliser AppShell normalement
+  return <AppShell>{children}</AppShell>
+}
+
