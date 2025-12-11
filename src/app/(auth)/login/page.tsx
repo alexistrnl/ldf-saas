@@ -1,122 +1,70 @@
-'use client'
-
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
+import { headers } from 'next/headers'
 import Image from 'next/image'
-import { supabase } from '@/lib/supabaseClient'
-import Spinner from '@/components/Spinner'
+import LoginForm from '@/components/LoginForm'
+import LoginPageClient from './LoginPageClient'
 
-export default function LoginPage() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const router = useRouter()
+export default async function LoginPage() {
+  // Détection du user-agent côté serveur
+  const headersList = await headers()
+  const userAgent = headersList.get('user-agent') || ''
+  const isMobileOrTablet = /Android|iPhone|iPad|iPod|Mobile/i.test(userAgent)
+  const isDesktop = !isMobileOrTablet
 
-  // Désactiver le scroll vertical uniquement sur cette page
-  useEffect(() => {
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = 'unset'
-    }
-  }, [])
+  // Si desktop, afficher le message au lieu du formulaire
+  if (isDesktop) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-100 to-slate-200 px-4 py-12">
+        <div className="w-full max-w-md bg-white rounded-xl shadow-xl p-8 md:p-12">
+          <div className="flex flex-col items-center text-center space-y-6">
+            {/* Logo */}
+            <div className="flex justify-center mb-2">
+              <Image 
+                src="/bitebox-logo.png" 
+                alt="BiteBox logo" 
+                width={96} 
+                height={96}
+                className="rounded-lg"
+              />
+            </div>
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError(null)
+            {/* Titre */}
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
+              BiteBox est optimisée pour mobile
+            </h1>
 
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
+            {/* Message principal */}
+            <div className="space-y-4 text-gray-700">
+              <p className="text-lg md:text-xl leading-relaxed">
+                Pour profiter de toutes les fonctionnalités de BiteBox, merci d&apos;y accéder depuis ton téléphone.
+              </p>
+              <p className="text-base md:text-lg leading-relaxed">
+                Ouvre simplement <span className="font-semibold text-bitebox">https://www.bitebox.fr</span> dans le navigateur de ton smartphone.
+              </p>
+            </div>
 
-      if (error) {
-        setError(error.message)
-        setLoading(false)
-        return
-      }
-
-      router.push('/home')
-    } catch (err) {
-      setError('Une erreur est survenue')
-      setLoading(false)
-    }
+            {/* Icône mobile décorative */}
+            <div className="pt-4">
+              <svg
+                className="w-24 h-24 text-bitebox opacity-60"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"
+                />
+              </svg>
+            </div>
+          </div>
+        </div>
+      </main>
+    )
   }
 
-  return (
-    <main className="h-screen overflow-hidden flex items-center justify-center bg-gradient-to-b from-[#050816] via-[#050816] to-[#140421] px-4">
-      <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-8">
-        <div className="flex flex-col items-center mb-6">
-          <Image src="/bitebox-logo.png" alt="BiteBox logo" width={72} height={72} />
-        </div>
-        <h1 className="text-3xl font-bold text-gray-900 mb-6 text-center">
-          Connexion
-        </h1>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-bitebox focus:border-transparent"
-              placeholder="ton@email.com"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-              Mot de passe
-            </label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-bitebox focus:border-transparent"
-              placeholder="••••••••"
-            />
-          </div>
-
-          {error && (
-            <div className="text-red-600 text-sm bg-red-50 border border-red-200 p-3 rounded-lg">
-              {error}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full mt-6 px-8 py-3 bg-bitebox text-white font-semibold rounded-lg hover:bg-bitebox-dark transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            {loading ? (
-              <>
-                <Spinner size="sm" />
-                <span>Connexion...</span>
-              </>
-            ) : (
-              'Se connecter'
-            )}
-          </button>
-        </form>
-
-        <p className="mt-6 text-center text-sm text-gray-600">
-          Pas encore de compte ?{' '}
-          <Link href="/signup" className="text-bitebox hover:text-bitebox-dark font-medium">
-            Créer un compte
-          </Link>
-        </p>
-      </div>
-    </main>
-  )
+  // Si mobile/tablette, afficher le formulaire de connexion normal
+  return <LoginPageClient />
 }
 
