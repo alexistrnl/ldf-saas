@@ -1,0 +1,2300 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabaseClient";
+import Spinner from "@/components/Spinner";
+
+// Ce composant contient tout le contenu de la page admin restaurants
+// Il est extrait pour permettre la protection par mot de passe
+
+type Restaurant = {
+  id: string;
+  name: string;
+  slug: string | null;
+  logo_url: string | null;
+  description: string | null;
+};
+
+type Dish = {
+  id: string;
+  restaurant_id: string;
+  name: string;
+  image_url: string | null;
+  description: string | null;
+  is_signature: boolean;
+  is_limited_edition: boolean;
+  position: number | null;
+  category_id: string | null;
+};
+
+type DishCategory = {
+  id: string;
+  restaurant_id: string;
+  name: string;
+  order_index: number;
+};
+
+function slugify(name: string) {
+  return name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+export default function AdminRestaurantsContent() {
+  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // création
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoUrl, setLogoUrl] = useState("");
+  const [logoImageMode, setLogoImageMode] = useState<"upload" | "url">("upload");
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  // édition restaurant
+  const [editingRestaurant, setEditingRestaurant] = useState<Restaurant | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editLogoFile, setEditLogoFile] = useState<File | null>(null);
+  const [editLogoUrl, setEditLogoUrl] = useState("");
+  const [editLogoImageMode, setEditLogoImageMode] = useState<"upload" | "url">("upload");
+  const [editLogoPreview, setEditLogoPreview] = useState<string | null>(null);
+
+  // gestion des plats
+  const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
+  const [dishes, setDishes] = useState<Dish[]>([]);
+  const [loadingDishes, setLoadingDishes] = useState(false);
+
+  // gestion des sections de menu
+  const [categories, setCategories] = useState<DishCategory[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
+  const [editingSectionName, setEditingSectionName] = useState<string>("");
+  const [isSavingSectionName, setIsSavingSectionName] = useState(false);
+  const [showCategoryForm, setShowCategoryForm] = useState(false);
+  const [categoryError, setCategoryError] = useState<string | null>(null);
+
+  const [dishName, setDishName] = useState("");
+  const [dishDescription, setDishDescription] = useState("");
+  const [dishImageUrl, setDishImageUrl] = useState("");
+  const [dishImagePreview, setDishImagePreview] = useState<string | null>(null);
+  const [dishImageError, setDishImageError] = useState<string | null>(null);
+  const [dishIsSignature, setDishIsSignature] = useState(false);
+  const [dishIsLimitedEdition, setDishIsLimitedEdition] = useState(false);
+  const [dishCategoryId, setDishCategoryId] = useState<string | null>(null);
+
+  const [editingDish, setEditingDish] = useState<Dish | null>(null);
+  const [editDishName, setEditDishName] = useState("");
+  const [editDishDescription, setEditDishDescription] = useState("");
+  const [editDishImageUrl, setEditDishImageUrl] = useState("");
+  const [editDishImagePreview, setEditDishImagePreview] = useState<string | null>(null);
+  const [editDishImageError, setEditDishImageError] = useState<string | null>(null);
+  const [editDishIsSignature, setEditDishIsSignature] = useState(false);
+  const [editDishIsLimitedEdition, setEditDishIsLimitedEdition] = useState(false);
+  const [editDishCategoryId, setEditDishCategoryId] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchRestaurants();
+  }, []);
+
+  // Nettoyer les URLs d'aperçu pour éviter les fuites mémoire
+  useEffect(() => {
+    return () => {
+      if (logoPreview && logoPreview.startsWith('blob:')) {
+        URL.revokeObjectURL(logoPreview);
+      }
+      if (editLogoPreview && editLogoPreview.startsWith('blob:')) {
+        URL.revokeObjectURL(editLogoPreview);
+      }
+      if (dishImagePreview && dishImagePreview.startsWith('blob:')) {
+        URL.revokeObjectURL(dishImagePreview);
+      }
+      if (editDishImagePreview && editDishImagePreview.startsWith('blob:')) {
+        URL.revokeObjectURL(editDishImagePreview);
+      }
+    };
+  }, [logoPreview, editLogoPreview, dishImagePreview, editDishImagePreview]);
+
+  const fetchRestaurants = async () => {
+    try {
+      setError(null);
+      setLoading(true);
+
+      const { data, error } = await supabase
+        .from("restaurants")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("[Admin] restaurants error", error);
+        setError("Erreur lors du chargement des enseignes.");
+        return;
+      }
+
+      setRestaurants((data || []) as Restaurant[]);
+    } catch (err) {
+      console.error("[Admin] restaurants unexpected", err);
+      setError("Erreur inattendue lors du chargement des enseignes.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchDishes = async (restaurant: Restaurant) => {
+    try {
+      setError(null);
+      setLoadingDishes(true);
+
+      const { data, error } = await supabase
+        .from("dishes")
+        .select("*")
+        .eq("restaurant_id", restaurant.id)
+        .order("position", { ascending: true, nullsFirst: false })
+        .order("name", { ascending: true });
+
+      if (error) {
+        console.error("[Admin] dishes error", error);
+        setError("Erreur lors du chargement des plats.");
+        return;
+      }
+
+      const typed = (data || []) as Dish[];
+      const sorted = [...typed].sort((a, b) => {
+        const posA = a.position ?? Number.MAX_SAFE_INTEGER;
+        const posB = b.position ?? Number.MAX_SAFE_INTEGER;
+        if (posA !== posB) return posA - posB;
+        return a.name.localeCompare(b.name);
+      });
+      setDishes(sorted);
+    } catch (err) {
+      console.error("[Admin] dishes unexpected", err);
+      setError("Erreur inattendue lors du chargement des plats.");
+    } finally {
+      setLoadingDishes(false);
+    }
+  };
+
+  const resetCreateForm = () => {
+    setName("");
+    setDescription("");
+    if (logoPreview && logoPreview.startsWith('blob:')) {
+      URL.revokeObjectURL(logoPreview);
+    }
+    setLogoFile(null);
+    setLogoUrl("");
+    setLogoImageMode("upload");
+    setLogoPreview(null);
+  };
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) {
+      setError("Le nom de l'enseigne est obligatoire.");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      setError(null);
+
+      let finalLogoUrl: string | null = null;
+
+      // Mode upload : uploader le fichier
+      if (logoImageMode === "upload" && logoFile) {
+        const fileError = validateImageFile(logoFile);
+        if (fileError) {
+          setError(fileError);
+          setSaving(false);
+          return;
+        }
+
+        const path = `logos/${Date.now()}-${logoFile.name}`;
+        const { error: uploadError } = await supabase
+          .storage
+          .from("fastfood-images")
+          .upload(path, logoFile);
+
+        if (uploadError) {
+          console.error("[Admin] upload logo error", uploadError);
+          setError("Erreur lors de l'upload du logo.");
+          setSaving(false);
+          return;
+        }
+
+        const { data } = supabase.storage.from("fastfood-images").getPublicUrl(path);
+        finalLogoUrl = data.publicUrl;
+      }
+      // Mode URL : valider et utiliser l'URL
+      else if (logoImageMode === "url" && logoUrl.trim()) {
+        if (!validateImageUrl(logoUrl)) {
+          setError("URL invalide. L'URL doit commencer par http:// ou https:// et avoir une extension .png, .jpg, .jpeg ou .webp");
+          setSaving(false);
+          return;
+        }
+        finalLogoUrl = logoUrl.trim();
+      }
+
+      const slug = slugify(name);
+
+      const { error: insertError } = await supabase.from("restaurants").insert({
+        name,
+        description: description || null,
+        logo_url: finalLogoUrl,
+        slug,
+      });
+
+      if (insertError) {
+        console.error("[Admin] insert restaurant error", insertError);
+        setError("Erreur lors de la création de l'enseigne.");
+        setSaving(false);
+        return;
+      }
+
+      resetCreateForm();
+      fetchRestaurants();
+    } catch (err) {
+      console.error("[Admin] create restaurant unexpected", err);
+      setError("Erreur inattendue lors de la création de l'enseigne.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const startEditRestaurant = (restaurant: Restaurant) => {
+    setEditingRestaurant(restaurant);
+    setEditName(restaurant.name);
+    setEditDescription(restaurant.description || "");
+    setEditLogoFile(null);
+    setEditLogoUrl("");
+    setEditLogoImageMode("upload");
+    setEditLogoPreview(restaurant.logo_url);
+  };
+
+  const cancelEditRestaurant = () => {
+    setEditingRestaurant(null);
+    setEditName("");
+    setEditDescription("");
+    if (editLogoPreview && editLogoPreview.startsWith('blob:')) {
+      URL.revokeObjectURL(editLogoPreview);
+    }
+    setEditLogoFile(null);
+    setEditLogoUrl("");
+    setEditLogoImageMode("upload");
+    setEditLogoPreview(null);
+  };
+
+  const handleUpdateRestaurant = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingRestaurant) return;
+
+    try {
+      setError(null);
+
+      if (!editName.trim()) {
+        setError("Le nom de l'enseigne est obligatoire.");
+        return;
+      }
+
+      let finalLogoUrl: string | null = editingRestaurant.logo_url ?? null;
+
+      // Mode upload : uploader le fichier
+      if (editLogoImageMode === "upload" && editLogoFile) {
+        const fileError = validateImageFile(editLogoFile);
+        if (fileError) {
+          setError(fileError);
+          return;
+        }
+
+        const path = `logos/${editingRestaurant.id}/${Date.now()}-${editLogoFile.name}`;
+        const { error: uploadError } = await supabase
+          .storage
+          .from("fastfood-images")
+          .upload(path, editLogoFile);
+
+        if (uploadError) {
+          console.error("[Admin] upload new logo error", uploadError);
+          setError("Erreur lors de l'upload du nouveau logo.");
+          return;
+        }
+
+        const { data } = supabase.storage.from("fastfood-images").getPublicUrl(path);
+        finalLogoUrl = data.publicUrl;
+      }
+      // Mode URL : valider et utiliser l'URL
+      else if (editLogoImageMode === "url" && editLogoUrl.trim()) {
+        if (!validateImageUrl(editLogoUrl)) {
+          setError("URL invalide. L'URL doit commencer par http:// ou https:// et avoir une extension .png, .jpg, .jpeg ou .webp");
+          return;
+        }
+        finalLogoUrl = editLogoUrl.trim();
+      }
+      // Si on est en mode URL mais que l'URL est vide, on garde l'ancienne
+      else if (editLogoImageMode === "url" && !editLogoUrl.trim()) {
+        // Garder l'URL existante
+      }
+
+      const slug = slugify(editName);
+
+      const { error: updateError } = await supabase
+        .from("restaurants")
+        .update({
+          name: editName,
+          description: editDescription || null,
+          logo_url: finalLogoUrl,
+          slug,
+        })
+        .eq("id", editingRestaurant.id);
+
+      if (updateError) {
+        console.error("[Admin] update restaurant error", updateError);
+        setError("Erreur lors de la mise à jour de l'enseigne.");
+        return;
+      }
+
+      cancelEditRestaurant();
+      fetchRestaurants();
+    } catch (err) {
+      console.error("[Admin] update restaurant unexpected", err);
+      setError("Erreur inattendue lors de la mise à jour de l'enseigne.");
+    }
+  };
+
+  const handleDelete = async (restaurant: Restaurant) => {
+    if (!confirm(`Supprimer l'enseigne "${restaurant.name}" ?`)) return;
+
+    try {
+      setError(null);
+
+      const { error: deleteDishesError } = await supabase
+        .from("dishes")
+        .delete()
+        .eq("restaurant_id", restaurant.id);
+
+      if (deleteDishesError) {
+        console.error("[Admin] delete dishes error", deleteDishesError);
+        setError("Impossible de supprimer les plats avant l’enseigne.");
+        return;
+      }
+
+      const { error } = await supabase
+        .from("restaurants")
+        .delete()
+        .eq("id", restaurant.id);
+
+      if (error) {
+        console.error("[Admin] delete restaurant error", error);
+        setError("Erreur lors de la suppression de l’enseigne.");
+        return;
+      }
+
+      if (selectedRestaurant?.id === restaurant.id) {
+        setSelectedRestaurant(null);
+        setDishes([]);
+      }
+
+      if (editingRestaurant?.id === restaurant.id) {
+        cancelEditRestaurant();
+      }
+
+      setRestaurants((prev) => prev.filter((r) => r.id !== restaurant.id));
+    } catch (err) {
+      console.error("[Admin] delete restaurant unexpected", err);
+      setError("Erreur inattendue lors de la suppression de l’enseigne.");
+    }
+  };
+
+  const handleSelectRestaurant = (restaurant: Restaurant) => {
+    setSelectedRestaurant(restaurant);
+    setDishName("");
+    setDishDescription("");
+    setDishImageUrl("");
+    setDishImagePreview(null);
+    setDishImageError(null);
+    setDishIsSignature(false);
+    setDishIsLimitedEdition(false);
+    setDishCategoryId(null);
+    setEditingDish(null);
+    setShowCategoryForm(false);
+    setNewCategoryName("");
+    setCategoryError(null);
+    fetchDishes(restaurant);
+    fetchCategories(restaurant);
+  };
+
+  const handleCloseDishes = () => {
+    setSelectedRestaurant(null);
+    setDishes([]);
+    setCategories([]);
+    setEditingDish(null);
+    setShowCategoryForm(false);
+  };
+
+  // Fonctions de gestion des sections de menu
+  const fetchCategories = async (restaurant: Restaurant) => {
+    try {
+      setLoadingCategories(true);
+      const { data, error } = await supabase
+        .from("dish_categories")
+        .select("*")
+        .eq("restaurant_id", restaurant.id)
+        .order("order_index", { ascending: true });
+
+      if (error) {
+        console.error("[Admin] categories error", error);
+        setError("Erreur lors du chargement des sections.");
+        return;
+      }
+
+      setCategories((data || []) as DishCategory[]);
+    } catch (err) {
+      console.error("[Admin] categories unexpected", err);
+      setError("Erreur inattendue lors du chargement des sections.");
+    } finally {
+      setLoadingCategories(false);
+    }
+  };
+
+  const handleCreateCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    console.log("[Admin] handleCreateCategory appelé");
+    console.log("[Admin] selectedRestaurant:", selectedRestaurant);
+    console.log("[Admin] newCategoryName:", newCategoryName);
+    
+    if (!selectedRestaurant) {
+      console.error("[Admin] Pas de restaurant sélectionné");
+      setCategoryError("Aucun restaurant sélectionné.");
+      return;
+    }
+    
+    const trimmedName = newCategoryName.trim();
+    if (!trimmedName) {
+      console.log("[Admin] Nom de catégorie vide, on ignore");
+      setCategoryError("Le nom de la section ne peut pas être vide.");
+      return;
+    }
+
+    // Vérifier si une section avec ce nom existe déjà
+    const existingCategory = categories.find(
+      (c) => c.name.toLowerCase() === trimmedName.toLowerCase()
+    );
+    if (existingCategory) {
+      setCategoryError("Une section avec ce nom existe déjà.");
+      return;
+    }
+
+    try {
+      setCategoryError(null);
+      setError(null);
+
+      // Calculer le prochain order_index de manière plus robuste
+      const nextOrderIndex =
+        categories.length === 0
+          ? 0
+          : (categories.reduce((max, c) => Math.max(max, c.order_index ?? 0), 0) ?? 0) + 1;
+
+      console.log("[Admin] Restaurant ID:", selectedRestaurant.id);
+      console.log("[Admin] Nom de la catégorie:", trimmedName);
+      console.log("[Admin] Order index calculé:", nextOrderIndex);
+
+      const { data, error: insertError } = await supabase
+        .from("dish_categories")
+        .insert({
+          restaurant_id: selectedRestaurant.id,
+          name: trimmedName,
+          order_index: nextOrderIndex,
+        })
+        .select("*")
+        .single();
+
+      if (insertError) {
+        console.error("[Admin] Erreur création catégorie :", insertError);
+        const errorMessage = insertError.message || "Erreur lors de la création de la section.";
+        setCategoryError(errorMessage);
+        setError(errorMessage);
+        return;
+      }
+
+      // Ajouter la nouvelle catégorie au state
+      if (data) {
+        console.log("[Admin] Catégorie créée avec succès:", data);
+        setCategories((prev) => [...prev, data as DishCategory].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)));
+        setNewCategoryName("");
+        setShowCategoryForm(false);
+        setCategoryError(null);
+      } else {
+        console.error("[Admin] Aucune donnée retournée par Supabase");
+        setCategoryError("Aucune donnée retournée après la création.");
+      }
+    } catch (err: any) {
+      console.error("[Admin] Erreur inattendue création catégorie :", err);
+      const errorMessage = err?.message || "Une erreur inattendue est survenue lors de la création de la section.";
+      setCategoryError(errorMessage);
+      setError(errorMessage);
+    }
+  };
+
+  const handleSaveSectionName = async (sectionId: string, e?: React.MouseEvent | React.KeyboardEvent) => {
+    // Empêcher le comportement par défaut si c'est un événement clavier
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    const newName = editingSectionName.trim();
+    if (!newName) {
+      setCategoryError("Le nom de la section ne peut pas être vide.");
+      return;
+    }
+    if (!sectionId) {
+      setCategoryError("Erreur : identifiant de section manquant.");
+      return;
+    }
+    if (!selectedRestaurant) {
+      setCategoryError("Aucun restaurant sélectionné.");
+      return;
+    }
+
+    try {
+      setIsSavingSectionName(true);
+      setCategoryError(null);
+      setError(null);
+
+      // Appel Supabase pour mettre à jour le nom de la section
+      // On filtre par id ET restaurant_id pour garantir qu'une seule ligne est modifiée
+      // On utilise .select("*") sans .single() pour obtenir un tableau et éviter les problèmes avec RLS
+      const { data, error } = await supabase
+        .from("dish_categories")
+        .update({ name: newName })
+        .eq("id", sectionId)
+        .eq("restaurant_id", selectedRestaurant.id)
+        .select("*");
+
+      if (error) {
+        console.error("[Admin] Erreur update section name", error);
+        const errorMessage = error.message || "Erreur lors de la sauvegarde du nom de la section.";
+        setCategoryError(errorMessage);
+        setError(errorMessage);
+        return;
+      }
+
+      // Vérifier que data est un tableau et qu'il contient au moins une ligne
+      if (!Array.isArray(data) || data.length === 0) {
+        console.error("[Admin] Aucune ligne mise à jour", { data, sectionId, newName });
+        setCategoryError("Aucune ligne n'a été mise à jour. Vérifiez que la section existe toujours et que vous avez les permissions nécessaires.");
+        return;
+      }
+
+      // Récupérer la première ligne mise à jour (normalement il n'y en a qu'une)
+      const updatedCategory = data[0];
+
+      // Mets à jour la liste des sections en mémoire avec les données retournées
+      setCategories((prev) =>
+        prev.map((section) =>
+          section.id === sectionId ? { ...section, name: updatedCategory.name } : section
+        )
+      );
+
+      // Recharger les catégories depuis la base pour être sûr que tout est synchronisé
+      await fetchCategories(selectedRestaurant);
+
+      // Quitte le mode édition
+      setEditingSectionId(null);
+      setEditingSectionName("");
+    } catch (e: any) {
+      console.error("[Admin] Exception handleSaveSectionName", e);
+      const errorMessage = e?.message || "Une erreur inattendue est survenue lors de la sauvegarde.";
+      setCategoryError(errorMessage);
+      setError(errorMessage);
+    } finally {
+      setIsSavingSectionName(false);
+    }
+  };
+
+  const handleDeleteCategory = async (category: DishCategory) => {
+    if (!selectedRestaurant) return;
+
+    // Vérifier si la section contient des plats
+    const dishesInCategory = dishes.filter((d) => d.category_id === category.id);
+    if (dishesInCategory.length > 0) {
+      setError(
+        `Impossible de supprimer la section "${category.name}" car elle contient ${dishesInCategory.length} plat(s). Déplacez d'abord les plats vers une autre section.`
+      );
+      return;
+    }
+
+    if (!confirm(`Supprimer la section "${category.name}" ?`)) return;
+
+    try {
+      setError(null);
+
+      const { error: deleteError } = await supabase
+        .from("dish_categories")
+        .delete()
+        .eq("id", category.id);
+
+      if (deleteError) {
+        console.error("[Admin] delete category error", deleteError);
+        setError("Erreur lors de la suppression de la section.");
+        return;
+      }
+
+      if (selectedRestaurant) {
+        fetchCategories(selectedRestaurant);
+      }
+    } catch (err) {
+      console.error("[Admin] delete category unexpected", err);
+      setError("Erreur inattendue lors de la suppression de la section.");
+    }
+  };
+
+  const handleMoveSection = async (categoryId: string, direction: "up" | "down") => {
+    if (!selectedRestaurant) return;
+
+    const currentIndex = categories.findIndex((c) => c.id === categoryId);
+    if (currentIndex === -1) return;
+
+    const newIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+    if (newIndex < 0 || newIndex >= categories.length) return;
+
+    // Créer un nouveau tableau avec les sections réorganisées
+    const newSections = [...categories];
+    const [moved] = newSections.splice(currentIndex, 1);
+    newSections.splice(newIndex, 0, moved);
+
+    // Mettre à jour immédiatement le state pour un feedback visuel instantané
+    setCategories(newSections);
+
+    try {
+      setError(null);
+
+      // Recalculer tous les order_index de manière séquentielle (0, 1, 2, 3...)
+      const updatePromises = newSections.map((section, index) =>
+        supabase
+          .from("dish_categories")
+          .update({ order_index: index })
+          .eq("id", section.id)
+          .eq("restaurant_id", selectedRestaurant.id)
+      );
+
+      const results = await Promise.all(updatePromises);
+      
+      // Vérifier s'il y a des erreurs
+      const hasError = results.some((result) => result.error);
+      if (hasError) {
+        const firstError = results.find((result) => result.error)?.error;
+        console.error("[Admin] move section error", firstError);
+        setError("Erreur lors du changement d'ordre de la section.");
+        // Recharger les catégories pour restaurer l'état précédent
+        await fetchCategories(selectedRestaurant);
+        return;
+      }
+    } catch (err) {
+      console.error("[Admin] handleMoveSection unexpected", err);
+      setError("Erreur inattendue lors du changement d'ordre de la section.");
+      // Recharger les catégories pour restaurer l'état précédent
+      await fetchCategories(selectedRestaurant);
+    }
+  };
+
+  const moveCategoryUp = (category: DishCategory) => {
+    handleMoveSection(category.id, "up");
+  };
+
+  const moveCategoryDown = (category: DishCategory) => {
+    handleMoveSection(category.id, "down");
+  };
+
+  // Fonction pour changer la catégorie d'un plat
+  const handleChangeDishCategory = async (dish: Dish, newCategoryId: string | null) => {
+    if (!selectedRestaurant) return;
+
+    try {
+      setError(null);
+
+      const { error: updateError } = await supabase
+        .from("dishes")
+        .update({ category_id: newCategoryId })
+        .eq("id", dish.id);
+
+      if (updateError) {
+        console.error("[Admin] update dish category error", updateError);
+        setError("Erreur lors de la modification de la section du plat.");
+        return;
+      }
+
+      // Mettre à jour le state local
+      setDishes((prev) =>
+        prev.map((d) => (d.id === dish.id ? { ...d, category_id: newCategoryId } : d))
+      );
+    } catch (err) {
+      console.error("[Admin] changeDishCategory unexpected", err);
+      setError("Erreur inattendue lors de la modification de la section du plat.");
+    }
+  };
+
+  const handleAddDish = async (e: React.FormEvent) => {
+    e.preventDefault();
+    console.log("handleAddDish called");
+    
+    if (!selectedRestaurant) {
+      console.error("Erreur ajout plat: aucun restaurant sélectionné");
+      setError("Aucun restaurant sélectionné.");
+      return;
+    }
+
+    try {
+      setError(null);
+      setDishImageError(null);
+
+      if (!dishName.trim()) {
+        setError("Le nom du plat est obligatoire.");
+        return;
+      }
+
+      // Validation simple de l'URL : doit commencer par http:// ou https:// si fournie
+      let finalImageUrl: string | null = null;
+      if (dishImageUrl.trim()) {
+        const trimmedUrl = dishImageUrl.trim();
+        if (!/^https?:\/\//i.test(trimmedUrl)) {
+          setDishImageError("L'URL de l'image doit commencer par http:// ou https://");
+          return;
+        }
+        finalImageUrl = trimmedUrl;
+      }
+
+      const nextPosition =
+        dishes.length === 0
+          ? 0
+          : Math.max(...dishes.map((d) => d.position ?? 0)) + 1;
+
+      const payload = {
+        restaurant_id: selectedRestaurant.id,
+        name: dishName.trim(),
+        description: dishDescription.trim() || null,
+        image_url: finalImageUrl,
+        is_signature: dishIsSignature,
+        is_limited_edition: dishIsLimitedEdition,
+        position: nextPosition,
+        category_id: dishCategoryId || null,
+      };
+
+      console.log("Ajout plat avec payload:", payload);
+
+      const { data, error: insertError } = await supabase
+        .from("dishes")
+        .insert(payload)
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error("Erreur lors de l'ajout du plat :", insertError);
+        setError(`Impossible d'ajouter le plat. ${insertError.message || "Vérifie les infos et réessaie."}`);
+        return;
+      }
+
+      console.log("Plat ajouté avec succès:", data);
+
+      // Réinitialiser le formulaire
+      setDishName("");
+      setDishDescription("");
+      setDishImageUrl("");
+      setDishImagePreview(null);
+      setDishImageError(null);
+      setDishIsSignature(false);
+      setDishIsLimitedEdition(false);
+      setDishCategoryId(null);
+
+      // Recharger la liste des plats
+      await fetchDishes(selectedRestaurant);
+      
+      console.log("Plat ajouté avec succès");
+    } catch (err) {
+      console.error("Erreur ajout plat", err);
+      setError("Erreur inattendue lors de l'ajout du plat.");
+    }
+  };
+
+  const startEditDish = (dish: Dish) => {
+    setEditingDish(dish);
+    setEditDishName(dish.name);
+    setEditDishDescription(dish.description || "");
+    setEditDishIsSignature(dish.is_signature);
+    setEditDishIsLimitedEdition(dish.is_limited_edition ?? false);
+    setEditDishCategoryId(dish.category_id);
+    setEditDishImageUrl(dish.image_url || "");
+    setEditDishImagePreview(dish.image_url);
+  };
+
+  const cancelEditDish = () => {
+    setEditingDish(null);
+    setEditDishName("");
+    setEditDishDescription("");
+    setEditDishIsSignature(false);
+    setEditDishIsLimitedEdition(false);
+    setEditDishImageUrl("");
+    setEditDishImagePreview(null);
+    setEditDishImageError(null);
+  };
+
+  const handleUpdateDish = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingDish || !selectedRestaurant) return;
+
+    try {
+      setError(null);
+      setEditDishImageError(null);
+
+      if (!editDishName.trim()) {
+        setError("Le nom du plat est obligatoire.");
+        return;
+      }
+
+      let finalImageUrl: string | null = editingDish.image_url ?? null;
+
+      // Valider et utiliser l'URL si fournie, sinon garder l'ancienne
+      if (editDishImageUrl.trim()) {
+        const trimmedUrl = editDishImageUrl.trim();
+        if (!/^https?:\/\//i.test(trimmedUrl)) {
+          setEditDishImageError("L'URL de l'image doit commencer par http:// ou https://");
+          return;
+        }
+        finalImageUrl = trimmedUrl;
+      }
+
+      const payload = {
+        name: editDishName.trim(),
+        description: editDishDescription.trim() || null,
+        image_url: finalImageUrl,
+        is_signature: editDishIsSignature,
+        is_limited_edition: editDishIsLimitedEdition,
+        category_id: editDishCategoryId || null,
+      };
+
+      console.log("Mise à jour plat avec payload:", payload);
+
+      const { data, error: updateError } = await supabase
+        .from("dishes")
+        .update(payload)
+        .eq("id", editingDish.id)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error("Erreur lors de la mise à jour du plat :", updateError);
+        setError(`Impossible de mettre à jour le plat. ${updateError.message || "Vérifie les infos et réessaie."}`);
+        return;
+      }
+
+      console.log("Plat mis à jour avec succès:", data);
+
+      cancelEditDish();
+      await fetchDishes(selectedRestaurant);
+    } catch (err) {
+      console.error("Erreur mise à jour plat", err);
+      setError("Erreur inattendue lors de la mise à jour du plat.");
+    }
+  };
+
+  const handleDeleteDish = async (dish: Dish) => {
+    if (!selectedRestaurant) return;
+
+    // Confirmation avant suppression
+    const ok = window.confirm(`Voulez-vous vraiment supprimer le plat "${dish.name}" ?`);
+    if (!ok) return;
+
+    try {
+      setError(null);
+
+      // Suppression en BDD avec filtre restaurant_id pour sécurité
+      const { error } = await supabase
+        .from("dishes")
+        .delete()
+        .eq("id", dish.id)
+        .eq("restaurant_id", selectedRestaurant.id);
+
+      if (error) {
+        console.error("[Admin] delete dish error", error);
+        const errorMessage = error.message || "Impossible de supprimer ce plat.";
+        setError(errorMessage);
+        alert(`Erreur lors de la suppression du plat : ${errorMessage}`);
+        return;
+      }
+
+      // Mise à jour immédiate de l'état local (optimiste)
+      setDishes((prev) => prev.filter((d) => d.id !== dish.id));
+
+      // Si le plat était en cours d'édition, annuler l'édition
+      if (editingDish?.id === dish.id) {
+        cancelEditDish();
+      }
+    } catch (err) {
+      console.error("[Admin] delete dish unexpected", err);
+      const errorMessage = err instanceof Error ? err.message : "Erreur inattendue lors de la suppression du plat.";
+      setError(errorMessage);
+      alert(`Erreur inattendue lors de la suppression du plat : ${errorMessage}`);
+    }
+  };
+
+  const moveDishUp = async (dish: Dish) => {
+    if (!selectedRestaurant) return;
+    const index = dishes.findIndex((d) => d.id === dish.id);
+    if (index <= 0) return;
+    const previous = dishes[index - 1];
+    const currentPosition = dish.position ?? index;
+    const previousPosition = previous.position ?? index - 1;
+
+    try {
+      const { error: err1 } = await supabase
+        .from("dishes")
+        .update({ position: previousPosition })
+        .eq("id", dish.id);
+      const { error: err2 } = await supabase
+        .from("dishes")
+        .update({ position: currentPosition })
+        .eq("id", previous.id);
+
+      if (err1 || err2) {
+        console.error("[Admin] move dish up error", err1 || err2);
+        setError("Erreur lors du changement d’ordre du plat.");
+        return;
+      }
+
+      fetchDishes(selectedRestaurant);
+    } catch (err) {
+      console.error("[Admin] moveDishUp unexpected", err);
+      setError("Erreur inattendue lors du changement d’ordre du plat.");
+    }
+  };
+
+  const moveDishDown = async (dish: Dish) => {
+    if (!selectedRestaurant) return;
+    const index = dishes.findIndex((d) => d.id === dish.id);
+    if (index === -1 || index >= dishes.length - 1) return;
+    const next = dishes[index + 1];
+    const currentPosition = dish.position ?? index;
+    const nextPosition = next.position ?? index + 1;
+
+    try {
+      const { error: err1 } = await supabase
+        .from("dishes")
+        .update({ position: nextPosition })
+        .eq("id", dish.id);
+      const { error: err2 } = await supabase
+        .from("dishes")
+        .update({ position: currentPosition })
+        .eq("id", next.id);
+
+      if (err1 || err2) {
+        console.error("[Admin] move dish down error", err1 || err2);
+        setError("Erreur lors du changement d'ordre du plat.");
+        return;
+      }
+
+      fetchDishes(selectedRestaurant);
+    } catch (err) {
+      console.error("[Admin] moveDishDown unexpected", err);
+      setError("Erreur inattendue lors du changement d'ordre du plat.");
+    }
+  };
+
+  // Fonctions de validation
+  const validateImageUrl = (url: string): boolean => {
+    if (!url.trim()) return true; // URL vide est valide (optionnel)
+    
+    // Vérifier que l'URL commence par http ou https
+    if (!url.match(/^https?:\/\//i)) {
+      return false;
+    }
+
+    // Vérifier l'extension de l'image
+    const validExtensions = ['.png', '.jpg', '.jpeg', '.webp'];
+    const urlLower = url.toLowerCase();
+    const hasValidExtension = validExtensions.some(ext => urlLower.includes(ext));
+    
+    return hasValidExtension;
+  };
+
+  const validateImageFile = (file: File | null): string | null => {
+    if (!file) return null;
+
+    // Vérifier la taille (max 5MB)
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      return "L'image est trop lourde. Taille maximale : 5MB.";
+    }
+
+    // Vérifier le type
+    const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      return "Format d'image non accepté. Formats acceptés : PNG, JPG, JPEG, WEBP.";
+    }
+
+    return null;
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-50 px-4 py-10">
+        <div className="max-w-5xl mx-auto space-y-8">
+        <header>
+          <h1 className="text-2xl font-bold">Administration des enseignes</h1>
+          <p className="text-sm text-slate-300 mt-1">
+            Ajoute, liste, modifie et gère la carte de chaque enseigne.
+          </p>
+        </header>
+
+        {error && (
+          <div className="rounded-md bg-red-500/10 border border-red-500/40 px-3 py-2 text-sm text-red-300">
+            {error}
+          </div>
+        )}
+
+        {/* Création */}
+        <section className="bg-slate-900/80 rounded-2xl p-5 shadow-lg border border-slate-800/60 space-y-4">
+          <h2 className="text-lg font-semibold">Ajouter une nouvelle enseigne</h2>
+
+          <form onSubmit={handleCreate} className="space-y-3">
+            <div className="space-y-1">
+              <label className="text-xs text-slate-300">Nom de l’enseigne</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
+                placeholder="Ex : Black & White Burger"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs text-slate-300">Description (optionnel)</label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
+                rows={3}
+                placeholder="Quelques mots sur l’enseigne..."
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs text-slate-300">Logo (optionnel)</label>
+              
+              {/* Tabs pour choisir entre upload et URL */}
+              <div className="flex gap-2 border-b border-slate-700">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (logoPreview && logoPreview.startsWith('blob:')) {
+                        URL.revokeObjectURL(logoPreview);
+                      }
+                      setLogoImageMode("upload");
+                      setLogoUrl("");
+                      setLogoPreview(null);
+                    }}
+                  className={`px-3 py-1.5 text-xs font-medium transition ${
+                    logoImageMode === "upload"
+                      ? "text-bitebox border-b-2 border-bitebox"
+                      : "text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  Télécharger un fichier
+                </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (logoPreview && logoPreview.startsWith('blob:')) {
+                        URL.revokeObjectURL(logoPreview);
+                      }
+                      setLogoImageMode("url");
+                      setLogoFile(null);
+                      setLogoPreview(null);
+                    }}
+                  className={`px-3 py-1.5 text-xs font-medium transition ${
+                    logoImageMode === "url"
+                      ? "text-bitebox border-b-2 border-bitebox"
+                      : "text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  Entrer une URL
+                </button>
+              </div>
+
+              {/* Champ upload */}
+              {logoImageMode === "upload" && (
+                <div className="space-y-2">
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/jpg,image/webp"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] ?? null;
+                      // Nettoyer l'ancienne URL blob si elle existe
+                      if (logoPreview && logoPreview.startsWith('blob:')) {
+                        URL.revokeObjectURL(logoPreview);
+                      }
+                      setLogoFile(file);
+                      setLogoUrl("");
+                      if (file) {
+                        const preview = URL.createObjectURL(file);
+                        setLogoPreview(preview);
+                      } else {
+                        setLogoPreview(null);
+                      }
+                    }}
+                    className="text-xs text-slate-300"
+                  />
+                  <p className="text-[11px] text-slate-500">
+                    Formats acceptés : PNG, JPG, JPEG, WEBP (max 5MB)
+                  </p>
+                </div>
+              )}
+
+              {/* Champ URL */}
+              {logoImageMode === "url" && (
+                <div className="space-y-2">
+                  <input
+                    type="url"
+                    value={logoUrl}
+                    onChange={(e) => {
+                      const url = e.target.value;
+                      setLogoUrl(url);
+                      setLogoFile(null);
+                      if (url && validateImageUrl(url)) {
+                        setLogoPreview(url);
+                      } else {
+                        setLogoPreview(null);
+                      }
+                    }}
+                    placeholder="https://exemple.com/image.png"
+                    className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
+                  />
+                  <p className="text-[11px] text-slate-500">
+                    URL commençant par http:// ou https:// avec extension .png, .jpg, .jpeg ou .webp
+                  </p>
+                </div>
+              )}
+
+              {/* Aperçu de l'image */}
+              {logoPreview && (
+                <div className="mt-3 p-3 bg-slate-950 rounded-lg border border-slate-700">
+                  <p className="text-xs text-slate-400 mb-2">Aperçu :</p>
+                  <img
+                    src={logoPreview}
+                    alt="Aperçu logo"
+                    className="max-w-full h-32 object-contain rounded"
+                    onError={() => setLogoPreview(null)}
+                  />
+                </div>
+              )}
+            </div>
+
+            <button
+              type="submit"
+              disabled={saving}
+              className="inline-flex items-center justify-center rounded-md bg-bitebox px-4 py-2 text-sm font-semibold text-white shadow hover:bg-bitebox-dark disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {saving ? "Création en cours..." : "Créer l’enseigne"}
+            </button>
+          </form>
+        </section>
+
+        {/* Liste */}
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold">Enseignes existantes</h2>
+
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Spinner size="md" />
+            </div>
+          ) : restaurants.length === 0 ? (
+            <p className="text-sm text-slate-400">Aucune enseigne pour l’instant.</p>
+          ) : (
+            <div className="space-y-2">
+              {restaurants.map((r) => (
+                <div
+                  key={r.id}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900/70 rounded-xl px-3 py-2"
+                >
+                  <div className="flex items-center gap-3">
+                    {r.logo_url && (
+                      <img
+                        src={r.logo_url}
+                        alt={r.name}
+                        className="h-9 w-9 rounded-full object-cover"
+                      />
+                    )}
+                    <div>
+                      <p className="text-sm font-semibold">{r.name}</p>
+                      {r.slug && (
+                        <p className="text-[11px] text-slate-400">
+                          /restaurants/{r.slug}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-start sm:self-center">
+                    <button
+                      type="button"
+                      onClick={() => handleSelectRestaurant(r)}
+                      className="text-xs rounded-md border border-slate-600 px-3 py-1 hover:bg-slate-800"
+                    >
+                      Gérer la carte
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => startEditRestaurant(r)}
+                      className="text-xs rounded-md border border-bitebox/60 px-3 py-1 hover:bg-bitebox/10"
+                    >
+                      Modifier
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(r)}
+                      className="text-xs rounded-md border border-red-500/60 px-3 py-1 text-red-300 hover:bg-red-500/10"
+                    >
+                      Supprimer
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Bloc édition */}
+        {editingRestaurant && (
+          <section className="bg-slate-900/80 rounded-2xl p-5 shadow-lg border border-slate-700/70 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">
+                Modifier l’enseigne : {editingRestaurant.name}
+              </h2>
+              <button
+                type="button"
+                onClick={cancelEditRestaurant}
+                className="text-xs text-slate-400 hover:text-slate-100"
+              >
+                Annuler
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateRestaurant} className="space-y-3">
+              <div className="space-y-1">
+                <label className="text-xs text-slate-300">Nom de l’enseigne</label>
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs text-slate-300">Description (optionnel)</label>
+                <textarea
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
+                  rows={3}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs text-slate-300">Nouveau logo (optionnel)</label>
+                
+                {/* Tabs pour choisir entre upload et URL */}
+                <div className="flex gap-2 border-b border-slate-700">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (editLogoPreview && editLogoPreview.startsWith('blob:')) {
+                        URL.revokeObjectURL(editLogoPreview);
+                      }
+                      setEditLogoImageMode("upload");
+                      setEditLogoUrl("");
+                      setEditLogoPreview(editingRestaurant?.logo_url ?? null);
+                    }}
+                    className={`px-3 py-1.5 text-xs font-medium transition ${
+                      editLogoImageMode === "upload"
+                        ? "text-bitebox border-b-2 border-bitebox"
+                        : "text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    Télécharger un fichier
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (editLogoPreview && editLogoPreview.startsWith('blob:')) {
+                        URL.revokeObjectURL(editLogoPreview);
+                      }
+                      setEditLogoImageMode("url");
+                      setEditLogoFile(null);
+                      setEditLogoPreview(editingRestaurant?.logo_url ?? null);
+                    }}
+                    className={`px-3 py-1.5 text-xs font-medium transition ${
+                      editLogoImageMode === "url"
+                        ? "text-bitebox border-b-2 border-bitebox"
+                        : "text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    Entrer une URL
+                  </button>
+                </div>
+
+                {/* Champ upload */}
+                {editLogoImageMode === "upload" && (
+                  <div className="space-y-2">
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/jpg,image/webp"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] ?? null;
+                        // Nettoyer l'ancienne URL blob si elle existe
+                        if (editLogoPreview && editLogoPreview.startsWith('blob:')) {
+                          URL.revokeObjectURL(editLogoPreview);
+                        }
+                        setEditLogoFile(file);
+                        setEditLogoUrl("");
+                        if (file) {
+                          const preview = URL.createObjectURL(file);
+                          setEditLogoPreview(preview);
+                        } else {
+                          setEditLogoPreview(editingRestaurant?.logo_url ?? null);
+                        }
+                      }}
+                      className="text-xs text-slate-300"
+                    />
+                    <p className="text-[11px] text-slate-500">
+                      Formats acceptés : PNG, JPG, JPEG, WEBP (max 5MB). Laisse vide pour conserver le logo actuel.
+                    </p>
+                  </div>
+                )}
+
+                {/* Champ URL */}
+                {editLogoImageMode === "url" && (
+                  <div className="space-y-2">
+                    <input
+                      type="url"
+                      value={editLogoUrl}
+                      onChange={(e) => {
+                        const url = e.target.value;
+                        setEditLogoUrl(url);
+                        setEditLogoFile(null);
+                        if (url && validateImageUrl(url)) {
+                          setEditLogoPreview(url);
+                        } else if (!url) {
+                          setEditLogoPreview(editingRestaurant?.logo_url ?? null);
+                        } else {
+                          setEditLogoPreview(null);
+                        }
+                      }}
+                      placeholder="https://exemple.com/image.png"
+                      className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
+                    />
+                    <p className="text-[11px] text-slate-500">
+                      URL commençant par http:// ou https:// avec extension .png, .jpg, .jpeg ou .webp. Laisse vide pour conserver le logo actuel.
+                    </p>
+                  </div>
+                )}
+
+                {/* Aperçu de l'image */}
+                {editLogoPreview && (
+                  <div className="mt-3 p-3 bg-slate-950 rounded-lg border border-slate-700">
+                    <p className="text-xs text-slate-400 mb-2">Aperçu :</p>
+                    <img
+                      src={editLogoPreview}
+                      alt="Aperçu logo"
+                      className="max-w-full h-32 object-contain rounded"
+                      onError={() => setEditLogoPreview(editingRestaurant?.logo_url ?? null)}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="submit"
+                  className="inline-flex items-center justify-center rounded-md bg-emerald-500 px-4 py-2 text-sm font-semibold text-black shadow hover:bg-emerald-400 transition"
+                >
+                  Enregistrer les modifications
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelEditRestaurant}
+                  className="text-xs text-slate-300 hover:text-slate-100"
+                >
+                  Annuler
+                </button>
+              </div>
+            </form>
+          </section>
+        )}
+
+        {/* Carte */}
+        {selectedRestaurant && (
+          <section className="bg-slate-900/80 rounded-2xl p-5 shadow-lg border border-slate-800/60 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">
+                Carte de : {selectedRestaurant.name}
+              </h2>
+              <button
+                type="button"
+                onClick={handleCloseDishes}
+                className="text-xs text-slate-400 hover:text-slate-100"
+              >
+                Fermer
+              </button>
+            </div>
+
+            {/* Organisation de la carte - Sections */}
+            <div className="border-t border-slate-800 pt-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-md font-semibold">Organisation de la carte</h3>
+                {!showCategoryForm && (
+                  <button
+                    type="button"
+                    onClick={() => setShowCategoryForm(true)}
+                    className="text-xs rounded-md border border-bitebox/60 px-3 py-1.5 hover:bg-bitebox/10 text-bitebox"
+                  >
+                    ➕ Ajouter une section
+                  </button>
+                )}
+              </div>
+
+              {/* Formulaire d'ajout de section */}
+              {showCategoryForm && (
+                <form onSubmit={handleCreateCategory} className="bg-slate-950/70 rounded-lg p-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={newCategoryName}
+                      onChange={(e) => {
+                        setNewCategoryName(e.target.value);
+                        setCategoryError(null);
+                      }}
+                      placeholder="Nom de la section (ex: Burgers)"
+                      className="flex-1 rounded-md bg-slate-900 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
+                      autoFocus
+                    />
+                    <button
+                      type="submit"
+                      className="px-3 py-2 rounded-md bg-bitebox text-white text-xs font-semibold hover:bg-bitebox-dark disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={!newCategoryName.trim()}
+                    >
+                      Créer
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowCategoryForm(false);
+                        setNewCategoryName("");
+                        setCategoryError(null);
+                      }}
+                      className="px-3 py-2 rounded-md border border-slate-600 text-slate-300 text-xs hover:bg-slate-800"
+                    >
+                      Annuler
+                    </button>
+                  </div>
+                  {categoryError && (
+                    <p className="mt-2 text-sm text-red-400">
+                      {categoryError}
+                    </p>
+                  )}
+                </form>
+              )}
+
+              {/* Liste des sections */}
+              {loadingCategories ? (
+                <div className="flex items-center justify-center py-4">
+                  <Spinner size="sm" />
+                </div>
+              ) : categories.length === 0 ? (
+                <p className="text-xs text-slate-400">
+                  Aucune section créée. Les plats seront affichés dans un bloc unique.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {categories.map((category) => {
+                    const dishesCount = dishes.filter((d) => d.category_id === category.id).length;
+                    return (
+                      <div
+                        key={category.id}
+                        className="flex items-center justify-between gap-3 bg-slate-950/70 rounded-lg px-3 py-2"
+                      >
+                        <div className="flex items-center gap-2 flex-1">
+                          <div className="flex flex-col gap-1">
+                            <button
+                              type="button"
+                              onClick={() => moveCategoryUp(category)}
+                              disabled={categories.indexOf(category) === 0}
+                              className="text-[10px] border border-slate-600 rounded px-1.5 py-0.5 hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed"
+                            >
+                              ↑
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => moveCategoryDown(category)}
+                              disabled={categories.indexOf(category) === categories.length - 1}
+                              className="text-[10px] border border-slate-600 rounded px-1.5 py-0.5 hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed"
+                            >
+                              ↓
+                            </button>
+                          </div>
+                          {editingSectionId === category.id ? (
+                            <div className="flex flex-col gap-2 flex-1">
+                              <div className="flex gap-2 items-center">
+                                <input
+                                  type="text"
+                                  className="flex-1 rounded-md bg-bitebox-card px-3 py-1 text-sm text-white outline-none"
+                                  value={editingSectionName}
+                                  onChange={(e) => {
+                                    setEditingSectionName(e.target.value);
+                                    setCategoryError(null);
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter" && !isSavingSectionName && editingSectionName.trim().length > 0) {
+                                      handleSaveSectionName(category.id, e);
+                                    }
+                                  }}
+                                  autoFocus
+                                />
+                                <button
+                                  type="button"
+                                  className="rounded-md bg-bitebox-purple px-2 py-1 text-xs font-medium text-white disabled:opacity-50"
+                                  disabled={isSavingSectionName || editingSectionName.trim().length === 0}
+                                  onClick={(e) => handleSaveSectionName(category.id, e)}
+                                >
+                                  {isSavingSectionName ? "..." : "Valider"}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="rounded-md bg-bitebox-card px-2 py-1 text-xs text-gray-300"
+                                  onClick={() => {
+                                    setEditingSectionId(null);
+                                    setEditingSectionName("");
+                                    setCategoryError(null);
+                                  }}
+                                >
+                                  Annuler
+                                </button>
+                              </div>
+                              {categoryError && (
+                                <p className="text-xs text-red-400">
+                                  {categoryError}
+                                </p>
+                              )}
+                            </div>
+                          ) : (
+                            <>
+                              <span className="text-sm font-medium text-white">{category.name}</span>
+                              <span className="text-xs text-slate-400">
+                                ({dishesCount} plat{dishesCount !== 1 ? "s" : ""})
+                              </span>
+                            </>
+                          )}
+                        </div>
+                        {editingSectionId !== category.id && (
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingSectionId(category.id);
+                                setEditingSectionName(category.name);
+                              }}
+                              className="text-[10px] rounded border border-bitebox/60 px-2 py-1 hover:bg-bitebox/10"
+                            >
+                              Renommer
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCategory(category)}
+                              className="text-[10px] rounded border border-red-500/60 px-2 py-1 text-red-300 hover:bg-red-500/10"
+                            >
+                              Supprimer
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Liste des plats groupés par catégorie */}
+            {loadingDishes ? (
+              <div className="flex items-center justify-center py-8">
+                <Spinner size="md" />
+              </div>
+            ) : dishes.length === 0 ? (
+              <p className="text-sm text-slate-400">
+                Aucun plat enregistré pour cette enseigne.
+              </p>
+            ) : (
+              <div className="space-y-6 border-t border-slate-800 pt-4">
+                {/* Plats groupés par catégorie */}
+                {categories.map((category) => {
+                  const categoryDishes = dishes.filter((d) => d.category_id === category.id);
+                  if (categoryDishes.length === 0) return null;
+
+                  return (
+                    <div key={category.id} className="space-y-3">
+                      <h3 className="text-sm font-semibold text-slate-200 border-b border-slate-800 pb-2">
+                        {category.name}
+                      </h3>
+                      <div className="space-y-2">
+                        {categoryDishes.map((dish) => (
+                          <div
+                            key={dish.id}
+                            className="bg-slate-950/70 rounded-xl px-3 py-3 space-y-3"
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                              <div className="flex items-center gap-3 flex-1">
+                                {dish.image_url && (
+                                  <div className="relative h-12 w-12 overflow-hidden rounded-xl bg-[#0d0d12]">
+                                    <img
+                                      src={dish.image_url}
+                                      alt={dish.name}
+                                      className="absolute inset-0 w-full h-full object-cover object-center scale-90"
+                                    />
+                                  </div>
+                                )}
+                                <div className="flex-1">
+                                  <p className="text-sm font-semibold">{dish.name}</p>
+                                  {dish.description && (
+                                    <p className="text-[11px] text-slate-400">
+                                      {dish.description}
+                                    </p>
+                                  )}
+                                  {dish.is_signature && (
+                                    <span className="inline-flex items-center rounded-full bg-bitebox/90 text-white text-[9px] font-semibold px-2 py-[1px] mt-1">
+                                      Plat signature
+                                    </span>
+                                  )}
+                                  {dish.is_limited_edition && (
+                                    <span className="inline-flex items-center rounded-full bg-amber-500/90 text-white text-[9px] font-semibold px-2 py-[1px] mt-1">
+                                      Édition limitée
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 self-start sm:self-center flex-wrap">
+                                {/* Select pour changer la catégorie */}
+                                <select
+                                  value={dish.category_id || ""}
+                                  onChange={(e) =>
+                                    handleChangeDishCategory(dish, e.target.value || null)
+                                  }
+                                  className="text-[11px] rounded-md bg-slate-900 border border-slate-700 px-2 py-1 outline-none focus:border-bitebox"
+                                >
+                                  <option value="">Aucune section</option>
+                                  {categories.map((cat) => (
+                                    <option key={cat.id} value={cat.id}>
+                                      {cat.name}
+                                    </option>
+                                  ))}
+                                </select>
+                                <button
+                                  type="button"
+                                  onClick={() => moveDishUp(dish)}
+                                  className="text-[11px] border border-slate-600 rounded px-2 py-[1px] hover:bg-slate-800"
+                                >
+                                  ↑
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => moveDishDown(dish)}
+                                  className="text-[11px] border border-slate-600 rounded px-2 py-[1px] hover:bg-slate-800"
+                                >
+                                  ↓
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => startEditDish(dish)}
+                                  className="text-[11px] rounded-md border border-bitebox/60 px-3 py-1 hover:bg-bitebox/10"
+                                >
+                                  Modifier
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteDish(dish)}
+                                  className="text-[11px] rounded-md border border-red-500/60 px-3 py-1 text-red-300 hover:bg-red-500/10"
+                                >
+                                  Supprimer
+                                </button>
+                              </div>
+                            </div>
+
+                            {editingDish?.id === dish.id && (
+                              <div className="border-t border-slate-800 pt-4 mt-4">
+                                <div className="bg-slate-900/50 rounded-xl border border-slate-800 p-6">
+                                  <div className="mb-6">
+                                    <h3 className="text-lg font-semibold text-gray-200 mb-1">Modifier le plat</h3>
+                                    <p className="text-xs text-gray-400">
+                                      Modifie les informations de ce plat.
+                                    </p>
+                                  </div>
+
+                                  <form onSubmit={handleUpdateDish} className="space-y-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                      {/* Colonne gauche */}
+                                      <div className="space-y-4">
+                                        <div className="space-y-2">
+                                          <label className="text-sm font-medium text-gray-200">Nom du plat</label>
+                                          <input
+                                            type="text"
+                                            value={editDishName}
+                                            onChange={(e) => setEditDishName(e.target.value)}
+                                            className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-gray-200 outline-none focus:border-bitebox"
+                                            required
+                                          />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                          <label className="text-sm font-medium text-gray-200">
+                                            Description <span className="text-xs text-gray-400">(optionnel)</span>
+                                          </label>
+                                          <input
+                                            type="text"
+                                            value={editDishDescription}
+                                            onChange={(e) => setEditDishDescription(e.target.value)}
+                                            className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-gray-200 outline-none focus:border-bitebox"
+                                          />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                          <label className="text-sm font-medium text-gray-200">
+                                            Image du plat (URL) <span className="text-xs text-gray-400">(optionnel)</span>
+                                          </label>
+                                          <input
+                                            type="url"
+                                            value={editDishImageUrl}
+                                            onChange={(e) => {
+                                              const url = e.target.value;
+                                              setEditDishImageUrl(url);
+                                              setEditDishImageError(null);
+                                              // Afficher l'aperçu si l'URL semble valide
+                                              if (url && /^https?:\/\//i.test(url.trim())) {
+                                                setEditDishImagePreview(url.trim());
+                                              } else if (!url) {
+                                                setEditDishImagePreview(editingDish?.image_url ?? null);
+                                              } else {
+                                                setEditDishImagePreview(null);
+                                              }
+                                            }}
+                                            placeholder="https://exemple.com/mon-burger.png"
+                                            className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-gray-200 outline-none focus:border-bitebox"
+                                          />
+                                          {editDishImageError && (
+                                            <p className="text-xs text-red-400">{editDishImageError}</p>
+                                          )}
+                                          <p className="text-xs text-gray-400">
+                                            URL commençant par http:// ou https://. Laisse vide pour conserver l'image actuelle.
+                                          </p>
+                                          {editDishImagePreview && (
+                                            <div className="mt-3 p-3 bg-slate-950 rounded-lg border border-slate-700">
+                                              <p className="text-xs text-gray-400 mb-2">Aperçu :</p>
+                                              <div className="relative h-32 w-full overflow-hidden rounded-xl bg-[#0d0d12]">
+                                                <img
+                                                  src={editDishImagePreview}
+                                                  alt="Aperçu plat"
+                                                  className="absolute inset-0 w-full h-full object-cover object-center scale-95"
+                                                  onError={() => setEditDishImagePreview(editingDish?.image_url ?? null)}
+                                                />
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      {/* Colonne droite */}
+                                      <div className="space-y-4">
+                                        <div className="space-y-2">
+                                          <label className="text-sm font-medium text-gray-200">
+                                            Section <span className="text-xs text-gray-400">(optionnel)</span>
+                                          </label>
+                                          <select
+                                            value={editDishCategoryId || ""}
+                                            onChange={(e) => setEditDishCategoryId(e.target.value || null)}
+                                            className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-gray-200 outline-none focus:border-bitebox"
+                                          >
+                                            <option value="">Aucune section</option>
+                                            {categories.map((cat) => (
+                                              <option key={cat.id} value={cat.id}>
+                                                {cat.name}
+                                              </option>
+                                            ))}
+                                          </select>
+                                        </div>
+
+                                        <div className="space-y-3">
+                                          <h4 className="text-sm font-medium text-gray-200">Options du plat</h4>
+                                          <div className="space-y-3 pl-1">
+                                            <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                                              <input
+                                                type="checkbox"
+                                                checked={editDishIsSignature}
+                                                onChange={(e) => setEditDishIsSignature(e.target.checked)}
+                                                className="h-4 w-4 rounded border-slate-600 text-bitebox focus:ring-bitebox"
+                                              />
+                                              <span>Plat signature</span>
+                                            </label>
+                                            <div className="space-y-1">
+                                              <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                                                <input
+                                                  type="checkbox"
+                                                  checked={editDishIsLimitedEdition}
+                                                  onChange={(e) => setEditDishIsLimitedEdition(e.target.checked)}
+                                                  className="h-4 w-4 rounded border-slate-600 text-amber-500 focus:ring-amber-500"
+                                                />
+                                                <span>Édition limitée</span>
+                                              </label>
+                                              <p className="text-xs text-gray-400 ml-6">
+                                                Plat disponible pour une durée limitée / collab spéciale, peut ne plus être au menu plus tard.
+                                              </p>
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-3 pt-2">
+                                          <button
+                                            type="submit"
+                                            className="rounded-full bg-[#6A24A4] hover:bg-[#581c87] px-6 py-2 text-sm font-semibold text-white transition"
+                                          >
+                                            Enregistrer
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={cancelEditDish}
+                                            className="text-sm text-gray-400 hover:text-gray-200 transition"
+                                          >
+                                            Annuler
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </form>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Plats sans catégorie */}
+                {(() => {
+                  const dishesWithoutCategory = dishes.filter((d) => !d.category_id);
+                  if (dishesWithoutCategory.length === 0) return null;
+
+                  return (
+                    <div className="space-y-3">
+                      <h3 className="text-sm font-semibold text-slate-200 border-b border-slate-800 pb-2">
+                        Autres plats
+                      </h3>
+                      <div className="space-y-2">
+                        {dishesWithoutCategory.map((dish) => (
+                          <div
+                            key={dish.id}
+                            className="bg-slate-950/70 rounded-xl px-3 py-3 space-y-3"
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                              <div className="flex items-center gap-3 flex-1">
+                                {dish.image_url && (
+                                  <div className="relative h-12 w-12 overflow-hidden rounded-xl bg-[#0d0d12]">
+                                    <img
+                                      src={dish.image_url}
+                                      alt={dish.name}
+                                      className="absolute inset-0 w-full h-full object-cover object-center scale-90"
+                                    />
+                                  </div>
+                                )}
+                                <div className="flex-1">
+                                  <p className="text-sm font-semibold">{dish.name}</p>
+                                  {dish.description && (
+                                    <p className="text-[11px] text-slate-400">
+                                      {dish.description}
+                                    </p>
+                                  )}
+                                  {dish.is_signature && (
+                                    <span className="inline-flex items-center rounded-full bg-bitebox/90 text-white text-[9px] font-semibold px-2 py-[1px] mt-1">
+                                      Plat signature
+                                    </span>
+                                  )}
+                                  {dish.is_limited_edition && (
+                                    <span className="inline-flex items-center rounded-full bg-amber-500/90 text-white text-[9px] font-semibold px-2 py-[1px] mt-1">
+                                      Édition limitée
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 self-start sm:self-center flex-wrap">
+                                {/* Select pour changer la catégorie */}
+                                <select
+                                  value={dish.category_id || ""}
+                                  onChange={(e) =>
+                                    handleChangeDishCategory(dish, e.target.value || null)
+                                  }
+                                  className="text-[11px] rounded-md bg-slate-900 border border-slate-700 px-2 py-1 outline-none focus:border-bitebox"
+                                >
+                                  <option value="">Aucune section</option>
+                                  {categories.map((cat) => (
+                                    <option key={cat.id} value={cat.id}>
+                                      {cat.name}
+                                    </option>
+                                  ))}
+                                </select>
+                                <button
+                                  type="button"
+                                  onClick={() => moveDishUp(dish)}
+                                  className="text-[11px] border border-slate-600 rounded px-2 py-[1px] hover:bg-slate-800"
+                                >
+                                  ↑
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => moveDishDown(dish)}
+                                  className="text-[11px] border border-slate-600 rounded px-2 py-[1px] hover:bg-slate-800"
+                                >
+                                  ↓
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => startEditDish(dish)}
+                                  className="text-[11px] rounded-md border border-bitebox/60 px-3 py-1 hover:bg-bitebox/10"
+                                >
+                                  Modifier
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteDish(dish)}
+                                  className="text-[11px] rounded-md border border-red-500/60 px-3 py-1 text-red-300 hover:bg-red-500/10"
+                                >
+                                  Supprimer
+                                </button>
+                              </div>
+                            </div>
+
+                            {editingDish?.id === dish.id && (
+                              <div className="border-t border-slate-800 pt-4 mt-4">
+                                <div className="bg-slate-900/50 rounded-xl border border-slate-800 p-6">
+                                  <div className="mb-6">
+                                    <h3 className="text-lg font-semibold text-gray-200 mb-1">Modifier le plat</h3>
+                                    <p className="text-xs text-gray-400">
+                                      Modifie les informations de ce plat.
+                                    </p>
+                                  </div>
+
+                                  <form onSubmit={handleUpdateDish} className="space-y-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                      {/* Colonne gauche */}
+                                      <div className="space-y-4">
+                                        <div className="space-y-2">
+                                          <label className="text-sm font-medium text-gray-200">Nom du plat</label>
+                                          <input
+                                            type="text"
+                                            value={editDishName}
+                                            onChange={(e) => setEditDishName(e.target.value)}
+                                            className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-gray-200 outline-none focus:border-bitebox"
+                                            required
+                                          />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                          <label className="text-sm font-medium text-gray-200">
+                                            Description <span className="text-xs text-gray-400">(optionnel)</span>
+                                          </label>
+                                          <input
+                                            type="text"
+                                            value={editDishDescription}
+                                            onChange={(e) => setEditDishDescription(e.target.value)}
+                                            className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-gray-200 outline-none focus:border-bitebox"
+                                          />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                          <label className="text-sm font-medium text-gray-200">
+                                            Image du plat (URL) <span className="text-xs text-gray-400">(optionnel)</span>
+                                          </label>
+                                          <input
+                                            type="url"
+                                            value={editDishImageUrl}
+                                            onChange={(e) => {
+                                              const url = e.target.value;
+                                              setEditDishImageUrl(url);
+                                              setEditDishImageError(null);
+                                              // Afficher l'aperçu si l'URL semble valide
+                                              if (url && /^https?:\/\//i.test(url.trim())) {
+                                                setEditDishImagePreview(url.trim());
+                                              } else if (!url) {
+                                                setEditDishImagePreview(editingDish?.image_url ?? null);
+                                              } else {
+                                                setEditDishImagePreview(null);
+                                              }
+                                            }}
+                                            placeholder="https://exemple.com/mon-burger.png"
+                                            className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-gray-200 outline-none focus:border-bitebox"
+                                          />
+                                          {editDishImageError && (
+                                            <p className="text-xs text-red-400">{editDishImageError}</p>
+                                          )}
+                                          <p className="text-xs text-gray-400">
+                                            URL commençant par http:// ou https://. Laisse vide pour conserver l'image actuelle.
+                                          </p>
+                                          {editDishImagePreview && (
+                                            <div className="mt-3 p-3 bg-slate-950 rounded-lg border border-slate-700">
+                                              <p className="text-xs text-gray-400 mb-2">Aperçu :</p>
+                                              <div className="relative h-32 w-full overflow-hidden rounded-xl bg-[#0d0d12]">
+                                                <img
+                                                  src={editDishImagePreview}
+                                                  alt="Aperçu plat"
+                                                  className="absolute inset-0 w-full h-full object-cover object-center scale-95"
+                                                  onError={() => setEditDishImagePreview(editingDish?.image_url ?? null)}
+                                                />
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      {/* Colonne droite */}
+                                      <div className="space-y-4">
+                                        <div className="space-y-2">
+                                          <label className="text-sm font-medium text-gray-200">
+                                            Section <span className="text-xs text-gray-400">(optionnel)</span>
+                                          </label>
+                                          <select
+                                            value={editDishCategoryId || ""}
+                                            onChange={(e) => setEditDishCategoryId(e.target.value || null)}
+                                            className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-gray-200 outline-none focus:border-bitebox"
+                                          >
+                                            <option value="">Aucune section</option>
+                                            {categories.map((cat) => (
+                                              <option key={cat.id} value={cat.id}>
+                                                {cat.name}
+                                              </option>
+                                            ))}
+                                          </select>
+                                        </div>
+
+                                        <div className="space-y-3">
+                                          <h4 className="text-sm font-medium text-gray-200">Options du plat</h4>
+                                          <div className="space-y-3 pl-1">
+                                            <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                                              <input
+                                                type="checkbox"
+                                                checked={editDishIsSignature}
+                                                onChange={(e) => setEditDishIsSignature(e.target.checked)}
+                                                className="h-4 w-4 rounded border-slate-600 text-bitebox focus:ring-bitebox"
+                                              />
+                                              <span>Plat signature</span>
+                                            </label>
+                                            <div className="space-y-1">
+                                              <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                                                <input
+                                                  type="checkbox"
+                                                  checked={editDishIsLimitedEdition}
+                                                  onChange={(e) => setEditDishIsLimitedEdition(e.target.checked)}
+                                                  className="h-4 w-4 rounded border-slate-600 text-amber-500 focus:ring-amber-500"
+                                                />
+                                                <span>Édition limitée</span>
+                                              </label>
+                                              <p className="text-xs text-gray-400 ml-6">
+                                                Plat disponible pour une durée limitée / collab spéciale, peut ne plus être au menu plus tard.
+                                              </p>
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-3 pt-2">
+                                          <button
+                                            type="submit"
+                                            className="rounded-full bg-[#6A24A4] hover:bg-[#581c87] px-6 py-2 text-sm font-semibold text-white transition"
+                                          >
+                                            Enregistrer
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={cancelEditDish}
+                                            className="text-sm text-gray-400 hover:text-gray-200 transition"
+                                          >
+                                            Annuler
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </form>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
+            {/* Ajout de plat */}
+            <div className="border-t border-slate-800 pt-6">
+              <div className="bg-slate-900/50 rounded-xl border border-slate-800 p-6">
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold text-gray-200 mb-1">Ajouter un plat</h3>
+                  <p className="text-xs text-gray-400">
+                    Complète les informations de ce plat pour l'ajouter à la carte de l'enseigne.
+                  </p>
+                </div>
+
+                <form onSubmit={handleAddDish} className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Colonne gauche */}
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-200">Nom du plat</label>
+                        <input
+                          type="text"
+                          value={dishName}
+                          onChange={(e) => setDishName(e.target.value)}
+                          className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-gray-200 outline-none focus:border-bitebox"
+                          placeholder="Ex : Whopper"
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-200">
+                          Description <span className="text-xs text-gray-400">(optionnel)</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={dishDescription}
+                          onChange={(e) => setDishDescription(e.target.value)}
+                          className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-gray-200 outline-none focus:border-bitebox"
+                          placeholder="Burger signature..."
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-200">
+                          Image du plat (URL) <span className="text-xs text-gray-400">(optionnel)</span>
+                        </label>
+                        <input
+                          type="url"
+                          value={dishImageUrl}
+                          onChange={(e) => {
+                            const url = e.target.value;
+                            setDishImageUrl(url);
+                            setDishImageError(null);
+                            // Afficher l'aperçu si l'URL semble valide
+                            if (url && /^https?:\/\//i.test(url.trim())) {
+                              setDishImagePreview(url.trim());
+                            } else {
+                              setDishImagePreview(null);
+                            }
+                          }}
+                          placeholder="https://exemple.com/mon-burger.png"
+                          className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-gray-200 outline-none focus:border-bitebox"
+                        />
+                        {dishImageError && (
+                          <p className="text-xs text-red-400">{dishImageError}</p>
+                        )}
+                        <p className="text-xs text-gray-400">
+                          URL commençant par http:// ou https:// (optionnel)
+                        </p>
+                        {dishImagePreview && (
+                          <div className="mt-3 p-3 bg-slate-950 rounded-lg border border-slate-700">
+                            <p className="text-xs text-gray-400 mb-2">Aperçu :</p>
+                            <div className="relative h-32 w-full overflow-hidden rounded-xl bg-[#0d0d12]">
+                              <img
+                                src={dishImagePreview}
+                                alt="Aperçu plat"
+                                className="absolute inset-0 w-full h-full object-cover object-center scale-95"
+                                onError={() => setDishImagePreview(null)}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Colonne droite */}
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-200">
+                          Section <span className="text-xs text-gray-400">(optionnel)</span>
+                        </label>
+                        <select
+                          value={dishCategoryId || ""}
+                          onChange={(e) => setDishCategoryId(e.target.value || null)}
+                          className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-gray-200 outline-none focus:border-bitebox"
+                        >
+                          <option value="">Aucune section</option>
+                          {categories.map((cat) => (
+                            <option key={cat.id} value={cat.id}>
+                              {cat.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-3">
+                        <h4 className="text-sm font-medium text-gray-200">Options du plat</h4>
+                        <div className="space-y-3 pl-1">
+                          <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={dishIsSignature}
+                              onChange={(e) => setDishIsSignature(e.target.checked)}
+                              className="h-4 w-4 rounded border-slate-600 text-bitebox focus:ring-bitebox"
+                            />
+                            <span>Plat signature</span>
+                          </label>
+                          <div className="space-y-1">
+                            <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={dishIsLimitedEdition}
+                                onChange={(e) => setDishIsLimitedEdition(e.target.checked)}
+                                className="h-4 w-4 rounded border-slate-600 text-amber-500 focus:ring-amber-500"
+                              />
+                              <span>Édition limitée</span>
+                            </label>
+                            <p className="text-xs text-gray-400 ml-6">
+                              Plat disponible pour une durée limitée / collab spéciale, peut ne plus être au menu plus tard.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="pt-2">
+                        <button
+                          type="submit"
+                          className="w-full md:w-auto md:ml-auto md:float-right rounded-full bg-[#6A24A4] hover:bg-[#581c87] px-6 py-2 text-sm font-semibold text-white transition"
+                        >
+                          Ajouter le plat
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </section>
+        )}
+      </div>
+    </div>
+  );
+}
+

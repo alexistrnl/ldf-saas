@@ -2,7 +2,7 @@ import { cookies } from 'next/headers'
 import AdminRestaurantsContent from './AdminRestaurantsContent'
 import AdminPasswordGate from './AdminPasswordGate'
 
-export default async function AdminRestaurantsPage() {
+export default async function AdminRestaurantsPageWrapper() {
   // Vérifier si l'utilisateur a le cookie admin_access
   const cookieStore = await cookies()
   const adminAccess = cookieStore.get('admin_access')
@@ -15,3 +15,4 @@ export default async function AdminRestaurantsPage() {
   // Sinon, afficher le formulaire de mot de passe
   return <AdminPasswordGate />
 }
+
