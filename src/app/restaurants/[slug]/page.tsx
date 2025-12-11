@@ -123,12 +123,7 @@ export default function RestaurantPage() {
   const [topDishIndex, setTopDishIndex] = useState(0);
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
   const [isDesktop, setIsDesktop] = useState(false);
-  const [recentLogs, setRecentLogs] = useState<Array<{
-    id: string;
-    created_at: string;
-    rating: number | null;
-    dishes: Array<{ dish_name: string }>;
-  }>>([]);
+  const [latestDishes, setLatestDishes] = useState<DishWithStats[]>([]);
 
   useEffect(() => {
     const checkDesktop = () => {
@@ -266,50 +261,60 @@ export default function RestaurantPage() {
 
         setDishes(dishesWithStats);
 
-        // 6) Charger les 4 derniers ajouts pour ce restaurant
-        const { data: recentLogsData, error: recentLogsError } = await supabase
-          .from("fastfood_logs")
-          .select("id, created_at, rating")
+        // 6) Charger les 4 derniers plats créés pour ce restaurant
+        const { data: latestDishesData, error: latestDishesError } = await supabase
+          .from("dishes")
+          .select("*")
           .eq("restaurant_id", restaurantData.id)
           .order("created_at", { ascending: false })
           .limit(4);
 
-        if (recentLogsError) {
-          console.error("[RestaurantPage] recent logs error", recentLogsError);
-        } else if (recentLogsData && recentLogsData.length > 0) {
-          // Récupérer les plats associés à ces logs
-          const recentLogIds = recentLogsData.map((log) => log.id);
-          const { data: recentDishLogs, error: recentDishLogsError } = await supabase
-            .from("fastfood_log_dishes")
-            .select("log_id, dish_name")
-            .in("log_id", recentLogIds);
+        if (latestDishesError) {
+          console.error("[RestaurantPage] latest dishes error", latestDishesError);
+        } else if (latestDishesData && latestDishesData.length > 0) {
+          // Enrichir les plats récents avec leurs stats de notation
+          const latestDishIds = latestDishesData.map((d) => d.id);
+          const latestDishRatingMap = new Map<string, { count: number; sum: number; avg: number }>();
 
-          if (recentDishLogsError) {
-            console.error("[RestaurantPage] recent dish logs error", recentDishLogsError);
-          }
+          if (latestDishIds.length > 0) {
+            const { data: latestDishLogs, error: latestDishLogsError } = await supabase
+              .from("fastfood_log_dishes")
+              .select("dish_id, rating")
+              .in("dish_id", latestDishIds);
 
-          // Organiser les plats par log_id
-          const dishesByLogId = new Map<string, Array<{ dish_name: string }>>();
-          if (recentDishLogs) {
-            recentDishLogs.forEach((dishLog) => {
-              if (!dishesByLogId.has(dishLog.log_id)) {
-                dishesByLogId.set(dishLog.log_id, []);
+            if (latestDishLogsError) {
+              console.error("[RestaurantPage] latest dish logs error", latestDishLogsError);
+            } else if (latestDishLogs) {
+              for (const row of latestDishLogs) {
+                if (!row.dish_id || typeof row.rating !== "number") continue;
+                const current = latestDishRatingMap.get(row.dish_id) ?? {
+                  count: 0,
+                  sum: 0,
+                  avg: 0,
+                };
+                const count = current.count + 1;
+                const sum = current.sum + row.rating;
+                latestDishRatingMap.set(row.dish_id, {
+                  count,
+                  sum,
+                  avg: sum / count,
+                });
               }
-              dishesByLogId.get(dishLog.log_id)?.push({ dish_name: dishLog.dish_name });
-            });
+            }
           }
 
-          // Construire les logs avec leurs plats
-          const logsWithDishes = recentLogsData.map((log) => ({
-            id: log.id,
-            created_at: log.created_at,
-            rating: log.rating,
-            dishes: dishesByLogId.get(log.id) || [],
-          }));
+          // Construire les plats récents avec leurs stats
+          const latestDishesWithStats: DishWithStats[] = (latestDishesData as Dish[]).map((dish) => {
+            const stats = latestDishRatingMap.get(dish.id);
+            return {
+              ...dish,
+              ratingStats: stats ?? { count: 0, sum: 0, avg: 0 },
+            };
+          });
 
-          setRecentLogs(logsWithDishes);
+          setLatestDishes(latestDishesWithStats);
         } else {
-          setRecentLogs([]);
+          setLatestDishes([]);
         }
 
         setLoading(false);
@@ -324,6 +329,92 @@ export default function RestaurantPage() {
       fetchData();
     }
   }, [params?.slug]);
+
+  // Fonction helper pour rendre une carte de plat (réutilisée dans plusieurs sections)
+  const renderDishCard = (dish: DishWithStats) => {
+    const isPng = dish.image_url?.toLowerCase().includes(".png");
+    const isBurgerKing = restaurant?.name?.toLowerCase().includes("burger king") || restaurant?.slug?.toLowerCase().includes("burger-king");
+    const isBlackWhite = restaurant?.name?.toLowerCase().includes("black") && restaurant?.name?.toLowerCase().includes("white");
+    const category = categories.find(cat => cat.id === dish.category_id) || null;
+    const { shouldZoom, zoomLevel, shouldCenter } = getPopeyesDishZoom(dish, category, restaurant);
+    
+    return (
+      <div
+        key={dish.id}
+        className="bg-slate-900/80 rounded-2xl overflow-hidden border border-slate-800/70 shadow-md flex flex-col"
+      >
+        <div className="relative w-full aspect-square rounded-xl overflow-hidden flex items-center justify-center bg-amber-50 border border-amber-200">
+          {dish.image_url ? (
+            isPng ? (
+              <img
+                src={dish.image_url}
+                alt={dish.name}
+                className={`w-full h-full object-contain ${shouldCenter ? 'object-center' : 'object-top'} ${isBlackWhite ? 'scale-150' : zoomLevel} drop-shadow-xl ${isBurgerKing ? 'pt-0 pb-4 px-4' : 'p-4'}`}
+              />
+            ) : (
+              <img
+                src={dish.image_url}
+                alt={dish.name}
+                className={`w-full h-full object-cover object-center ${shouldZoom ? zoomLevel : ''}`}
+              />
+            )
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-xs text-slate-500">Pas d'image</span>
+            </div>
+          )}
+        </div>
+
+        <div className="px-3 py-3 space-y-1">
+          <p className="text-sm font-semibold truncate">{dish.name}</p>
+          {(dish.is_signature || dish.is_limited_edition) && (
+            <div className="flex gap-2 flex-wrap">
+              {dish.is_signature && (
+                <span className="inline-flex items-center rounded-full bg-bitebox/90 text-white text-[10px] font-semibold px-2 py-[1px]">
+                  Plat signature
+                </span>
+              )}
+              {dish.is_limited_edition && (
+                <span className="inline-flex items-center rounded-full bg-bitebox/60 text-white text-[10px] font-semibold px-2 py-[1px]">
+                  Édition limitée
+                </span>
+              )}
+            </div>
+          )}
+          {dish.description && (
+            <p className="text-[11px] text-slate-400 line-clamp-2">
+              {dish.description}
+            </p>
+          )}
+          <div className="mt-2 flex items-center justify-between text-[11px] text-slate-300">
+            {dish.ratingStats.count === 0 ? (
+              <span className="text-slate-500">Pas encore noté</span>
+            ) : (
+              <>
+                <div className="flex">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <span
+                      key={star}
+                      className={
+                        dish.ratingStats.avg >= star
+                          ? "text-yellow-400"
+                          : "text-slate-700"
+                      }
+                    >
+                      ★
+                    </span>
+                  ))}
+                </div>
+                <span className="text-slate-400 ml-1">
+                  {dish.ratingStats.avg.toFixed(1)} / 5 · {dish.ratingStats.count} avis
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   // Filtrer les catégories qui ont des plats (calculé avec useMemo)
   const categoriesWithDishes = useMemo(() => {
@@ -529,61 +620,12 @@ export default function RestaurantPage() {
 
         {/* Derniers ajouts */}
         <section className="mt-6">
-          <h2 className="text-lg font-semibold text-slate-50 mb-3">
-            Derniers ajouts
-          </h2>
-          {recentLogs.length === 0 ? (
-            <p className="text-sm text-slate-400">
-              Aucune expérience ajoutée pour le moment.
-            </p>
+          <h3 className="mb-3 text-base font-semibold text-white">Derniers ajouts</h3>
+          {latestDishes.length === 0 ? (
+            <p className="text-sm text-slate-400">Aucun plat ajouté récemment à la carte.</p>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {recentLogs.map((log) => {
-                const date = new Date(log.created_at);
-                const formattedDate = date.toLocaleDateString("fr-FR", {
-                  day: "2-digit",
-                  month: "2-digit",
-                  year: "numeric",
-                });
-
-                return (
-                  <div
-                    key={log.id}
-                    className="rounded-xl bg-slate-900 border border-slate-800 p-4"
-                  >
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <span className="text-xs text-slate-400">
-                        {formattedDate}
-                      </span>
-                      {log.rating !== null && (
-                        <div className="flex items-center gap-1">
-                          <span className="text-yellow-400 text-xs">★</span>
-                          <span className="text-xs text-slate-300">
-                            {log.rating}/5
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    {log.dishes.length > 0 && (
-                      <div className="space-y-1">
-                        {log.dishes.slice(0, 2).map((dish, idx) => (
-                          <p
-                            key={idx}
-                            className="text-sm text-slate-200 truncate"
-                          >
-                            {dish.dish_name}
-                          </p>
-                        ))}
-                        {log.dishes.length > 2 && (
-                          <p className="text-xs text-slate-400">
-                            +{log.dishes.length - 2} autre{log.dishes.length - 2 > 1 ? "s" : ""}
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+              {latestDishes.slice(0, 4).map((dish) => renderDishCard(dish))}
             </div>
           )}
         </section>
