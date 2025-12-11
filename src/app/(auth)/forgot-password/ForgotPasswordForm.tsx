@@ -7,10 +7,10 @@ import Image from 'next/image'
 import { supabase } from '@/lib/supabaseClient'
 import Spinner from '@/components/Spinner'
 
-export default function LoginForm() {
+export default function ForgotPasswordForm() {
   const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
@@ -18,11 +18,11 @@ export default function LoginForm() {
     e.preventDefault()
     setLoading(true)
     setError(null)
+    setSuccess(false)
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: 'https://www.bitebox.fr/reset-password',
       })
 
       if (error) {
@@ -31,11 +31,39 @@ export default function LoginForm() {
         return
       }
 
-      router.push('/home')
+      // Toujours afficher le message de succès (sécurité : éviter l'énumération de comptes)
+      setSuccess(true)
+      setLoading(false)
     } catch (err) {
-      setError('Une erreur est survenue')
+      setError('Une erreur est survenue. Veuillez réessayer.')
       setLoading(false)
     }
+  }
+
+  if (success) {
+    return (
+      <>
+        <div className="flex flex-col items-center mb-6">
+          <Image src="/bitebox-logo.png" alt="BiteBox logo" width={72} height={72} />
+        </div>
+        <h1 className="text-3xl font-bold text-gray-900 mb-6 text-center">
+          Email envoyé
+        </h1>
+        <div className="space-y-4">
+          <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
+            <p className="text-sm text-green-800 text-center">
+              Si un compte existe avec cet e-mail, un lien de réinitialisation vous a été envoyé.
+            </p>
+          </div>
+          <Link
+            href="/login"
+            className="block text-center text-sm text-bitebox hover:text-bitebox-dark font-medium"
+          >
+            Retour à la connexion
+          </Link>
+        </div>
+      </>
+    )
   }
 
   return (
@@ -43,9 +71,12 @@ export default function LoginForm() {
       <div className="flex flex-col items-center mb-6">
         <Image src="/bitebox-logo.png" alt="BiteBox logo" width={72} height={72} />
       </div>
-      <h1 className="text-3xl font-bold text-gray-900 mb-6 text-center">
-        Connexion
+      <h1 className="text-3xl font-bold text-gray-900 mb-2 text-center">
+        Mot de passe oublié
       </h1>
+      <p className="text-sm text-gray-600 mb-6 text-center">
+        Entrez votre adresse e-mail et nous vous enverrons un lien pour réinitialiser votre mot de passe.
+      </p>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
@@ -63,29 +94,6 @@ export default function LoginForm() {
           />
         </div>
 
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-              Mot de passe
-            </label>
-            <Link
-              href="/forgot-password"
-              className="text-xs text-bitebox hover:text-bitebox-dark font-medium"
-            >
-              Mot de passe oublié ?
-            </Link>
-          </div>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-bitebox focus:border-transparent"
-            placeholder="••••••••"
-          />
-        </div>
-
         {error && (
           <div className="text-red-600 text-sm bg-red-50 border border-red-200 p-3 rounded-lg">
             {error}
@@ -100,18 +108,17 @@ export default function LoginForm() {
           {loading ? (
             <>
               <Spinner size="sm" />
-              <span>Connexion...</span>
+              <span>Envoi en cours...</span>
             </>
           ) : (
-            'Se connecter'
+            'Envoyer le lien de réinitialisation'
           )}
         </button>
       </form>
 
       <p className="mt-6 text-center text-sm text-gray-600">
-        Pas encore de compte ?{' '}
-        <Link href="/signup" className="text-bitebox hover:text-bitebox-dark font-medium">
-          Créer un compte
+        <Link href="/login" className="text-bitebox hover:text-bitebox-dark font-medium">
+          Retour à la connexion
         </Link>
       </p>
     </>
