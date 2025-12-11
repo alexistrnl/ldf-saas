@@ -21,6 +21,7 @@ type RestaurantRatingStats = {
 
 type RestaurantWithStats = Restaurant & {
   ratingStats: RestaurantRatingStats;
+  latestLogDate: string | null;
 };
 
 export default function HomePage() {
@@ -53,14 +54,15 @@ export default function HomePage() {
         // Récupérer les notes de tous les restaurants avec user_id pour calculer la note publique (1 utilisateur = 1 voix)
         const { data: ratingRows, error: ratingError } = await supabase
           .from("fastfood_logs")
-          .select("restaurant_id, user_id, rating");
+          .select("restaurant_id, user_id, rating, created_at");
 
         if (ratingError) {
           console.error("Erreur chargement notes restaurants", ratingError);
         }
 
-        // Grouper les logs par restaurant_id
+        // Grouper les logs par restaurant_id et trouver la date du dernier log
         const logsByRestaurant = new Map<string, Array<{ user_id: string; rating: number | null }>>();
+        const latestLogDates = new Map<string, string>();
 
         if (ratingRows) {
           for (const row of ratingRows) {
@@ -71,10 +73,18 @@ export default function HomePage() {
               rating: row.rating,
             });
             logsByRestaurant.set(row.restaurant_id, restaurantLogs);
+
+            // Enregistrer la date du dernier log pour ce restaurant
+            if (row.created_at) {
+              const currentLatest = latestLogDates.get(row.restaurant_id);
+              if (!currentLatest || row.created_at > currentLatest) {
+                latestLogDates.set(row.restaurant_id, row.created_at);
+              }
+            }
           }
         }
 
-        // Enrichir chaque restaurant avec ses stats (note publique = 1 utilisateur = 1 voix)
+        // Enrichir chaque restaurant avec ses stats (note publique = 1 utilisateur = 1 voix) et la date du dernier log
         const restaurantsWithStats: RestaurantWithStats[] = restaurantsData.map((r) => {
           const logs = logsByRestaurant.get(r.id) ?? [];
           const { publicRating, uniqueVotersCount } = calculatePublicRating(logs);
@@ -85,6 +95,7 @@ export default function HomePage() {
               sum: publicRating * uniqueVotersCount,
               avg: publicRating,
             },
+            latestLogDate: latestLogDates.get(r.id) || null,
           };
         });
 
@@ -114,6 +125,7 @@ export default function HomePage() {
           }
 
           // Trier les restaurants par nombre de notes (décroissant)
+          // Note: restaurantsWithStats contient déjà latestLogDate
           const trendingList = restaurantsWithStats
             .map((r) => ({
               ...r,
@@ -122,7 +134,7 @@ export default function HomePage() {
             .filter((r) => r.recentNotesCount > 0)
             .sort((a, b) => b.recentNotesCount - a.recentNotesCount)
             .slice(0, 8) // Top 8
-            .map(({ recentNotesCount, ...rest }) => rest);
+            .map(({ recentNotesCount, ...rest }) => rest) as RestaurantWithStats[];
 
           setTrendingRestaurants(trendingList);
         }
@@ -153,6 +165,17 @@ export default function HomePage() {
 
   const getRestaurantUrl = (r: RestaurantWithStats) =>
     r.slug ? `/restaurants/${r.slug}` : `/restaurants/${r.id}`;
+
+  // Fonction pour déterminer si un restaurant est "NEW" (dernier log < 3 jours)
+  const isRestaurantNew = (restaurant: RestaurantWithStats): boolean => {
+    if (!restaurant.latestLogDate) {
+      return false;
+    }
+
+    const latestLogDate = new Date(restaurant.latestLogDate);
+    const threeDaysAgo = Date.now() - 3 * 24 * 60 * 60 * 1000;
+    return latestLogDate.getTime() >= threeDaysAgo;
+  };
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50 px-4 py-6">
@@ -192,12 +215,19 @@ export default function HomePage() {
               Les enseignes les plus notées ces 3 derniers jours
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-              {trendingRestaurants.map((restaurant) => (
+              {trendingRestaurants.map((restaurant) => {
+                const isNew = isRestaurantNew(restaurant);
+                return (
                 <Link
                   key={restaurant.id}
                   href={getRestaurantUrl(restaurant)}
-                  className="group block bg-slate-900/80 rounded-2xl shadow-md hover:shadow-xl border border-slate-800/70 hover:border-bitebox/60 transition overflow-hidden flex flex-col"
+                  className="group block bg-slate-900/80 rounded-2xl shadow-md hover:shadow-xl border border-slate-800/70 hover:border-bitebox/60 transition overflow-hidden flex flex-col relative"
                 >
+                  {isNew && (
+                    <div className="absolute top-2 right-2 z-10 rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-semibold text-white shadow-lg">
+                      NEW
+                    </div>
+                  )}
                   <div className="w-full aspect-[4/3] overflow-hidden rounded-t-2xl bg-slate-950">
                     {restaurant.logo_url ? (
                       <img
@@ -244,7 +274,8 @@ export default function HomePage() {
                     </div>
                   </div>
                 </Link>
-              ))}
+              );
+              })}
             </div>
           </section>
         )}
@@ -271,12 +302,19 @@ export default function HomePage() {
             </p>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-              {filteredRestaurants.map((restaurant) => (
+              {filteredRestaurants.map((restaurant) => {
+                const isNew = isRestaurantNew(restaurant);
+                return (
                 <Link
                   key={restaurant.id}
                   href={getRestaurantUrl(restaurant)}
-                  className="group block bg-slate-900/80 rounded-2xl shadow-md hover:shadow-xl border border-slate-800/70 hover:border-bitebox/60 transition overflow-hidden flex flex-col"
+                  className="group block bg-slate-900/80 rounded-2xl shadow-md hover:shadow-xl border border-slate-800/70 hover:border-bitebox/60 transition overflow-hidden flex flex-col relative"
                 >
+                  {isNew && (
+                    <div className="absolute top-2 right-2 z-10 rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-semibold text-white shadow-lg">
+                      NEW
+                    </div>
+                  )}
                   <div className="w-full aspect-[4/3] overflow-hidden rounded-t-2xl bg-slate-950">
                     {restaurant.logo_url ? (
                       <img
@@ -323,7 +361,8 @@ export default function HomePage() {
                     </div>
                   </div>
                 </Link>
-              ))}
+              );
+              })}
             </div>
           )}
         </section>
