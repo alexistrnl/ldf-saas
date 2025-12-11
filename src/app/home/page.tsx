@@ -21,7 +21,7 @@ type RestaurantRatingStats = {
 
 type RestaurantWithStats = Restaurant & {
   ratingStats: RestaurantRatingStats;
-  latestLogDate: string | null;
+  latestDishCreatedAt: string | null;
 };
 
 export default function HomePage() {
@@ -54,15 +54,14 @@ export default function HomePage() {
         // Récupérer les notes de tous les restaurants avec user_id pour calculer la note publique (1 utilisateur = 1 voix)
         const { data: ratingRows, error: ratingError } = await supabase
           .from("fastfood_logs")
-          .select("restaurant_id, user_id, rating, created_at");
+          .select("restaurant_id, user_id, rating");
 
         if (ratingError) {
           console.error("Erreur chargement notes restaurants", ratingError);
         }
 
-        // Grouper les logs par restaurant_id et trouver la date du dernier log
+        // Grouper les logs par restaurant_id pour calculer les notes
         const logsByRestaurant = new Map<string, Array<{ user_id: string; rating: number | null }>>();
-        const latestLogDates = new Map<string, string>();
 
         if (ratingRows) {
           for (const row of ratingRows) {
@@ -73,18 +72,31 @@ export default function HomePage() {
               rating: row.rating,
             });
             logsByRestaurant.set(row.restaurant_id, restaurantLogs);
+          }
+        }
 
-            // Enregistrer la date du dernier log pour ce restaurant
-            if (row.created_at) {
-              const currentLatest = latestLogDates.get(row.restaurant_id);
-              if (!currentLatest || row.created_at > currentLatest) {
-                latestLogDates.set(row.restaurant_id, row.created_at);
-              }
+        // Récupérer la date du dernier plat créé pour chaque restaurant
+        const { data: allDishes, error: dishesError } = await supabase
+          .from("dishes")
+          .select("restaurant_id, created_at");
+
+        if (dishesError) {
+          console.error("Erreur chargement plats pour dates", dishesError);
+        }
+
+        // Trouver la date du dernier plat créé pour chaque restaurant
+        const latestDishDates = new Map<string, string>();
+        if (allDishes) {
+          for (const dish of allDishes) {
+            if (!dish.restaurant_id || !dish.created_at) continue;
+            const currentLatest = latestDishDates.get(dish.restaurant_id);
+            if (!currentLatest || dish.created_at > currentLatest) {
+              latestDishDates.set(dish.restaurant_id, dish.created_at);
             }
           }
         }
 
-        // Enrichir chaque restaurant avec ses stats (note publique = 1 utilisateur = 1 voix) et la date du dernier log
+        // Enrichir chaque restaurant avec ses stats (note publique = 1 utilisateur = 1 voix) et la date du dernier plat
         const restaurantsWithStats: RestaurantWithStats[] = restaurantsData.map((r) => {
           const logs = logsByRestaurant.get(r.id) ?? [];
           const { publicRating, uniqueVotersCount } = calculatePublicRating(logs);
@@ -95,7 +107,7 @@ export default function HomePage() {
               sum: publicRating * uniqueVotersCount,
               avg: publicRating,
             },
-            latestLogDate: latestLogDates.get(r.id) || null,
+            latestDishCreatedAt: latestDishDates.get(r.id) || null,
           };
         });
 
@@ -125,7 +137,7 @@ export default function HomePage() {
           }
 
           // Trier les restaurants par nombre de notes (décroissant)
-          // Note: restaurantsWithStats contient déjà latestLogDate
+          // Note: restaurantsWithStats contient déjà latestDishCreatedAt
           const trendingList = restaurantsWithStats
             .map((r) => ({
               ...r,
@@ -166,15 +178,15 @@ export default function HomePage() {
   const getRestaurantUrl = (r: RestaurantWithStats) =>
     r.slug ? `/restaurants/${r.slug}` : `/restaurants/${r.id}`;
 
-  // Fonction pour déterminer si un restaurant est "NEW" (dernier log < 3 jours)
+  // Fonction pour déterminer si un restaurant est "NEW" (dernier plat créé < 3 jours)
   const isRestaurantNew = (restaurant: RestaurantWithStats): boolean => {
-    if (!restaurant.latestLogDate) {
+    if (!restaurant.latestDishCreatedAt) {
       return false;
     }
 
-    const latestLogDate = new Date(restaurant.latestLogDate);
+    const latestDishDate = new Date(restaurant.latestDishCreatedAt);
     const threeDaysAgo = Date.now() - 3 * 24 * 60 * 60 * 1000;
-    return latestLogDate.getTime() >= threeDaysAgo;
+    return latestDishDate.getTime() >= threeDaysAgo;
   };
 
   return (
