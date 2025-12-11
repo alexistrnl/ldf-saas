@@ -340,6 +340,49 @@ export default function ProfileSettingsPage() {
             </div>
           )}
         </section>
+
+        {/* Instructions pour ajouter à l'écran d'accueil */}
+        <section className="rounded-xl bg-[#0e0e1a] border border-white/5 p-4 w-full overflow-x-hidden">
+          <div className="mb-4">
+            <h2 className="text-sm font-medium text-white mb-1">
+              Ajouter BiteBox à l'écran d'accueil
+            </h2>
+            <p className="text-xs text-slate-400">
+              Accède rapidement à BiteBox depuis ton téléphone.
+            </p>
+          </div>
+
+          <div className="space-y-6">
+            {/* iPhone */}
+            <div className="space-y-2">
+              <h3 className="text-xs font-semibold text-white">
+                iPhone (Safari)
+              </h3>
+              <ol className="space-y-1.5 text-xs text-slate-300 list-decimal list-inside">
+                <li>Ouvre BiteBox dans Safari.</li>
+                <li>Appuie sur le bouton Partager (carré avec flèche).</li>
+                <li>Sélectionne &apos;Ajouter à l&apos;écran d&apos;accueil&apos;.</li>
+                <li>Valide.</li>
+              </ol>
+            </div>
+
+            {/* Séparateur */}
+            <div className="border-t border-white/5"></div>
+
+            {/* Android */}
+            <div className="space-y-2">
+              <h3 className="text-xs font-semibold text-white">
+                Android (Chrome)
+              </h3>
+              <ol className="space-y-1.5 text-xs text-slate-300 list-decimal list-inside">
+                <li>Ouvre BiteBox dans Chrome.</li>
+                <li>Appuie sur le menu ⋮ (trois points).</li>
+                <li>Choisis &apos;Ajouter à l&apos;écran d&apos;accueil&apos;.</li>
+                <li>Valide.</li>
+              </ol>
+            </div>
+          </div>
+        </section>
       </div>
     </main>
   );
