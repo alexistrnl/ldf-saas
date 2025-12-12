@@ -22,19 +22,12 @@ export default function SignupPage() {
     setSuccess(false)
 
     try {
-      // Construire l'URL de redirection de manière dynamique
-      const siteUrl = getSiteUrl()
-      const redirectUrl = `${siteUrl}/confirmation`
-      
       // Appel signUp avec configuration explicite pour forcer l'utilisation du template "Confirm sign up"
       const { error, data } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          // URL de redirection après confirmation - doit correspondre exactement au template Supabase
-          emailRedirectTo: redirectUrl,
-          // Forcer l'envoi de l'email de confirmation même si l'utilisateur existe déjà
-          // (utile pour les tests et la réinitialisation)
+          emailRedirectTo: "https://www.bitebox.fr/confirmation",
         },
       })
 

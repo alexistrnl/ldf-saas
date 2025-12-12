@@ -18,6 +18,7 @@ function slugify(name: string) {
 type ViewMode = "details" | "edit" | "create";
 
 export default function AdminRestaurantsContent() {
+  const router = useRouter();
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
