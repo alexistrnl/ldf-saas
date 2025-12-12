@@ -33,7 +33,7 @@ export default function RestaurantListPanel({
   });
 
   return (
-    <div className="flex flex-col h-screen bg-slate-900/50 border-r border-slate-800/70">
+    <div className="flex flex-col h-full bg-slate-900/50 border-r border-slate-800/70 overflow-hidden">
       {/* Header avec bouton Nouvelle enseigne */}
       <div className="p-4 border-b border-slate-800/70">
         <button
@@ -56,7 +56,7 @@ export default function RestaurantListPanel({
       </div>
 
       {/* Liste scrollable */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto min-h-0">
         {loading ? (
           <div className="flex items-center justify-center py-8">
             <p className="text-sm text-slate-400">Chargement...</p>

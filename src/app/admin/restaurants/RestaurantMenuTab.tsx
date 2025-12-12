@@ -525,66 +525,69 @@ export default function RestaurantMenuTab({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="h-full flex flex-col gap-6 min-h-0 overflow-hidden">
       {/* Sections */}
-      <div className="bg-slate-900/80 rounded-2xl p-6 border border-slate-800/60">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">Sections de menu</h3>
-          {!showCategoryForm && (
-            <button
-              onClick={() => setShowCategoryForm(true)}
-              className="px-3 py-1.5 text-sm bg-bitebox text-white rounded-lg hover:bg-bitebox-dark transition"
-            >
-              + Ajouter une section
-            </button>
+      <div className="flex-[0_1_45%] flex flex-col bg-slate-900/80 rounded-2xl border border-slate-800/60 min-h-0 overflow-hidden">
+        <div className="flex-shrink-0 p-6 pb-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold">Sections de menu</h3>
+            {!showCategoryForm && (
+              <button
+                onClick={() => setShowCategoryForm(true)}
+                className="px-3 py-1.5 text-sm bg-bitebox text-white rounded-lg hover:bg-bitebox-dark transition"
+              >
+                + Ajouter une section
+              </button>
+            )}
+          </div>
+
+          {categoryError && (
+            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/40 rounded-lg text-sm text-red-300">
+              {categoryError}
+            </div>
+          )}
+
+          {showCategoryForm && (
+            <form onSubmit={handleCreateCategory} className="mb-4 p-4 bg-slate-950/70 rounded-lg space-y-2">
+              <input
+                type="text"
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                placeholder="Nom de la section"
+                className="w-full px-3 py-2 rounded-md bg-slate-900 border border-slate-700 text-sm text-white outline-none focus:border-bitebox"
+                autoFocus
+              />
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  className="px-4 py-2 text-sm bg-bitebox text-white rounded-lg hover:bg-bitebox-dark transition"
+                >
+                  Créer
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCategoryForm(false);
+                    setNewCategoryName("");
+                    setCategoryError(null);
+                  }}
+                  className="px-4 py-2 text-sm bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition"
+                >
+                  Annuler
+                </button>
+              </div>
+            </form>
           )}
         </div>
 
-        {categoryError && (
-          <div className="mb-4 p-3 bg-red-500/10 border border-red-500/40 rounded-lg text-sm text-red-300">
-            {categoryError}
-          </div>
-        )}
-
-        {showCategoryForm && (
-          <form onSubmit={handleCreateCategory} className="mb-4 p-4 bg-slate-950/70 rounded-lg space-y-2">
-            <input
-              type="text"
-              value={newCategoryName}
-              onChange={(e) => setNewCategoryName(e.target.value)}
-              placeholder="Nom de la section"
-              className="w-full px-3 py-2 rounded-md bg-slate-900 border border-slate-700 text-sm text-white outline-none focus:border-bitebox"
-              autoFocus
-            />
-            <div className="flex gap-2">
-              <button
-                type="submit"
-                className="px-4 py-2 text-sm bg-bitebox text-white rounded-lg hover:bg-bitebox-dark transition"
-              >
-                Créer
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowCategoryForm(false);
-                  setNewCategoryName("");
-                  setCategoryError(null);
-                }}
-                className="px-4 py-2 text-sm bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition"
-              >
-                Annuler
-              </button>
-            </div>
-          </form>
-        )}
-
-        {loadingCategories ? (
-          <p className="text-sm text-slate-400">Chargement...</p>
-        ) : categories.length === 0 ? (
-          <p className="text-sm text-slate-400">Aucune section pour l'instant.</p>
-        ) : (
-          <div className="space-y-2">
-            {categories.map((category, index) => (
+        <div className="flex-1 overflow-y-auto min-h-0 px-6 pb-6">
+          {loadingCategories ? (
+            <p className="text-sm text-slate-400">Chargement...</p>
+          ) : categories.length === 0 ? (
+            <p className="text-sm text-slate-400">Aucune section pour l'instant.</p>
+          ) : (
+            <div className="space-y-2">
+              {categories.map((category, index) => (
               <div
                 key={category.id}
                 className="flex items-center gap-2 p-3 bg-slate-950/70 rounded-lg border border-slate-800"
@@ -665,31 +668,33 @@ export default function RestaurantMenuTab({
                 </div>
               </div>
             ))}
-          </div>
-        )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Plats */}
-      <div className="bg-slate-900/80 rounded-2xl p-6 border border-slate-800/60">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">Plats</h3>
-          {!showDishForm && !editingDish && (
-            <button
-              onClick={() => setShowDishForm(true)}
-              className="px-3 py-1.5 text-sm bg-bitebox text-white rounded-lg hover:bg-bitebox-dark transition"
-            >
-              + Ajouter un plat
-            </button>
-          )}
-        </div>
-
-        {dishImageError && (
-          <div className="mb-4 p-3 bg-red-500/10 border border-red-500/40 rounded-lg text-sm text-red-300">
-            {dishImageError}
+      <div className="flex-1 flex flex-col min-h-0 bg-slate-900/80 rounded-2xl border border-slate-800/60 overflow-hidden">
+        <div className="flex-shrink-0 p-6 pb-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold">Plats</h3>
+            {!showDishForm && !editingDish && (
+              <button
+                onClick={() => setShowDishForm(true)}
+                className="px-3 py-1.5 text-sm bg-bitebox text-white rounded-lg hover:bg-bitebox-dark transition"
+              >
+                + Ajouter un plat
+              </button>
+            )}
           </div>
-        )}
 
-        {showDishForm && (
+          {dishImageError && (
+            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/40 rounded-lg text-sm text-red-300">
+              {dishImageError}
+            </div>
+          )}
+
+          {showDishForm && (
           <form onSubmit={handleAddDish} className="mb-6 p-4 bg-slate-950/70 rounded-lg space-y-4">
             <div>
               <label className="block text-sm font-medium mb-1">Nom du plat *</label>
@@ -907,7 +912,8 @@ export default function RestaurantMenuTab({
         ) : dishes.length === 0 ? (
           <p className="text-sm text-slate-400">Aucun plat pour l'instant.</p>
         ) : (
-          <div className="space-y-3">
+          <div className="flex-1 overflow-y-auto min-h-0 px-6 pb-6">
+            <div className="space-y-3">
             {dishes.map((dish, index) => (
               <div
                 key={dish.id}
@@ -977,6 +983,7 @@ export default function RestaurantMenuTab({
                 </div>
               </div>
             ))}
+            </div>
           </div>
         )}
       </div>

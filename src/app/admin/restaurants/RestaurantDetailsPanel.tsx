@@ -197,11 +197,11 @@ export default function RestaurantDetailsPanel({
   );
 
   return (
-    <div className="flex-1 flex flex-col h-screen bg-slate-950 overflow-y-auto">
-      <div className="p-6 space-y-6">
-        {/* Header avec onglets */}
-        {selectedRestaurant && (
-          <div className="flex items-center justify-between border-b border-slate-800">
+    <div className="flex-1 flex flex-col h-full bg-slate-950 overflow-hidden">
+      {/* Header avec onglets - Fixe en haut */}
+      {selectedRestaurant && (
+        <div className="flex-shrink-0 px-6 pt-6 pb-4 border-b border-slate-800">
+          <div className="flex items-center justify-between">
             <div className="flex gap-4">
               <button
                 onClick={() => onViewModeChange("overview")}
@@ -250,26 +250,34 @@ export default function RestaurantDetailsPanel({
           </div>
         )}
 
-        {error && (
-          <div className="rounded-md bg-red-500/10 border border-red-500/40 px-3 py-2 text-sm text-red-300">
-            {error}
+      {/* Contenu scrollable */}
+      <div className="flex-1 overflow-y-auto min-h-0">
+        {currentMode === "menu" && selectedRestaurant ? (
+          <div className="h-full">
+            <RestaurantMenuTab restaurant={selectedRestaurant} onError={onError} />
           </div>
-        )}
+        ) : (
+          <div className="p-6 space-y-6">
+            {error && (
+              <div className="rounded-md bg-red-500/10 border border-red-500/40 px-3 py-2 text-sm text-red-300">
+                {error}
+              </div>
+            )}
 
-        {/* Contenu selon le mode */}
-        {currentMode === "edit" && !selectedRestaurant && (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center space-y-2">
-              <p className="text-lg text-slate-400">Sélectionne une enseigne</p>
-              <p className="text-sm text-slate-500">
-                Choisis une enseigne dans la liste à gauche pour la modifier
-              </p>
-            </div>
-          </div>
-        )}
+            {/* Contenu selon le mode */}
+            {currentMode === "edit" && !selectedRestaurant && (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center space-y-2">
+                  <p className="text-lg text-slate-400">Sélectionne une enseigne</p>
+                  <p className="text-sm text-slate-500">
+                    Choisis une enseigne dans la liste à gauche pour la modifier
+                  </p>
+                </div>
+              </div>
+            )}
 
-        {currentMode === "edit" && selectedRestaurant && editingRestaurant && (
-          <div className="bg-slate-900/80 rounded-2xl p-6 shadow-lg border border-slate-700/70 space-y-4">
+            {currentMode === "edit" && selectedRestaurant && editingRestaurant && (
+              <div className="bg-slate-900/80 rounded-2xl p-6 shadow-lg border border-slate-700/70 space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold">
                 Modifier l'enseigne : {editingRestaurant.name}
@@ -330,11 +338,7 @@ export default function RestaurantDetailsPanel({
           </div>
         )}
 
-        {currentMode === "menu" && selectedRestaurant && (
-          <RestaurantMenuTab restaurant={selectedRestaurant} onError={onError} />
-        )}
-
-        {currentMode === "overview" && !selectedRestaurant && (
+            {currentMode === "overview" && !selectedRestaurant && (
           <div className="flex items-center justify-center h-full">
             <div className="text-center space-y-2">
               <p className="text-lg text-slate-400">Sélectionne une enseigne</p>
@@ -380,6 +384,8 @@ export default function RestaurantDetailsPanel({
                 Voir la page publique
               </button>
             </div>
+          </div>
+        )}
           </div>
         )}
       </div>

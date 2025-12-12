@@ -521,9 +521,9 @@ export default function AdminRestaurantsContent() {
   ) || null;
 
   return (
-    <div className="flex h-screen bg-slate-950 text-slate-50 overflow-hidden">
+    <div className="fixed inset-x-0 top-[60px] bottom-0 flex bg-slate-950 text-slate-50 overflow-hidden">
       {/* Sidebar gauche - Liste des enseignes */}
-      <div className="w-80 flex-shrink-0">
+      <div className="w-80 flex-shrink-0 h-full overflow-hidden flex flex-col">
         <RestaurantListPanel
           restaurants={restaurants}
           searchQuery={searchQuery}
@@ -537,8 +537,8 @@ export default function AdminRestaurantsContent() {
 
       {/* Panel droite - Détails/Édition/Carte ou Création */}
       {showCreateForm ? (
-        <div className="flex-1 flex flex-col h-screen bg-slate-950 overflow-y-auto">
-          <div className="p-6">
+        <div className="flex-1 flex flex-col h-full bg-slate-950 overflow-hidden">
+          <div className="flex-1 overflow-y-auto min-h-0 p-6">
             <div className="bg-slate-900/80 rounded-2xl p-6 shadow-lg border border-slate-800/60 space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold">Ajouter une nouvelle enseigne</h2>
@@ -601,7 +601,8 @@ export default function AdminRestaurantsContent() {
           </div>
         </div>
       ) : (
-        <RestaurantDetailsPanel
+        <div className="flex-1 h-full overflow-hidden">
+          <RestaurantDetailsPanel
           selectedRestaurant={selectedRestaurant}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
@@ -626,6 +627,7 @@ export default function AdminRestaurantsContent() {
           error={error}
           onError={setError}
         />
+        </div>
       )}
     </div>
   );
