@@ -593,6 +593,29 @@ export default function RestaurantMenuTab({
 
   const groupedDishes = getGroupedDishes();
 
+  // Fonction pour déterminer si une image doit être zoomée
+  const shouldZoomImage = (dish: Dish, categoryName: string): boolean => {
+    const dishNameLower = dish.name.toLowerCase();
+    const categoryNameLower = categoryName.toLowerCase();
+    
+    // Croquette camembert
+    if (dishNameLower.includes("croquette") && dishNameLower.includes("camembert")) {
+      return true;
+    }
+    
+    // Binchouzz
+    if (dishNameLower.includes("binchouzz")) {
+      return true;
+    }
+    
+    // Tous les plats de la section "sauce"
+    if (categoryNameLower.includes("sauce")) {
+      return true;
+    }
+    
+    return false;
+  };
+
   return (
     <div className="h-full min-h-0 overflow-hidden flex gap-6">
       {/* Sections - Colonne gauche */}
@@ -1012,7 +1035,11 @@ export default function RestaurantMenuTab({
                             <img
                               src={dish.image_url}
                               alt={dish.name}
-                              className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
+                              className={`rounded-lg object-cover flex-shrink-0 ${
+                                shouldZoomImage(dish, sectionGroup.categoryName)
+                                  ? "w-20 h-20"
+                                  : "w-12 h-12"
+                              }`}
                             />
                           )}
                           <div className="flex-1 min-w-0">
