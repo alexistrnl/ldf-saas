@@ -15,7 +15,7 @@ function slugify(name: string) {
     .replace(/^-+|-+$/g, "");
 }
 
-type ViewMode = "details" | "edit" | "create";
+type ViewMode = "overview" | "edit" | "menu";
 
 export default function AdminRestaurantsContent() {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
@@ -23,7 +23,8 @@ export default function AdminRestaurantsContent() {
   const [error, setError] = useState<string | null>(null);
   const [selectedRestaurantId, setSelectedRestaurantId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [viewMode, setViewMode] = useState<ViewMode>("details");
+  const [viewMode, setViewMode] = useState<ViewMode>("overview");
+  const [showCreateForm, setShowCreateForm] = useState(false);
 
   // État pour la création
   const [name, setName] = useState("");
@@ -51,7 +52,7 @@ export default function AdminRestaurantsContent() {
   useEffect(() => {
     if (restaurants.length > 0 && !selectedRestaurantId && !loading) {
       setSelectedRestaurantId(restaurants[0].id);
-      setViewMode("details");
+      setViewMode("overview");
     }
   }, [restaurants, loading]);
 
@@ -102,6 +103,7 @@ export default function AdminRestaurantsContent() {
     setLogoUrl("");
     setLogoImageMode("upload");
     setLogoPreview(null);
+    setShowCreateForm(false);
   };
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -183,7 +185,7 @@ export default function AdminRestaurantsContent() {
       
       if (newRestaurants) {
         setSelectedRestaurantId((newRestaurants as Restaurant).id);
-        setViewMode("details");
+        setViewMode("overview");
       }
     } catch (err) {
       console.error("[Admin] create restaurant unexpected", err);
@@ -201,8 +203,8 @@ export default function AdminRestaurantsContent() {
     setEditLogoUrl("");
     setEditLogoImageMode("upload");
     setEditLogoPreview(restaurant.logo_url);
-    setViewMode("edit");
     setSelectedRestaurantId(restaurant.id);
+    setViewMode("edit");
   };
 
   const cancelEditRestaurant = () => {
@@ -216,7 +218,7 @@ export default function AdminRestaurantsContent() {
     setEditLogoUrl("");
     setEditLogoImageMode("upload");
     setEditLogoPreview(null);
-    setViewMode("details");
+    setViewMode("overview");
   };
 
   const handleUpdateRestaurant = async (e: React.FormEvent) => {
@@ -327,10 +329,10 @@ export default function AdminRestaurantsContent() {
         const remaining = restaurants.filter((r) => r.id !== restaurant.id);
         if (remaining.length > 0) {
           setSelectedRestaurantId(remaining[0].id);
-          setViewMode("details");
+          setViewMode("overview");
         } else {
           setSelectedRestaurantId(null);
-          setViewMode("details");
+          setViewMode("overview");
         }
       }
 
@@ -347,17 +349,19 @@ export default function AdminRestaurantsContent() {
 
   const handleSelectRestaurant = (restaurant: Restaurant) => {
     setSelectedRestaurantId(restaurant.id);
-    setViewMode("details");
+    setViewMode("overview");
     cancelEditRestaurant();
   };
 
   const handleManageMenu = (restaurant: Restaurant) => {
-    window.location.href = `/admin/restaurants?manage=${restaurant.id}`;
+    setSelectedRestaurantId(restaurant.id);
+    setViewMode("menu");
+    cancelEditRestaurant();
   };
 
   const handleCreateNew = () => {
     resetCreateForm();
-    setViewMode("create");
+    setShowCreateForm(true);
     setSelectedRestaurantId(null);
     cancelEditRestaurant();
   };
@@ -398,6 +402,122 @@ export default function AdminRestaurantsContent() {
     return null;
   };
 
+  const renderLogoInput = (
+    mode: "upload" | "url",
+    setMode: (m: "upload" | "url") => void,
+    file: File | null,
+    setFile: (f: File | null) => void,
+    url: string,
+    setUrl: (u: string) => void,
+    preview: string | null,
+    setPreview: (p: string | null) => void
+  ) => (
+    <div className="space-y-2">
+      <div className="flex gap-2 border-b border-slate-700">
+        <button
+          type="button"
+          onClick={() => {
+            if (preview && preview.startsWith("blob:")) {
+              URL.revokeObjectURL(preview);
+            }
+            setMode("upload");
+            setUrl("");
+            setPreview(null);
+          }}
+          className={`px-3 py-1.5 text-xs font-medium transition ${
+            mode === "upload"
+              ? "text-bitebox border-b-2 border-bitebox"
+              : "text-slate-400 hover:text-slate-200"
+          }`}
+        >
+          Télécharger un fichier
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            if (preview && preview.startsWith("blob:")) {
+              URL.revokeObjectURL(preview);
+            }
+            setMode("url");
+            setFile(null);
+            setPreview(null);
+          }}
+          className={`px-3 py-1.5 text-xs font-medium transition ${
+            mode === "url"
+              ? "text-bitebox border-b-2 border-bitebox"
+              : "text-slate-400 hover:text-slate-200"
+          }`}
+        >
+          Entrer une URL
+        </button>
+      </div>
+
+      {mode === "upload" && (
+        <div className="space-y-2">
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/jpg,image/webp"
+            onChange={(e) => {
+              const newFile = e.target.files?.[0] ?? null;
+              if (preview && preview.startsWith("blob:")) {
+                URL.revokeObjectURL(preview);
+              }
+              setFile(newFile);
+              setUrl("");
+              if (newFile) {
+                const newPreview = URL.createObjectURL(newFile);
+                setPreview(newPreview);
+              } else {
+                setPreview(null);
+              }
+            }}
+            className="text-xs text-slate-300"
+          />
+          <p className="text-[11px] text-slate-500">
+            Formats acceptés : PNG, JPG, JPEG, WEBP (max 5MB)
+          </p>
+        </div>
+      )}
+
+      {mode === "url" && (
+        <div className="space-y-2">
+          <input
+            type="url"
+            value={url}
+            onChange={(e) => {
+              const newUrl = e.target.value;
+              setUrl(newUrl);
+              setFile(null);
+              if (newUrl && validateImageUrl(newUrl)) {
+                setPreview(newUrl);
+              } else {
+                setPreview(null);
+              }
+            }}
+            placeholder="https://exemple.com/image.png"
+            className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
+          />
+          <p className="text-[11px] text-slate-500">
+            URL commençant par http:// ou https:// avec extension .png, .jpg,
+            .jpeg ou .webp
+          </p>
+        </div>
+      )}
+
+      {preview && (
+        <div className="mt-3 p-3 bg-slate-950 rounded-lg border border-slate-700">
+          <p className="text-xs text-slate-400 mb-2">Aperçu :</p>
+          <img
+            src={preview}
+            alt="Aperçu logo"
+            className="max-w-full h-32 object-contain rounded"
+            onError={() => setPreview(null)}
+          />
+        </div>
+      )}
+    </div>
+  );
+
   const selectedRestaurant = restaurants.find(
     (r) => r.id === selectedRestaurantId
   ) || null;
@@ -420,46 +540,97 @@ export default function AdminRestaurantsContent() {
         />
       </div>
 
-      {/* Panel droite - Détails/Édition/Création */}
-      <RestaurantDetailsPanel
-        selectedRestaurant={selectedRestaurant}
-        viewMode={viewMode}
-        onViewModeChange={setViewMode}
-        name={name}
-        setName={setName}
-        description={description}
-        setDescription={setDescription}
-        logoFile={logoFile}
-        setLogoFile={setLogoFile}
-        logoUrl={logoUrl}
-        setLogoUrl={setLogoUrl}
-        logoImageMode={logoImageMode}
-        setLogoImageMode={setLogoImageMode}
-        logoPreview={logoPreview}
-        setLogoPreview={setLogoPreview}
-        saving={saving}
-        onCreate={handleCreate}
-        onResetCreateForm={resetCreateForm}
-        editingRestaurant={editingRestaurant}
-        editName={editName}
-        setEditName={setEditName}
-        editDescription={editDescription}
-        setEditDescription={setEditDescription}
-        editLogoFile={editLogoFile}
-        setEditLogoFile={setEditLogoFile}
-        editLogoUrl={editLogoUrl}
-        setEditLogoUrl={setEditLogoUrl}
-        editLogoImageMode={editLogoImageMode}
-        setEditLogoImageMode={setEditLogoImageMode}
-        editLogoPreview={editLogoPreview}
-        setEditLogoPreview={setEditLogoPreview}
-        onUpdate={handleUpdateRestaurant}
-        onCancelEdit={cancelEditRestaurant}
-        validateImageUrl={validateImageUrl}
-        validateImageFile={validateImageFile}
-        error={error}
-      />
+      {/* Panel droite - Détails/Édition/Carte ou Création */}
+      {showCreateForm ? (
+        <div className="flex-1 flex flex-col h-screen bg-slate-950 overflow-y-auto">
+          <div className="p-6">
+            <div className="bg-slate-900/80 rounded-2xl p-6 shadow-lg border border-slate-800/60 space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold">Ajouter une nouvelle enseigne</h2>
+                <button
+                  onClick={resetCreateForm}
+                  className="text-xs text-slate-400 hover:text-slate-100"
+                >
+                  ✕ Fermer
+                </button>
+              </div>
+
+              <form onSubmit={handleCreate} className="space-y-4">
+                <div className="space-y-1">
+                  <label className="text-xs text-slate-300">Nom de l'enseigne</label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
+                    placeholder="Ex : Black & White Burger"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs text-slate-300">
+                    Description (optionnel)
+                  </label>
+                  <textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
+                    rows={3}
+                    placeholder="Quelques mots sur l'enseigne..."
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs text-slate-300">Logo (optionnel)</label>
+                  {renderLogoInput(
+                    logoImageMode,
+                    setLogoImageMode,
+                    logoFile,
+                    setLogoFile,
+                    logoUrl,
+                    setLogoUrl,
+                    logoPreview,
+                    setLogoPreview
+                  )}
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="inline-flex items-center justify-center rounded-md bg-bitebox px-4 py-2 text-sm font-semibold text-white shadow hover:bg-bitebox-dark disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {saving ? "Création en cours..." : "Créer l'enseigne"}
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <RestaurantDetailsPanel
+          selectedRestaurant={selectedRestaurant}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          editingRestaurant={editingRestaurant}
+          editName={editName}
+          setEditName={setEditName}
+          editDescription={editDescription}
+          setEditDescription={setEditDescription}
+          editLogoFile={editLogoFile}
+          setEditLogoFile={setEditLogoFile}
+          editLogoUrl={editLogoUrl}
+          setEditLogoUrl={setEditLogoUrl}
+          editLogoImageMode={editLogoImageMode}
+          setEditLogoImageMode={setEditLogoImageMode}
+          editLogoPreview={editLogoPreview}
+          setEditLogoPreview={setEditLogoPreview}
+          onUpdate={handleUpdateRestaurant}
+          onCancelEdit={cancelEditRestaurant}
+          validateImageUrl={validateImageUrl}
+          validateImageFile={validateImageFile}
+          error={error}
+          onError={setError}
+        />
+      )}
     </div>
   );
 }
-

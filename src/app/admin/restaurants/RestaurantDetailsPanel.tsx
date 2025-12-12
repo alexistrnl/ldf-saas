@@ -2,29 +2,14 @@
 
 import { useRouter } from "next/navigation";
 import { Restaurant } from "./types";
+import RestaurantMenuTab from "./RestaurantMenuTab";
 
-type ViewMode = "details" | "edit" | "create";
+type ViewMode = "overview" | "edit" | "menu";
 
 type RestaurantDetailsPanelProps = {
   selectedRestaurant: Restaurant | null;
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
-  // Props pour la création
-  name: string;
-  setName: (name: string) => void;
-  description: string;
-  setDescription: (description: string) => void;
-  logoFile: File | null;
-  setLogoFile: (file: File | null) => void;
-  logoUrl: string;
-  setLogoUrl: (url: string) => void;
-  logoImageMode: "upload" | "url";
-  setLogoImageMode: (mode: "upload" | "url") => void;
-  logoPreview: string | null;
-  setLogoPreview: (preview: string | null) => void;
-  saving: boolean;
-  onCreate: (e: React.FormEvent) => void;
-  onResetCreateForm: () => void;
   // Props pour l'édition
   editingRestaurant: Restaurant | null;
   editName: string;
@@ -45,27 +30,13 @@ type RestaurantDetailsPanelProps = {
   validateImageUrl: (url: string) => boolean;
   validateImageFile: (file: File | null) => string | null;
   error: string | null;
+  onError: (error: string | null) => void;
 };
 
 export default function RestaurantDetailsPanel({
   selectedRestaurant,
   viewMode,
   onViewModeChange,
-  name,
-  setName,
-  description,
-  setDescription,
-  logoFile,
-  setLogoFile,
-  logoUrl,
-  setLogoUrl,
-  logoImageMode,
-  setLogoImageMode,
-  logoPreview,
-  setLogoPreview,
-  saving,
-  onCreate,
-  onResetCreateForm,
   editingRestaurant,
   editName,
   setEditName,
@@ -84,18 +55,13 @@ export default function RestaurantDetailsPanel({
   validateImageUrl,
   validateImageFile,
   error,
+  onError,
 }: RestaurantDetailsPanelProps) {
   const router = useRouter();
 
   // Déterminer le mode d'affichage actuel
   const currentMode: ViewMode =
-    viewMode === "create"
-      ? "create"
-      : editingRestaurant
-      ? "edit"
-      : selectedRestaurant
-      ? "details"
-      : "details";
+    editingRestaurant ? "edit" : selectedRestaurant ? viewMode : "overview";
 
   const renderLogoInput = (
     mode: "upload" | "url",
@@ -217,49 +183,46 @@ export default function RestaurantDetailsPanel({
     <div className="flex-1 flex flex-col h-screen bg-slate-950 overflow-y-auto">
       <div className="p-6 space-y-6">
         {/* Header avec onglets */}
-        <div className="flex items-center justify-between border-b border-slate-800">
-          <div className="flex gap-4">
-            {selectedRestaurant && (
-              <>
-                <button
-                  onClick={() => onViewModeChange("details")}
-                  className={`px-4 py-2 text-sm font-medium transition ${
-                    currentMode === "details"
-                      ? "text-bitebox border-b-2 border-bitebox"
-                      : "text-slate-400 hover:text-slate-200"
-                  }`}
-                >
-                  Détails
-                </button>
-                <button
-                  onClick={() => {
-                    onViewModeChange("edit");
-                  }}
-                  className={`px-4 py-2 text-sm font-medium transition ${
-                    currentMode === "edit"
-                      ? "text-bitebox border-b-2 border-bitebox"
-                      : "text-slate-400 hover:text-slate-200"
-                  }`}
-                >
-                  Modifier
-                </button>
-              </>
-            )}
-            <button
-              onClick={() => {
-                onResetCreateForm();
-                onViewModeChange("create");
-              }}
-              className={`px-4 py-2 text-sm font-medium transition ${
-                currentMode === "create"
-                  ? "text-bitebox border-b-2 border-bitebox"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              Créer
-            </button>
+        {selectedRestaurant && (
+          <div className="flex items-center justify-between border-b border-slate-800">
+            <div className="flex gap-4">
+              <button
+                onClick={() => onViewModeChange("overview")}
+                className={`px-4 py-2 text-sm font-medium transition ${
+                  currentMode === "overview"
+                    ? "text-bitebox border-b-2 border-bitebox"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                Aperçu
+              </button>
+              <button
+                onClick={() => {
+                  onViewModeChange("edit");
+                }}
+                className={`px-4 py-2 text-sm font-medium transition ${
+                  currentMode === "edit"
+                    ? "text-bitebox border-b-2 border-bitebox"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                Modifier
+              </button>
+              <button
+                onClick={() => {
+                  onViewModeChange("menu");
+                }}
+                className={`px-4 py-2 text-sm font-medium transition ${
+                  currentMode === "menu"
+                    ? "text-bitebox border-b-2 border-bitebox"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                Carte
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         {error && (
           <div className="rounded-md bg-red-500/10 border border-red-500/40 px-3 py-2 text-sm text-red-300">
@@ -268,60 +231,6 @@ export default function RestaurantDetailsPanel({
         )}
 
         {/* Contenu selon le mode */}
-        {currentMode === "create" && (
-          <div className="bg-slate-900/80 rounded-2xl p-6 shadow-lg border border-slate-800/60 space-y-4">
-            <h2 className="text-lg font-semibold">Ajouter une nouvelle enseigne</h2>
-
-            <form onSubmit={onCreate} className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-xs text-slate-300">Nom de l'enseigne</label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
-                  placeholder="Ex : Black & White Burger"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs text-slate-300">
-                  Description (optionnel)
-                </label>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
-                  rows={3}
-                  placeholder="Quelques mots sur l'enseigne..."
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs text-slate-300">Logo (optionnel)</label>
-                {renderLogoInput(
-                  logoImageMode,
-                  setLogoImageMode,
-                  logoFile,
-                  setLogoFile,
-                  logoUrl,
-                  setLogoUrl,
-                  logoPreview,
-                  setLogoPreview
-                )}
-              </div>
-
-              <button
-                type="submit"
-                disabled={saving}
-                className="inline-flex items-center justify-center rounded-md bg-bitebox px-4 py-2 text-sm font-semibold text-white shadow hover:bg-bitebox-dark disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {saving ? "Création en cours..." : "Créer l'enseigne"}
-              </button>
-            </form>
-          </div>
-        )}
-
         {currentMode === "edit" && editingRestaurant && (
           <div className="bg-slate-900/80 rounded-2xl p-6 shadow-lg border border-slate-700/70 space-y-4">
             <div className="flex items-center justify-between">
@@ -384,7 +293,11 @@ export default function RestaurantDetailsPanel({
           </div>
         )}
 
-        {currentMode === "details" && !selectedRestaurant && (
+        {currentMode === "menu" && selectedRestaurant && (
+          <RestaurantMenuTab restaurant={selectedRestaurant} onError={onError} />
+        )}
+
+        {currentMode === "overview" && !selectedRestaurant && (
           <div className="flex items-center justify-center h-full">
             <div className="text-center space-y-2">
               <p className="text-lg text-slate-400">Sélectionne une enseigne</p>
@@ -395,7 +308,7 @@ export default function RestaurantDetailsPanel({
           </div>
         )}
 
-        {currentMode === "details" && selectedRestaurant && (
+        {currentMode === "overview" && selectedRestaurant && (
           <div className="bg-slate-900/80 rounded-2xl p-6 shadow-lg border border-slate-800/60 space-y-4">
             <div className="flex items-start gap-4">
               {selectedRestaurant.logo_url && (
@@ -429,15 +342,6 @@ export default function RestaurantDetailsPanel({
               >
                 Voir la page publique
               </button>
-              <button
-                onClick={() => {
-                  // Rediriger vers la page admin avec le paramètre manage
-                  window.location.href = `/admin/restaurants?manage=${selectedRestaurant.id}`;
-                }}
-                className="px-4 py-2 text-sm rounded-lg bg-bitebox text-white hover:bg-bitebox-dark transition"
-              >
-                Gérer la carte
-              </button>
             </div>
           </div>
         )}
@@ -445,4 +349,3 @@ export default function RestaurantDetailsPanel({
     </div>
   );
 }
-
