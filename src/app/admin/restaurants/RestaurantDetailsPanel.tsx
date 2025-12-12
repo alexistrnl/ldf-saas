@@ -278,114 +278,114 @@ export default function RestaurantDetailsPanel({
 
             {currentMode === "edit" && selectedRestaurant && editingRestaurant && (
               <div className="bg-slate-900/80 rounded-2xl p-6 shadow-lg border border-slate-700/70 space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">
-                Modifier l'enseigne : {editingRestaurant.name}
-              </h2>
-              <button
-                type="button"
-                onClick={onCancelEdit}
-                className="text-xs text-slate-400 hover:text-slate-100"
-              >
-                Annuler
-              </button>
-            </div>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-semibold">
+                    Modifier l'enseigne : {editingRestaurant.name}
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={onCancelEdit}
+                    className="text-xs text-slate-400 hover:text-slate-100"
+                  >
+                    Annuler
+                  </button>
+                </div>
 
-            <form onSubmit={onUpdate} className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-xs text-slate-300">Nom de l'enseigne</label>
-                <input
-                  type="text"
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
-                />
+                <form onSubmit={onUpdate} className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="text-xs text-slate-300">Nom de l'enseigne</label>
+                    <input
+                      type="text"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs text-slate-300">
+                      Description (optionnel)
+                    </label>
+                    <textarea
+                      value={editDescription}
+                      onChange={(e) => setEditDescription(e.target.value)}
+                      className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
+                      rows={3}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs text-slate-300">Logo (optionnel)</label>
+                    {renderLogoInput(
+                      editLogoImageMode,
+                      setEditLogoImageMode,
+                      editLogoFile,
+                      setEditLogoFile,
+                      editLogoUrl,
+                      setEditLogoUrl,
+                      editLogoPreview,
+                      setEditLogoPreview
+                    )}
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="inline-flex items-center justify-center rounded-md bg-bitebox px-4 py-2 text-sm font-semibold text-white shadow hover:bg-bitebox-dark"
+                  >
+                    Enregistrer les modifications
+                  </button>
+                </form>
               </div>
-
-              <div className="space-y-1">
-                <label className="text-xs text-slate-300">
-                  Description (optionnel)
-                </label>
-                <textarea
-                  value={editDescription}
-                  onChange={(e) => setEditDescription(e.target.value)}
-                  className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-bitebox"
-                  rows={3}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs text-slate-300">Logo (optionnel)</label>
-                {renderLogoInput(
-                  editLogoImageMode,
-                  setEditLogoImageMode,
-                  editLogoFile,
-                  setEditLogoFile,
-                  editLogoUrl,
-                  setEditLogoUrl,
-                  editLogoPreview,
-                  setEditLogoPreview
-                )}
-              </div>
-
-              <button
-                type="submit"
-                className="inline-flex items-center justify-center rounded-md bg-bitebox px-4 py-2 text-sm font-semibold text-white shadow hover:bg-bitebox-dark"
-              >
-                Enregistrer les modifications
-              </button>
-            </form>
-          </div>
-        )}
+            )}
 
             {currentMode === "overview" && !selectedRestaurant && (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center space-y-2">
-              <p className="text-lg text-slate-400">Sélectionne une enseigne</p>
-              <p className="text-sm text-slate-500">
-                Choisis une enseigne dans la liste à gauche pour voir ses détails
-              </p>
-            </div>
-          </div>
-        )}
-
-        {currentMode === "overview" && selectedRestaurant && (
-          <div className="bg-slate-900/80 rounded-2xl p-6 shadow-lg border border-slate-800/60 space-y-4">
-            <div className="flex items-start gap-4">
-              {selectedRestaurant.logo_url && (
-                <img
-                  src={selectedRestaurant.logo_url}
-                  alt={selectedRestaurant.name}
-                  className="h-20 w-20 rounded-lg object-cover"
-                />
-              )}
-              <div className="flex-1">
-                <h2 className="text-xl font-semibold">{selectedRestaurant.name}</h2>
-                {selectedRestaurant.slug && (
-                  <p className="text-sm text-slate-400 mt-1">
-                    /restaurants/{selectedRestaurant.slug}
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center space-y-2">
+                  <p className="text-lg text-slate-400">Sélectionne une enseigne</p>
+                  <p className="text-sm text-slate-500">
+                    Choisis une enseigne dans la liste à gauche pour voir ses détails
                   </p>
-                )}
-                {selectedRestaurant.description && (
-                  <p className="text-sm text-slate-300 mt-2">
-                    {selectedRestaurant.description}
-                  </p>
-                )}
+                </div>
               </div>
-            </div>
+            )}
 
-            <div className="flex gap-2 pt-4 border-t border-slate-800">
-              <button
-                onClick={() => {
-                  router.push(`/restaurants/${selectedRestaurant.slug}`);
-                }}
-                className="px-4 py-2 text-sm rounded-lg border border-slate-700 hover:bg-slate-800 transition"
-              >
-                Voir la page publique
-              </button>
-            </div>
-          </div>
-        )}
+            {currentMode === "overview" && selectedRestaurant && (
+              <div className="bg-slate-900/80 rounded-2xl p-6 shadow-lg border border-slate-800/60 space-y-4">
+                <div className="flex items-start gap-4">
+                  {selectedRestaurant.logo_url && (
+                    <img
+                      src={selectedRestaurant.logo_url}
+                      alt={selectedRestaurant.name}
+                      className="h-20 w-20 rounded-lg object-cover"
+                    />
+                  )}
+                  <div className="flex-1">
+                    <h2 className="text-xl font-semibold">{selectedRestaurant.name}</h2>
+                    {selectedRestaurant.slug && (
+                      <p className="text-sm text-slate-400 mt-1">
+                        /restaurants/{selectedRestaurant.slug}
+                      </p>
+                    )}
+                    {selectedRestaurant.description && (
+                      <p className="text-sm text-slate-300 mt-2">
+                        {selectedRestaurant.description}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-4 border-t border-slate-800">
+                  <button
+                    onClick={() => {
+                      router.push(`/restaurants/${selectedRestaurant.slug}`);
+                    }}
+                    className="px-4 py-2 text-sm rounded-lg border border-slate-700 hover:bg-slate-800 transition"
+                  >
+                    Voir la page publique
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
