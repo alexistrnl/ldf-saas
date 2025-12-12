@@ -8,9 +8,6 @@ type RestaurantListPanelProps = {
   onSearchChange: (query: string) => void;
   selectedRestaurantId: string | null;
   onSelectRestaurant: (restaurant: Restaurant) => void;
-  onEditRestaurant: (restaurant: Restaurant) => void;
-  onDeleteRestaurant: (restaurant: Restaurant) => void;
-  onManageMenu: (restaurant: Restaurant) => void;
   onCreateNew: () => void;
   loading?: boolean;
 };
@@ -21,9 +18,6 @@ export default function RestaurantListPanel({
   onSearchChange,
   selectedRestaurantId,
   onSelectRestaurant,
-  onEditRestaurant,
-  onDeleteRestaurant,
-  onManageMenu,
   onCreateNew,
   loading = false,
 }: RestaurantListPanelProps) {
@@ -83,9 +77,8 @@ export default function RestaurantListPanel({
                 <div
                   key={restaurant.id}
                   onClick={() => onSelectRestaurant(restaurant)}
-                  onDoubleClick={() => onEditRestaurant(restaurant)}
                   className={`
-                    group relative p-3 rounded-lg cursor-pointer transition-all
+                    p-3 rounded-lg cursor-pointer transition-all
                     ${
                       isSelected
                         ? "bg-bitebox/20 border border-bitebox/50"
@@ -115,40 +108,6 @@ export default function RestaurantListPanel({
                         </p>
                       )}
                     </div>
-                  </div>
-
-                  {/* Actions rapides au hover */}
-                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onManageMenu(restaurant);
-                      }}
-                      className="p-1.5 rounded bg-slate-700/80 hover:bg-slate-600 text-xs text-slate-300"
-                      title="Gérer la carte"
-                    >
-                      🍽️
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onEditRestaurant(restaurant);
-                      }}
-                      className="p-1.5 rounded bg-bitebox/80 hover:bg-bitebox text-xs text-white"
-                      title="Modifier"
-                    >
-                      ✏️
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDeleteRestaurant(restaurant);
-                      }}
-                      className="p-1.5 rounded bg-red-500/80 hover:bg-red-500 text-xs text-white"
-                      title="Supprimer"
-                    >
-                      🗑️
-                    </button>
                   </div>
                 </div>
               );

@@ -530,9 +530,6 @@ export default function AdminRestaurantsContent() {
           onSearchChange={setSearchQuery}
           selectedRestaurantId={selectedRestaurantId}
           onSelectRestaurant={handleSelectRestaurant}
-          onEditRestaurant={startEditRestaurant}
-          onDeleteRestaurant={handleDelete}
-          onManageMenu={handleManageMenu}
           onCreateNew={handleCreateNew}
           loading={loading}
         />
@@ -609,6 +606,7 @@ export default function AdminRestaurantsContent() {
           viewMode={viewMode}
           onViewModeChange={setViewMode}
           editingRestaurant={editingRestaurant}
+          setEditingRestaurant={setEditingRestaurant}
           editName={editName}
           setEditName={setEditName}
           editDescription={editDescription}

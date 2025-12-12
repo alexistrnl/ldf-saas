@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Restaurant, ViewMode } from "./types";
 import RestaurantMenuTab from "./RestaurantMenuTab";
@@ -10,6 +11,7 @@ type RestaurantDetailsPanelProps = {
   onViewModeChange: (mode: ViewMode) => void;
   // Props pour l'édition
   editingRestaurant: Restaurant | null;
+  setEditingRestaurant: (restaurant: Restaurant | null) => void;
   editName: string;
   setEditName: (name: string) => void;
   editDescription: string;
@@ -36,6 +38,7 @@ export default function RestaurantDetailsPanel({
   viewMode,
   onViewModeChange,
   editingRestaurant,
+  setEditingRestaurant,
   editName,
   setEditName,
   editDescription,
@@ -57,9 +60,25 @@ export default function RestaurantDetailsPanel({
 }: RestaurantDetailsPanelProps) {
   const router = useRouter();
 
+  // Synchroniser les states quand selectedRestaurant change et qu'on est en mode edit
+  useEffect(() => {
+    if (viewMode === "edit" && selectedRestaurant && !editingRestaurant) {
+      // Initialiser l'édition si on passe en mode edit
+      setEditingRestaurant(selectedRestaurant);
+      setEditName(selectedRestaurant.name);
+      setEditDescription(selectedRestaurant.description || "");
+      setEditLogoFile(null);
+      setEditLogoUrl("");
+      setEditLogoImageMode("upload");
+      setEditLogoPreview(selectedRestaurant.logo_url);
+    } else if (viewMode !== "edit" && editingRestaurant) {
+      // Réinitialiser si on quitte le mode edit
+      setEditingRestaurant(null);
+    }
+  }, [viewMode, selectedRestaurant, editingRestaurant, setEditingRestaurant, setEditName, setEditDescription, setEditLogoFile, setEditLogoUrl, setEditLogoImageMode, setEditLogoPreview]);
+
   // Déterminer le mode d'affichage actuel
-  const currentMode: ViewMode =
-    editingRestaurant ? "edit" : selectedRestaurant ? viewMode : "overview";
+  const currentMode: ViewMode = viewMode;
 
   const renderLogoInput = (
     mode: "upload" | "url",
@@ -196,7 +215,16 @@ export default function RestaurantDetailsPanel({
               </button>
               <button
                 onClick={() => {
-                  onViewModeChange("edit");
+                  if (selectedRestaurant) {
+                    setEditingRestaurant(selectedRestaurant);
+                    setEditName(selectedRestaurant.name);
+                    setEditDescription(selectedRestaurant.description || "");
+                    setEditLogoFile(null);
+                    setEditLogoUrl("");
+                    setEditLogoImageMode("upload");
+                    setEditLogoPreview(selectedRestaurant.logo_url);
+                    onViewModeChange("edit");
+                  }
                 }}
                 className={`px-4 py-2 text-sm font-medium transition ${
                   currentMode === "edit"
@@ -229,7 +257,18 @@ export default function RestaurantDetailsPanel({
         )}
 
         {/* Contenu selon le mode */}
-        {currentMode === "edit" && editingRestaurant && (
+        {currentMode === "edit" && !selectedRestaurant && (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center space-y-2">
+              <p className="text-lg text-slate-400">Sélectionne une enseigne</p>
+              <p className="text-sm text-slate-500">
+                Choisis une enseigne dans la liste à gauche pour la modifier
+              </p>
+            </div>
+          </div>
+        )}
+
+        {currentMode === "edit" && selectedRestaurant && editingRestaurant && (
           <div className="bg-slate-900/80 rounded-2xl p-6 shadow-lg border border-slate-700/70 space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold">
