@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { Restaurant } from "./types";
+import { Restaurant, ViewMode } from "./types";
 import RestaurantListPanel from "./RestaurantListPanel";
 import RestaurantDetailsPanel from "./RestaurantDetailsPanel";
 
@@ -14,8 +14,6 @@ function slugify(name: string) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 }
-
-type ViewMode = "overview" | "edit" | "menu";
 
 export default function AdminRestaurantsContent() {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);

@@ -25,3 +25,5 @@ export type DishCategory = {
   order_index: number;
 };
 
+export type ViewMode = "overview" | "edit" | "menu";
+

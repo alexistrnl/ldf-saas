@@ -1,10 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Restaurant } from "./types";
+import { Restaurant, ViewMode } from "./types";
 import RestaurantMenuTab from "./RestaurantMenuTab";
-
-type ViewMode = "overview" | "edit" | "menu";
 
 type RestaurantDetailsPanelProps = {
   selectedRestaurant: Restaurant | null;
