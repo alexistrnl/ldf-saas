@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { Restaurant } from "./types";
 import RestaurantListPanel from "./RestaurantListPanel";
