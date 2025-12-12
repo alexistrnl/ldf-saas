@@ -5,91 +5,30 @@ import { useRouter } from "next/navigation";
 import { Restaurant, ViewMode } from "./types";
 import RestaurantMenuTab from "./RestaurantMenuTab";
 
-type RestaurantDetailsPanelProps = {
-  selectedRestaurant: Restaurant | null;
-  viewMode: ViewMode;
-  onViewModeChange: (mode: ViewMode) => void;
-  // Props pour l'édition
-  editingRestaurant: Restaurant | null;
-  setEditingRestaurant: (restaurant: Restaurant | null) => void;
-  editName: string;
-  setEditName: (name: string) => void;
-  editDescription: string;
-  setEditDescription: (description: string) => void;
-  editLogoFile: File | null;
-  setEditLogoFile: (file: File | null) => void;
-  editLogoUrl: string;
-  setEditLogoUrl: (url: string) => void;
-  editLogoImageMode: "upload" | "url";
-  setEditLogoImageMode: (mode: "upload" | "url") => void;
-  editLogoPreview: string | null;
-  setEditLogoPreview: (preview: string | null) => void;
-  onUpdate: (e: React.FormEvent) => void;
-  onCancelEdit: () => void;
-  // Validation
+type LogoInputProps = {
+  mode: "upload" | "url";
+  setMode: (m: "upload" | "url") => void;
+  file: File | null;
+  setFile: (f: File | null) => void;
+  url: string;
+  setUrl: (u: string) => void;
+  preview: string | null;
+  setPreview: (p: string | null) => void;
   validateImageUrl: (url: string) => boolean;
-  validateImageFile: (file: File | null) => string | null;
-  error: string | null;
-  onError: (error: string | null) => void;
 };
 
-export default function RestaurantDetailsPanel({
-  selectedRestaurant,
-  viewMode,
-  onViewModeChange,
-  editingRestaurant,
-  setEditingRestaurant,
-  editName,
-  setEditName,
-  editDescription,
-  setEditDescription,
-  editLogoFile,
-  setEditLogoFile,
-  editLogoUrl,
-  setEditLogoUrl,
-  editLogoImageMode,
-  setEditLogoImageMode,
-  editLogoPreview,
-  setEditLogoPreview,
-  onUpdate,
-  onCancelEdit,
+function LogoInput({
+  mode,
+  setMode,
+  file,
+  setFile,
+  url,
+  setUrl,
+  preview,
+  setPreview,
   validateImageUrl,
-  validateImageFile,
-  error,
-  onError,
-}: RestaurantDetailsPanelProps) {
-  const router = useRouter();
-
-  // Synchroniser les states quand selectedRestaurant change et qu'on est en mode edit
-  useEffect(() => {
-    if (viewMode === "edit" && selectedRestaurant && !editingRestaurant) {
-      // Initialiser l'édition si on passe en mode edit
-      setEditingRestaurant(selectedRestaurant);
-      setEditName(selectedRestaurant.name);
-      setEditDescription(selectedRestaurant.description || "");
-      setEditLogoFile(null);
-      setEditLogoUrl("");
-      setEditLogoImageMode("upload");
-      setEditLogoPreview(selectedRestaurant.logo_url);
-    } else if (viewMode !== "edit" && editingRestaurant) {
-      // Réinitialiser si on quitte le mode edit
-      setEditingRestaurant(null);
-    }
-  }, [viewMode, selectedRestaurant, editingRestaurant, setEditingRestaurant, setEditName, setEditDescription, setEditLogoFile, setEditLogoUrl, setEditLogoImageMode, setEditLogoPreview]);
-
-  // Déterminer le mode d'affichage actuel
-  const currentMode: ViewMode = viewMode;
-
-  const renderLogoInput = (
-    mode: "upload" | "url",
-    setMode: (m: "upload" | "url") => void,
-    file: File | null,
-    setFile: (f: File | null) => void,
-    url: string,
-    setUrl: (u: string) => void,
-    preview: string | null,
-    setPreview: (p: string | null) => void
-  ) => (
+}: LogoInputProps) {
+  return (
     <div className="space-y-2">
       <div className="flex gap-2 border-b border-slate-700">
         <button
@@ -195,10 +134,79 @@ export default function RestaurantDetailsPanel({
       )}
     </div>
   );
+}
+
+type RestaurantDetailsPanelProps = {
+  selectedRestaurant: Restaurant | null;
+  viewMode: ViewMode;
+  onViewModeChange: (mode: ViewMode) => void;
+  editingRestaurant: Restaurant | null;
+  setEditingRestaurant: (restaurant: Restaurant | null) => void;
+  editName: string;
+  setEditName: (name: string) => void;
+  editDescription: string;
+  setEditDescription: (description: string) => void;
+  editLogoFile: File | null;
+  setEditLogoFile: (file: File | null) => void;
+  editLogoUrl: string;
+  setEditLogoUrl: (url: string) => void;
+  editLogoImageMode: "upload" | "url";
+  setEditLogoImageMode: (mode: "upload" | "url") => void;
+  editLogoPreview: string | null;
+  setEditLogoPreview: (preview: string | null) => void;
+  onUpdate: (e: React.FormEvent) => void;
+  onCancelEdit: () => void;
+  validateImageUrl: (url: string) => boolean;
+  validateImageFile: (file: File | null) => string | null;
+  error: string | null;
+  onError: (error: string | null) => void;
+};
+
+export default function RestaurantDetailsPanel({
+  selectedRestaurant,
+  viewMode,
+  onViewModeChange,
+  editingRestaurant,
+  setEditingRestaurant,
+  editName,
+  setEditName,
+  editDescription,
+  setEditDescription,
+  editLogoFile,
+  setEditLogoFile,
+  editLogoUrl,
+  setEditLogoUrl,
+  editLogoImageMode,
+  setEditLogoImageMode,
+  editLogoPreview,
+  setEditLogoPreview,
+  onUpdate,
+  onCancelEdit,
+  validateImageUrl,
+  validateImageFile,
+  error,
+  onError,
+}: RestaurantDetailsPanelProps) {
+  const router = useRouter();
+
+  useEffect(() => {
+    if (viewMode === "edit" && selectedRestaurant && !editingRestaurant) {
+      setEditingRestaurant(selectedRestaurant);
+      setEditName(selectedRestaurant.name);
+      setEditDescription(selectedRestaurant.description || "");
+      setEditLogoFile(null);
+      setEditLogoUrl("");
+      setEditLogoImageMode("upload");
+      setEditLogoPreview(selectedRestaurant.logo_url);
+    } else if (viewMode !== "edit" && editingRestaurant) {
+      setEditingRestaurant(null);
+    }
+  }, [viewMode, selectedRestaurant, editingRestaurant, setEditingRestaurant, setEditName, setEditDescription, setEditLogoFile, setEditLogoUrl, setEditLogoImageMode, setEditLogoPreview]);
+
+  const currentMode: ViewMode = viewMode;
 
   return (
     <div className="flex-1 flex flex-col h-full bg-slate-950 overflow-hidden">
-      {/* Header avec onglets - Fixe en haut */}
       {selectedRestaurant && (
         <div className="flex-shrink-0 px-6 pt-6 pb-4 border-b border-slate-800">
           <div className="flex items-center justify-between">
@@ -248,9 +256,9 @@ export default function RestaurantDetailsPanel({
               </button>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-      {/* Contenu scrollable */}
       <div className="flex-1 overflow-y-auto min-h-0">
         {currentMode === "menu" && selectedRestaurant ? (
           <div className="h-full">
@@ -264,7 +272,6 @@ export default function RestaurantDetailsPanel({
               </div>
             )}
 
-            {/* Contenu selon le mode */}
             {currentMode === "edit" && !selectedRestaurant && (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center space-y-2">
@@ -316,16 +323,17 @@ export default function RestaurantDetailsPanel({
 
                   <div className="space-y-2">
                     <label className="text-xs text-slate-300">Logo (optionnel)</label>
-                    {renderLogoInput(
-                      editLogoImageMode,
-                      setEditLogoImageMode,
-                      editLogoFile,
-                      setEditLogoFile,
-                      editLogoUrl,
-                      setEditLogoUrl,
-                      editLogoPreview,
-                      setEditLogoPreview
-                    )}
+                    <LogoInput
+                      mode={editLogoImageMode}
+                      setMode={setEditLogoImageMode}
+                      file={editLogoFile}
+                      setFile={setEditLogoFile}
+                      url={editLogoUrl}
+                      setUrl={setEditLogoUrl}
+                      preview={editLogoPreview}
+                      setPreview={setEditLogoPreview}
+                      validateImageUrl={validateImageUrl}
+                    />
                   </div>
 
                   <button
