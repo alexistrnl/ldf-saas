@@ -520,15 +520,83 @@ export default function RestaurantMenuTab({
   };
 
   const getCategoryName = (categoryId: string | null): string => {
-    if (!categoryId) return "Aucune section";
+    if (!categoryId) return "Sans section";
     const category = categories.find((c) => c.id === categoryId);
     return category?.name || "Section inconnue";
   };
 
+  // Grouper et trier les plats par section
+  const getGroupedDishes = () => {
+    // Trier les sections par order_index
+    const sortedCategories = [...categories].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+    
+    // Créer un map de plats groupés par section
+    const grouped = new Map<string | null, Dish[]>();
+    
+    // Initialiser toutes les sections (y compris "Sans section")
+    sortedCategories.forEach((cat) => {
+      grouped.set(cat.id, []);
+    });
+    grouped.set(null, []); // Plats sans section
+    
+    // Grouper les plats
+    dishes.forEach((dish) => {
+      const sectionId = dish.category_id || null;
+      const sectionDishes = grouped.get(sectionId) || [];
+      sectionDishes.push(dish);
+      grouped.set(sectionId, sectionDishes);
+    });
+    
+    // Trier les plats dans chaque section
+    grouped.forEach((sectionDishes, sectionId) => {
+      sectionDishes.sort((a, b) => {
+        // D'abord par position
+        const posA = a.position ?? Number.MAX_SAFE_INTEGER;
+        const posB = b.position ?? Number.MAX_SAFE_INTEGER;
+        if (posA !== posB) return posA - posB;
+        // Sinon par nom
+        return a.name.localeCompare(b.name);
+      });
+    });
+    
+    // Retourner sous forme d'array avec metadata
+    const result: Array<{
+      categoryId: string | null;
+      categoryName: string;
+      dishes: Dish[];
+    }> = [];
+    
+    // D'abord les sections triées
+    sortedCategories.forEach((cat) => {
+      const sectionDishes = grouped.get(cat.id) || [];
+      if (sectionDishes.length > 0 || categories.length === 0) {
+        result.push({
+          categoryId: cat.id,
+          categoryName: cat.name,
+          dishes: sectionDishes,
+        });
+      }
+    });
+    
+    // Puis les plats sans section
+    const noSectionDishes = grouped.get(null) || [];
+    if (noSectionDishes.length > 0) {
+      result.push({
+        categoryId: null,
+        categoryName: "Sans section",
+        dishes: noSectionDishes,
+      });
+    }
+    
+    return result;
+  };
+
+  const groupedDishes = getGroupedDishes();
+
   return (
-    <div className="h-full flex flex-col gap-6 min-h-0 overflow-hidden">
-      {/* Sections */}
-      <div className="flex-[0_1_45%] flex flex-col bg-slate-900/80 rounded-2xl border border-slate-800/60 min-h-0 overflow-hidden">
+    <div className="h-full min-h-0 overflow-hidden flex gap-6">
+      {/* Sections - Colonne gauche */}
+      <div className="w-[360px] flex flex-col min-h-0 overflow-hidden bg-slate-900/80 rounded-2xl border border-slate-800/60">
         <div className="flex-shrink-0 p-6 pb-4">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold">Sections de menu</h3>
@@ -674,8 +742,8 @@ export default function RestaurantMenuTab({
         </div>
       </div>
 
-      {/* Plats */}
-      <div className="flex-1 flex flex-col min-h-0 bg-slate-900/80 rounded-2xl border border-slate-800/60 overflow-hidden">
+      {/* Plats - Colonne droite */}
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-slate-900/80 rounded-2xl border border-slate-800/60">
         <div className="flex-shrink-0 p-6 pb-4">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold">Plats</h3>
@@ -909,85 +977,111 @@ export default function RestaurantMenuTab({
           )}
         </div>
 
-        {loadingDishes ? (
-          <p className="text-sm text-slate-400 px-6">Chargement...</p>
-        ) : dishes.length === 0 ? (
-          <p className="text-sm text-slate-400 px-6">Aucun plat pour l'instant.</p>
-        ) : (
-          <div className="flex-1 overflow-y-auto min-h-0 px-6 pb-6">
-            <div className="space-y-3">
-              {dishes.map((dish, index) => (
-                <div
-                  key={dish.id}
-                  className="flex items-start gap-4 p-4 bg-slate-950/70 rounded-lg border border-slate-800"
-                >
-                  {dish.image_url && (
-                    <img
-                      src={dish.image_url}
-                      alt={dish.name}
-                      className="w-20 h-20 rounded-lg object-cover flex-shrink-0"
-                    />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1">
-                        <h4 className="text-sm font-semibold">{dish.name}</h4>
-                        {dish.description && (
-                          <p className="text-xs text-slate-400 mt-1">{dish.description}</p>
-                        )}
-                        <div className="flex items-center gap-2 mt-2">
-                          <span className="text-xs text-slate-500">
-                            {getCategoryName(dish.category_id)}
-                          </span>
-                          {dish.is_signature && (
-                            <span className="text-xs px-2 py-0.5 bg-bitebox/90 text-white rounded-full">
-                              Signature
-                            </span>
-                          )}
-                          {dish.is_limited_edition && (
-                            <span className="text-xs px-2 py-0.5 bg-amber-500/90 text-white rounded-full">
-                              Édition limitée
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <button
-                          onClick={() => moveDishUp(dish)}
-                          disabled={index === 0}
-                          className="p-1 text-xs disabled:opacity-30"
-                          title="Monter"
-                        >
-                          ↑
-                        </button>
-                        <button
-                          onClick={() => moveDishDown(dish)}
-                          disabled={index === dishes.length - 1}
-                          className="p-1 text-xs disabled:opacity-30"
-                          title="Descendre"
-                        >
-                          ↓
-                        </button>
-                        <button
-                          onClick={() => startEditDish(dish)}
-                          className="px-2 py-1 text-xs bg-slate-700 text-white rounded hover:bg-slate-600"
-                        >
-                          ✏️
-                        </button>
-                        <button
-                          onClick={() => handleDeleteDish(dish)}
-                          className="px-2 py-1 text-xs bg-red-500/80 text-white rounded hover:bg-red-500"
-                        >
-                          🗑️
-                        </button>
-                      </div>
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          {loadingDishes ? (
+            <p className="text-sm text-slate-400 px-6 py-4">Chargement...</p>
+          ) : groupedDishes.length === 0 ? (
+            <p className="text-sm text-slate-400 px-6 py-4">Aucun plat pour l'instant.</p>
+          ) : (
+            <div className="px-6 pb-6 space-y-6">
+              {groupedDishes.map((sectionGroup) => (
+                <div key={sectionGroup.categoryId || "no-section"} className="space-y-3">
+                  {/* En-tête de section */}
+                  <div className="sticky top-0 bg-slate-900/95 backdrop-blur-sm py-2 -mx-6 px-6 border-b border-slate-700/50">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-base font-semibold text-white">
+                        {sectionGroup.categoryName}
+                      </h4>
+                      <span className="text-xs text-slate-400">
+                        {sectionGroup.dishes.length} {sectionGroup.dishes.length === 1 ? "plat" : "plats"}
+                      </span>
                     </div>
+                  </div>
+
+                  {/* Liste des plats de cette section */}
+                  <div className="space-y-2">
+                    {sectionGroup.dishes.map((dish, dishIndex) => {
+                      const sectionDishes = sectionGroup.dishes;
+                      const dishIndexInSection = dishIndex;
+                      return (
+                        <div
+                          key={dish.id}
+                          className="flex items-center gap-3 p-3 bg-slate-950/70 rounded-lg border border-slate-800 hover:border-slate-700 transition"
+                        >
+                          {dish.image_url && (
+                            <img
+                              src={dish.image_url}
+                              alt={dish.name}
+                              className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
+                            />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <h5 className="text-sm font-medium text-white truncate">
+                                  {dish.name}
+                                </h5>
+                                {dish.description && (
+                                  <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">
+                                    {dish.description}
+                                  </p>
+                                )}
+                                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                                  {dish.is_signature && (
+                                    <span className="text-[10px] px-1.5 py-0.5 bg-bitebox/90 text-white rounded">
+                                      Signature
+                                    </span>
+                                  )}
+                                  {dish.is_limited_edition && (
+                                    <span className="text-[10px] px-1.5 py-0.5 bg-amber-500/90 text-white rounded">
+                                      Édition limitée
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1 flex-shrink-0">
+                                <button
+                                  onClick={() => moveDishUp(dish)}
+                                  disabled={dishIndexInSection === 0}
+                                  className="p-1 text-xs text-slate-400 hover:text-white disabled:opacity-20 disabled:cursor-not-allowed"
+                                  title="Monter dans la section"
+                                >
+                                  ↑
+                                </button>
+                                <button
+                                  onClick={() => moveDishDown(dish)}
+                                  disabled={dishIndexInSection === sectionDishes.length - 1}
+                                  className="p-1 text-xs text-slate-400 hover:text-white disabled:opacity-20 disabled:cursor-not-allowed"
+                                  title="Descendre dans la section"
+                                >
+                                  ↓
+                                </button>
+                                <button
+                                  onClick={() => startEditDish(dish)}
+                                  className="px-2 py-1 text-xs bg-slate-700 text-white rounded hover:bg-slate-600"
+                                  title="Modifier"
+                                >
+                                  ✏️
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteDish(dish)}
+                                  className="px-2 py-1 text-xs bg-red-500/80 text-white rounded hover:bg-red-500"
+                                  title="Supprimer"
+                                >
+                                  🗑️
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
