@@ -41,7 +41,7 @@ async function getPublicProfile(username: string): Promise<PublicProfileData | n
   // 1. Récupérer le profil par username
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("*")
+    .select("id, username, is_public, favorite_restaurant_ids, avatar_url")
     .eq("username", username.toLowerCase())
     .eq("is_public", true)
     .maybeSingle();
@@ -82,25 +82,51 @@ async function getPublicProfile(username: string): Promise<PublicProfileData | n
     : 0;
 
   // 3. Récupérer les 3 restaurants favoris
-  const favoriteIds: string[] = Array.isArray(profile.favorite_restaurant_ids)
-    ? (profile.favorite_restaurant_ids as string[])
-    : [];
+  // Normaliser favorite_restaurant_ids : gérer null, undefined, tableau, ou string Postgres
+  let favoriteIds: string[] = [];
+  
+  if (profile.favorite_restaurant_ids) {
+    if (Array.isArray(profile.favorite_restaurant_ids)) {
+      // Cas normal : tableau
+      favoriteIds = profile.favorite_restaurant_ids as string[];
+    } else if (typeof profile.favorite_restaurant_ids === 'string') {
+      // Cas Postgres string format (ex: "{uuid1,uuid2}") - à parser
+      try {
+        const cleaned = profile.favorite_restaurant_ids
+          .replace(/^{|}$/g, '') // Enlever { }
+          .split(',')
+          .map(id => id.trim())
+          .filter(id => id.length > 0);
+        favoriteIds = cleaned;
+      } catch (e) {
+        console.error("[PublicProfile] Error parsing favorite_restaurant_ids:", e);
+        favoriteIds = [];
+      }
+    }
+  }
+  
+  // Limiter à 3 favoris max
   const favoriteIdsSliced = favoriteIds.slice(0, 3);
   let favoriteRestaurants: PublicProfileData["favoriteRestaurants"] = [];
 
   if (favoriteIdsSliced.length > 0) {
-    const { data: restaurantsData } = await supabase
+    const { data: restaurantsData, error: restaurantsError } = await supabase
       .from("restaurants")
       .select("id, name, slug, logo_url")
       .in("id", favoriteIdsSliced);
 
-    if (restaurantsData) {
+    if (restaurantsError) {
+      console.error("[PublicProfile] Error loading favorite restaurants:", restaurantsError);
+      // Ne pas casser la page si la requête échoue
+      favoriteRestaurants = [];
+    } else if (restaurantsData && restaurantsData.length > 0) {
       const typedRestaurantsData = restaurantsData as RestaurantLite[];
-      // Préserver l'ordre des favoris
+      // Préserver l'ordre des favoris : mapper favoriteIdsSliced vers restaurantsData
       favoriteRestaurants = favoriteIdsSliced
         .map((id: string) => typedRestaurantsData.find((r) => r.id === id))
         .filter((r): r is RestaurantLite => Boolean(r));
     }
+    // Si restaurantsData est vide, favoriteRestaurants reste [] (pas d'erreur)
   }
 
   // 4. Récupérer la dernière expérience
@@ -243,11 +269,11 @@ export default async function PublicProfilePage({
         </section>
 
         {/* 3 enseignes favorites */}
-        {favoriteRestaurants.length > 0 && (
-          <section className="space-y-3">
-            <h2 className="text-lg font-bold text-white">
-              3 enseignes favorites
-            </h2>
+        <section className="space-y-3">
+          <h2 className="text-lg font-bold text-white">
+            3 enseignes favorites
+          </h2>
+          {favoriteRestaurants.length > 0 ? (
             <div className="grid grid-cols-3 gap-3">
               {favoriteRestaurants.map((restaurant) => (
                 <Link
@@ -275,8 +301,12 @@ export default async function PublicProfilePage({
                 </Link>
               ))}
             </div>
-          </section>
-        )}
+          ) : (
+            <p className="text-sm text-slate-400">
+              Aucune enseigne favorite définie.
+            </p>
+          )}
+        </section>
 
         {/* Dernière expérience */}
         {lastExperience && (
