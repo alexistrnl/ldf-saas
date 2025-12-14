@@ -269,7 +269,7 @@ export default async function PublicProfilePage({
         </section>
 
         {/* Stats rapides */}
-        <section className="grid grid-cols-3 gap-3 rounded-xl bg-[#0F0F1A] border border-white/5 shadow-md shadow-black/20 px-4 py-4">
+        <section className={`grid grid-cols-3 gap-3 rounded-xl bg-[#0F0F1A] border border-slate-800/60 ${accentTheme.borderSoft} ring-1 ${accentTheme.ringSoft} shadow-md shadow-black/20 px-4 py-4`}>
           <div className="flex flex-col items-center">
             <span className="text-lg font-semibold text-white">
               {stats.restaurantsCount}
@@ -297,7 +297,7 @@ export default async function PublicProfilePage({
         </section>
 
         {/* 3 enseignes favorites */}
-        <section className="space-y-3">
+        <section className={`space-y-3 rounded-xl p-3 border ${accentTheme.borderExtraSoft}`}>
           <h2 className="text-lg font-bold text-white">
             3 enseignes favorites
           </h2>
@@ -342,7 +342,7 @@ export default async function PublicProfilePage({
             <h2 className="text-lg font-bold text-white">
               Dernière expérience
             </h2>
-            <div className="rounded-xl bg-[#0F0F1A] border border-white/5 p-4">
+            <div className={`rounded-xl bg-[#0F0F1A] border border-slate-800/60 ${accentTheme.borderSoft} ring-1 ${accentTheme.ringSoft} p-4`}>
               <div className="flex items-start gap-3">
                 {lastExperience.restaurant_logo_url && (
                   <div className="relative h-12 w-12 flex-shrink-0 rounded overflow-hidden">

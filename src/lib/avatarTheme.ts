@@ -15,6 +15,9 @@ export type AvatarTheme = {
   ring: string;        // Classe pour les rings (ex: ring-violet-500/30)
   buttonOutline: string; // Classe pour les boutons outline
   buttonFilled: string;  // Classe pour les boutons filled
+  borderSoft: string;   // Classe pour bordures très subtiles (/20)
+  borderExtraSoft: string; // Classe pour bordures ultra subtiles (/15)
+  ringSoft: string;     // Classe pour rings très subtils (/10)
 };
 
 /**
@@ -31,6 +34,9 @@ const THEME_MAP: Record<AvatarVariant, AvatarTheme> = {
     ring: "ring-violet-500/30",
     buttonOutline: "border-violet-500/50 text-violet-400 hover:bg-violet-500/10",
     buttonFilled: "bg-violet-500 text-white hover:bg-violet-600",
+    borderSoft: "border-violet-500/20",
+    borderExtraSoft: "border-violet-500/15",
+    ringSoft: "ring-violet-500/10",
   },
   bleu: {
     text: "text-blue-400",
@@ -41,6 +47,9 @@ const THEME_MAP: Record<AvatarVariant, AvatarTheme> = {
     ring: "ring-blue-500/30",
     buttonOutline: "border-blue-500/50 text-blue-400 hover:bg-blue-500/10",
     buttonFilled: "bg-blue-500 text-white hover:bg-blue-600",
+    borderSoft: "border-blue-500/20",
+    borderExtraSoft: "border-blue-500/15",
+    ringSoft: "ring-blue-500/10",
   },
   orange: {
     text: "text-orange-400",
@@ -51,6 +60,9 @@ const THEME_MAP: Record<AvatarVariant, AvatarTheme> = {
     ring: "ring-orange-500/30",
     buttonOutline: "border-orange-500/50 text-orange-400 hover:bg-orange-500/10",
     buttonFilled: "bg-orange-500 text-white hover:bg-orange-600",
+    borderSoft: "border-orange-500/20",
+    borderExtraSoft: "border-orange-500/15",
+    ringSoft: "ring-orange-500/10",
   },
   rouge: {
     text: "text-red-400",
@@ -61,6 +73,9 @@ const THEME_MAP: Record<AvatarVariant, AvatarTheme> = {
     ring: "ring-red-500/30",
     buttonOutline: "border-red-500/50 text-red-400 hover:bg-red-500/10",
     buttonFilled: "bg-red-500 text-white hover:bg-red-600",
+    borderSoft: "border-red-500/20",
+    borderExtraSoft: "border-red-500/15",
+    ringSoft: "ring-red-500/10",
   },
   vert: {
     text: "text-emerald-400",
@@ -71,6 +86,9 @@ const THEME_MAP: Record<AvatarVariant, AvatarTheme> = {
     ring: "ring-emerald-500/30",
     buttonOutline: "border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10",
     buttonFilled: "bg-emerald-500 text-white hover:bg-emerald-600",
+    borderSoft: "border-emerald-500/20",
+    borderExtraSoft: "border-emerald-500/15",
+    ringSoft: "ring-emerald-500/10",
   },
 };
 
