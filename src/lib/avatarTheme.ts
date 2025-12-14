@@ -4,7 +4,63 @@
  * Utilise des classes hardcodées pour éviter la purge Tailwind
  */
 
-export type AvatarVariant = "red" | "violet" | "blue" | "green" | "pink";
+export type AvatarVariant = "red" | "purple" | "blue" | "green" | "orange";
+
+/**
+ * Mapping avatar_variant → URL de l'avatar
+ */
+const AVATAR_URL_MAP: Record<AvatarVariant, string> = {
+  red: "/avatar/avatar-rouge.png",
+  purple: "/avatar/avatar-violet.png",
+  blue: "/avatar/avatar-bleu.png",
+  green: "/avatar/avatar-vert.png",
+  orange: "/avatar/avatar-orange.png",
+};
+
+/**
+ * Mapping avatar_variant → couleur d'accent (hex)
+ */
+const AVATAR_COLOR_MAP: Record<AvatarVariant, string> = {
+  red: "#ef4444",      // red-500
+  purple: "#8b5cf6",   // violet-500
+  blue: "#3b82f6",     // blue-500
+  green: "#10b981",    // emerald-500
+  orange: "#f97316",   // orange-500
+};
+
+/**
+ * Retourne le thème complet basé sur avatar_variant
+ * SOURCE DE VÉRITÉ UNIQUE pour l'avatar et les accents
+ */
+export function getAvatarThemeFromVariant(variant: AvatarVariant | null | undefined): {
+  variant: AvatarVariant;
+  accent: string;           // Couleur d'accent principale (hex)
+  accentSoft: string;       // Couleur d'accent avec alpha (rgba)
+  ring: string;             // Style inline pour ring/border (boxShadow)
+  avatarSrc: string;        // URL de l'image avatar
+  glow: string;             // Style inline pour glow autour de l'avatar
+} {
+  // Fallback sur purple si variant manquant
+  const safeVariant: AvatarVariant = (variant && variant in AVATAR_URL_MAP) ? variant : "purple";
+  
+  const accentHex = AVATAR_COLOR_MAP[safeVariant];
+  
+  // Convertir hex en rgba avec alpha
+  const r = parseInt(accentHex.slice(1, 3), 16);
+  const g = parseInt(accentHex.slice(3, 5), 16);
+  const b = parseInt(accentHex.slice(5, 7), 16);
+  const accentSoft = `rgba(${r}, ${g}, ${b}, 0.2)`;
+  const glow = `rgba(${r}, ${g}, ${b}, 0.33)`;
+  
+  return {
+    variant: safeVariant,
+    accent: accentHex,
+    accentSoft: accentSoft,
+    ring: `0 0 0 1px ${accentSoft}`,
+    glow: `0 0 20px ${glow}`,
+    avatarSrc: AVATAR_URL_MAP[safeVariant],
+  };
+}
 
 export type AvatarTheme = {
   text: string;        // Classe pour le texte (ex: text-violet-400)
@@ -44,7 +100,7 @@ const THEME_MAP: Record<AvatarVariant, AvatarTheme> = {
     borderExtraSoft: "border-red-500/15",
     ringSoft: "ring-red-500/10",
   },
-  violet: {
+  purple: {
     text: "text-violet-400",
     textHover: "hover:text-violet-300",
     bgSoft: "bg-violet-500/10",
@@ -83,18 +139,18 @@ const THEME_MAP: Record<AvatarVariant, AvatarTheme> = {
     borderExtraSoft: "border-emerald-500/15",
     ringSoft: "ring-emerald-500/10",
   },
-  pink: {
-    text: "text-pink-400",
-    textHover: "hover:text-pink-300",
-    bgSoft: "bg-pink-500/10",
-    border: "border-pink-500/30",
-    borderLeft: "border-l-pink-500/60",
-    ring: "ring-pink-500/30",
-    buttonOutline: "border-pink-500/50 text-pink-400 hover:bg-pink-500/10",
-    buttonFilled: "bg-pink-500 text-white hover:bg-pink-600",
-    borderSoft: "border-pink-500/20",
-    borderExtraSoft: "border-pink-500/15",
-    ringSoft: "ring-pink-500/10",
+  orange: {
+    text: "text-orange-400",
+    textHover: "hover:text-orange-300",
+    bgSoft: "bg-orange-500/10",
+    border: "border-orange-500/30",
+    borderLeft: "border-l-orange-500/60",
+    ring: "ring-orange-500/30",
+    buttonOutline: "border-orange-500/50 text-orange-400 hover:bg-orange-500/10",
+    buttonFilled: "bg-orange-500 text-white hover:bg-orange-600",
+    borderSoft: "border-orange-500/20",
+    borderExtraSoft: "border-orange-500/15",
+    ringSoft: "ring-orange-500/10",
   },
 };
 
@@ -107,7 +163,7 @@ const ACCENT_STYLES_MAP: Record<AvatarVariant, AccentStyles> = {
     ring: "ring-1 ring-red-400/20",
     shadow: "", // Pas de shadow arbitraire pour éviter les problèmes Tailwind
   },
-  violet: {
+  purple: {
     border: "border-violet-500/30",
     ring: "ring-1 ring-violet-400/20",
     shadow: "",
@@ -122,9 +178,9 @@ const ACCENT_STYLES_MAP: Record<AvatarVariant, AccentStyles> = {
     ring: "ring-1 ring-emerald-400/20",
     shadow: "",
   },
-  pink: {
-    border: "border-pink-500/30",
-    ring: "ring-1 ring-pink-400/20",
+  orange: {
+    border: "border-orange-500/30",
+    ring: "ring-1 ring-orange-400/20",
     shadow: "",
   },
 };
@@ -134,7 +190,7 @@ const ACCENT_STYLES_MAP: Record<AvatarVariant, AccentStyles> = {
  * SOURCE DE VÉRITÉ UNIQUE pour les accents des cartes
  */
 export function getAccentStyles(variant: AvatarVariant | null | undefined): AccentStyles {
-  const safeVariant = (variant && variant in ACCENT_STYLES_MAP) ? variant : "violet";
+  const safeVariant = (variant && variant in ACCENT_STYLES_MAP) ? variant : "purple";
   return ACCENT_STYLES_MAP[safeVariant];
 }
 
@@ -151,9 +207,9 @@ function getAvatarVariant(avatarUrl: string | null | undefined, avatarVariant?: 
   // Sinon, déduire depuis avatar_url (fallback uniquement)
   if (!avatarUrl) {
     if (process.env.NODE_ENV === "development") {
-      console.log("[AvatarTheme] Missing avatar_url and avatar_variant, fallback to violet");
+      console.log("[AvatarTheme] Missing avatar_url and avatar_variant, fallback to purple");
     }
-    return "violet";
+    return "purple";
   }
 
   const urlLower = avatarUrl.toLowerCase();
@@ -166,12 +222,12 @@ function getAvatarVariant(avatarUrl: string | null | undefined, avatarVariant?: 
   
   // Violet / Purple  
   if (urlLower.includes("violet") || urlLower.includes("purple")) {
-    return "violet";
+    return "purple";
   }
   
-  // Orange -> pas dans les nouvelles valeurs, utiliser pink comme fallback
+  // Orange
   if (urlLower.includes("orange")) {
-    return "pink"; // Orange n'existe plus, utiliser pink
+    return "orange";
   }
   
   // Bleu / Blue
@@ -183,17 +239,12 @@ function getAvatarVariant(avatarUrl: string | null | undefined, avatarVariant?: 
   if (urlLower.includes("vert") || urlLower.includes("green")) {
     return "green";
   }
-  
-  // Pink
-  if (urlLower.includes("pink") || urlLower.includes("rose")) {
-    return "pink";
-  }
 
   // Fallback avec log en dev
   if (process.env.NODE_ENV === "development") {
-    console.warn("[AvatarTheme] Could not detect variant from avatar_url, fallback to violet:", avatarUrl);
+    console.warn("[AvatarTheme] Could not detect variant from avatar_url, fallback to purple:", avatarUrl);
   }
-  return "violet";
+  return "purple";
 }
 
 /**

@@ -2,8 +2,7 @@ import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
-import { getAvatarTheme, hexToRgba } from "@/lib/getAvatarTheme";
-import { getAvatarAccentTheme, getAccentStyles } from "@/lib/avatarTheme";
+import { getAvatarThemeFromVariant } from "@/lib/avatarTheme";
 import { UserProfile } from "@/lib/profile";
 
 // Désactiver le cache pour cette page (données toujours fraîches)
@@ -214,47 +213,30 @@ export default async function PublicProfilePage({
   }
 
   const { profile, stats, favoriteRestaurants, lastExperience } = data;
-  const theme = getAvatarTheme(profile.avatar_url);
-  const themeColorGlow = hexToRgba(theme.color, 0.33);
-  const accentTheme = getAvatarAccentTheme(profile.avatar_url, profile.avatar_variant);
-  const accentStyles = getAccentStyles(profile.avatar_variant as any);
-  
-  // Debug: afficher la variante en dev
-  if (process.env.NODE_ENV === "development") {
-    console.log("[PublicProfile] DEBUG - avatar_variant:", profile.avatar_variant, "avatar_url:", profile.avatar_url, "→ accentStyles:", accentStyles);
-  }
+  // Utiliser avatar_variant comme source de vérité unique
+  const theme = getAvatarThemeFromVariant(profile.avatar_variant as any);
 
   return (
     <main className="min-h-screen w-full overflow-x-hidden bg-[#020617]">
       <div className="mx-auto flex w-full max-w-xl flex-col gap-6 px-4 pb-28 pt-6">
         {/* Header profil */}
-        <section className={`flex items-start gap-4 rounded-xl p-4 border ${accentTheme.border} ${accentTheme.bgSoft}`}>
+        <section className="flex items-start gap-4 rounded-xl p-4 border" style={{ borderColor: theme.accentSoft, backgroundColor: theme.accentSoft }}>
           <div
-            className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-full"
-            style={{ boxShadow: `0 0 20px ${themeColorGlow}` }}
+            className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-full border"
+            style={{ boxShadow: theme.glow, borderColor: theme.accentSoft }}
           >
-            {profile.avatar_url ? (
-              <Image
-                src={profile.avatar_url}
-                alt={profile.username || "Avatar"}
-                fill
-                className="object-cover object-center scale-150"
-                style={{ minWidth: '100%', minHeight: '100%' }}
-              />
-            ) : (
-              <Image
-                src="/avatar/avatar-violet.png"
-                alt="Avatar par défaut"
-                fill
-                className="object-cover object-center scale-150"
-                style={{ minWidth: '100%', minHeight: '100%' }}
-              />
-            )}
+            <Image
+              src={theme.avatarSrc}
+              alt={profile.username || "Avatar"}
+              fill
+              className="object-cover object-center scale-150"
+              style={{ minWidth: '100%', minHeight: '100%' }}
+            />
           </div>
           <div className="flex flex-col min-w-0 flex-1 gap-1">
             {profile.display_name && profile.display_name.trim().length > 0 ? (
               <>
-                <h1 className={`text-lg font-semibold ${accentTheme.text} break-words`}>
+                <h1 className="text-lg font-semibold break-words" style={{ color: theme.accent }}>
                   {profile.display_name}
                 </h1>
                 <span className="text-xs text-slate-400 break-words">
@@ -262,7 +244,7 @@ export default async function PublicProfilePage({
                 </span>
               </>
             ) : (
-              <h1 className={`text-lg font-semibold ${accentTheme.text} break-words`}>
+              <h1 className="text-lg font-semibold break-words" style={{ color: theme.accent }}>
                 @{profile.username}
               </h1>
             )}
@@ -275,7 +257,7 @@ export default async function PublicProfilePage({
         </section>
 
         {/* Stats rapides */}
-        <section className={`grid grid-cols-3 gap-3 rounded-xl bg-[#0F0F1A] border ${accentStyles.border} ${accentStyles.ring} shadow-md shadow-black/20 px-4 py-4`}>
+        <section className="grid grid-cols-3 gap-3 rounded-xl bg-[#0F0F1A] border shadow-md shadow-black/20 px-4 py-4" style={{ borderColor: theme.accentSoft, boxShadow: theme.ring }}>
           <div className="flex flex-col items-center">
             <span className="text-lg font-semibold text-white">
               {stats.restaurantsCount}
@@ -303,7 +285,7 @@ export default async function PublicProfilePage({
         </section>
 
         {/* 3 enseignes favorites */}
-        <section className={`space-y-3 rounded-xl p-3 border ${accentStyles.border}`}>
+        <section className="space-y-3 rounded-xl p-3 border" style={{ borderColor: theme.accentSoft }}>
           <h2 className="text-lg font-bold text-white">
             3 enseignes favorites
           </h2>
@@ -348,7 +330,7 @@ export default async function PublicProfilePage({
             <h2 className="text-lg font-bold text-white">
               Dernière expérience
             </h2>
-            <div className={`rounded-xl bg-[#0F0F1A] border ${accentStyles.border} ${accentStyles.ring} p-4`}>
+            <div className="rounded-xl bg-[#0F0F1A] border p-4" style={{ borderColor: theme.accentSoft, boxShadow: theme.ring }}>
               <div className="flex items-start gap-3">
                 {lastExperience.restaurant_logo_url && (
                   <div className="relative h-12 w-12 flex-shrink-0 rounded overflow-hidden">

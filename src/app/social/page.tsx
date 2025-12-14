@@ -4,8 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
-import { getAvatarTheme, hexToRgba } from "@/lib/getAvatarTheme";
-import { getAvatarAccentTheme } from "@/lib/avatarTheme";
+import { getAvatarThemeFromVariant } from "@/lib/avatarTheme";
 import { useProfile } from "@/context/ProfileContext";
 import Spinner from "@/components/Spinner";
 
@@ -13,6 +12,7 @@ type PublicProfile = {
   id: string;
   username: string | null;
   avatar_url: string | null;
+  avatar_variant?: string | null;
   favorite_restaurant_ids: string[] | null;
 };
 
@@ -220,44 +220,33 @@ export default function SocialPage() {
         ) : (
           <div className="flex flex-col gap-3">
             {profiles.map((profile) => {
-              const theme = getAvatarTheme(profile.avatar_url);
-              const themeColorGlow = hexToRgba(theme.color, 0.33);
-              const accentTheme = getAvatarAccentTheme(profile.avatar_url);
+              const theme = getAvatarThemeFromVariant((profile as any).avatar_variant);
               const favoritesCount = favoriteCount(profile.favorite_restaurant_ids);
 
               return (
                 <button
                   key={profile.id}
                   onClick={() => handleProfileClick(profile)}
-                  className={`flex items-center gap-4 rounded-2xl bg-slate-800/50 border-l-4 ${accentTheme.borderLeft} border-r border-t border-b border-white/10 p-4 hover:bg-slate-800/70 transition-colors text-left`}
+                  className="flex items-center gap-4 rounded-2xl bg-slate-800/50 border-l-4 border-r border-t border-b p-4 hover:bg-slate-800/70 transition-colors text-left"
+                  style={{ borderLeftColor: theme.accent, borderRightColor: theme.accentSoft, borderTopColor: theme.accentSoft, borderBottomColor: theme.accentSoft }}
                 >
                   {/* Avatar */}
                   <div
-                    className="relative h-14 w-14 flex-shrink-0 overflow-hidden rounded-full"
-                    style={{ boxShadow: `0 0 15px ${themeColorGlow}` }}
+                    className="relative h-14 w-14 flex-shrink-0 overflow-hidden rounded-full border"
+                    style={{ boxShadow: theme.glow, borderColor: theme.accentSoft }}
                   >
-                    {profile.avatar_url ? (
-                      <Image
-                        src={profile.avatar_url}
-                        alt={profile.username || "Avatar"}
-                        fill
-                        className="object-cover object-center scale-150"
-                        style={{ minWidth: '100%', minHeight: '100%' }}
-                      />
-                    ) : (
-                      <Image
-                        src="/avatar/avatar-violet.png"
-                        alt="Avatar par défaut"
-                        fill
-                        className="object-cover object-center scale-150"
-                        style={{ minWidth: '100%', minHeight: '100%' }}
-                      />
-                    )}
+                    <Image
+                      src={theme.avatarSrc}
+                      alt={profile.username || "Avatar"}
+                      fill
+                      className="object-cover object-center scale-150"
+                      style={{ minWidth: '100%', minHeight: '100%' }}
+                    />
                   </div>
 
                   {/* Infos */}
                   <div className="flex flex-col flex-1 min-w-0">
-                    <span className={`text-base font-semibold ${accentTheme.text} truncate`}>
+                    <span className="text-base font-semibold truncate" style={{ color: theme.accent }}>
                       @{profile.username}
                     </span>
                     <div className="flex items-center gap-4 mt-1">

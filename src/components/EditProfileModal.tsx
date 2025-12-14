@@ -9,9 +9,9 @@ import { useProfile } from "@/context/ProfileContext";
 import Spinner from "@/components/Spinner";
 
 const AVAILABLE_AVATARS = [
-  { key: "violet", label: "Violet", url: "/avatar/avatar-violet.png", variant: "violet" as const },
+  { key: "violet", label: "Violet", url: "/avatar/avatar-violet.png", variant: "purple" as const },
   { key: "bleu", label: "Bleu", url: "/avatar/avatar-bleu.png", variant: "blue" as const },
-  { key: "orange", label: "Orange", url: "/avatar/avatar-orange.png", variant: "pink" as const },
+  { key: "orange", label: "Orange", url: "/avatar/avatar-orange.png", variant: "orange" as const },
   { key: "rouge", label: "Rouge", url: "/avatar/avatar-rouge.png", variant: "red" as const },
   { key: "vert", label: "Vert", url: "/avatar/avatar-vert.png", variant: "green" as const },
 ];

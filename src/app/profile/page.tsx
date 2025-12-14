@@ -7,8 +7,7 @@ import Image from "next/image";
 import { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
 import { UserProfile } from "@/lib/profile";
-import { getAvatarTheme, hexToRgba } from "@/lib/getAvatarTheme";
-import { getAvatarAccentTheme, getAccentStyles } from "@/lib/avatarTheme";
+import { getAvatarThemeFromVariant } from "@/lib/avatarTheme";
 import { useProfile } from "@/context/ProfileContext";
 import Spinner from "@/components/Spinner";
 import EditProfileModal from "@/components/EditProfileModal";
@@ -253,14 +252,12 @@ export default function ProfilePage() {
     );
   }
 
-  const theme = getAvatarTheme(profile?.avatar_url);
-  const themeColorGlow = hexToRgba(theme.color, 0.33);
-  const accentTheme = getAvatarAccentTheme(profile?.avatar_url, profile?.avatar_variant);
-  const accentStyles = getAccentStyles(profile?.avatar_variant as any);
+  // Utiliser avatar_variant comme source de vérité unique
+  const theme = getAvatarThemeFromVariant(profile?.avatar_variant as any);
   
-  // Debug: afficher la variante en dev
+  // Log temporaire pour confirmer la valeur depuis la DB
   if (process.env.NODE_ENV === "development") {
-    console.log("[Profile] DEBUG - avatar_variant:", profile?.avatar_variant, "avatar_url:", profile?.avatar_url, "→ accentStyles:", accentStyles);
+    console.log("[Profile] avatar_variant from DB =", profile?.avatar_variant, "→ theme:", theme);
   }
   const displayName = profile?.display_name && profile.display_name.trim().length > 0
     ? profile.display_name
@@ -279,32 +276,22 @@ export default function ProfilePage() {
         )}
 
         {/* Header profil */}
-        <section className={`flex items-start justify-between gap-3 rounded-xl p-4 border ${accentTheme.border} ${accentTheme.bgSoft}`}>
+        <section className="flex items-start justify-between gap-3 rounded-xl p-4" style={{ borderColor: theme.accentSoft, backgroundColor: theme.accentSoft }}>
           <div className="flex items-start gap-4 flex-1 min-w-0">
             <div
-              className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-full"
-              style={{ boxShadow: `0 0 20px ${themeColorGlow}` }}
+              className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-full border"
+              style={{ boxShadow: theme.glow, borderColor: theme.accentSoft }}
             >
-              {profile?.avatar_url ? (
-                <Image
-                  src={profile.avatar_url}
-                  alt="Avatar"
-                  fill
-                  className="object-cover object-center scale-150"
-                  style={{ minWidth: '100%', minHeight: '100%' }}
-                />
-              ) : (
-                <Image
-                  src="/avatar/avatar-violet.png"
-                  alt="Avatar par défaut"
-                  fill
-                  className="object-cover object-center scale-150"
-                  style={{ minWidth: '100%', minHeight: '100%' }}
-                />
-              )}
+              <Image
+                src={theme.avatarSrc}
+                alt="Avatar"
+                fill
+                className="object-cover object-center scale-150"
+                style={{ minWidth: '100%', minHeight: '100%' }}
+              />
             </div>
             <div className="flex flex-col min-w-0 flex-1 gap-1">
-              <span className={`text-lg font-semibold ${accentTheme.text} break-words`}>
+              <span className="text-lg font-semibold break-words" style={{ color: theme.accent }}>
                 {displayName}
               </span>
               {usernameDisplay && (
@@ -327,11 +314,13 @@ export default function ProfilePage() {
           <div className="flex items-center gap-2 flex-shrink-0">
             <button
               onClick={handleStartEdit}
-              className={`flex h-10 w-10 items-center justify-center rounded-full transition-all flex-shrink-0 border ${accentTheme.buttonOutline} ${accentTheme.bgSoft}`}
+              className="flex h-10 w-10 items-center justify-center rounded-full transition-all flex-shrink-0 border"
+              style={{ borderColor: theme.accentSoft, backgroundColor: theme.accentSoft }}
               aria-label="Modifier le profil"
             >
               <svg
-                className={`w-5 h-5 ${accentTheme.text}`}
+                className="w-5 h-5"
+                style={{ color: theme.accent }}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -346,11 +335,13 @@ export default function ProfilePage() {
             </button>
             <button
               onClick={() => router.push("/settings")}
-              className={`flex h-10 w-10 items-center justify-center rounded-full transition-all flex-shrink-0 border ${accentTheme.buttonOutline} ${accentTheme.bgSoft}`}
+              className="flex h-10 w-10 items-center justify-center rounded-full transition-all flex-shrink-0 border"
+              style={{ borderColor: theme.accentSoft, backgroundColor: theme.accentSoft }}
               aria-label="Paramètres"
             >
               <svg
-                className={`w-5 h-5 ${accentTheme.text}`}
+                className="w-5 h-5"
+                style={{ color: theme.accent }}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -373,7 +364,7 @@ export default function ProfilePage() {
         </section>
 
         {/* Stats rapides (mini) */}
-        <section className={`grid grid-cols-3 gap-3 rounded-xl bg-[#0F0F1A] border ${accentStyles.border} ${accentStyles.ring} shadow-md shadow-black/20 px-4 py-4`}>
+        <section className="grid grid-cols-3 gap-3 rounded-xl bg-[#0F0F1A] border shadow-md shadow-black/20 px-4 py-4" style={{ borderColor: theme.accentSoft, boxShadow: theme.ring }}>
           <div className="flex flex-col items-center">
             <span className="text-lg font-semibold text-white">
               {stats.restaurantsCount}
@@ -422,7 +413,7 @@ export default function ProfilePage() {
         </Link>
 
         {/* 3 enseignes favorites */}
-        <section className={`space-y-3 rounded-xl p-3 border ${accentStyles.border}`}>
+        <section className="space-y-3 rounded-xl p-3 border" style={{ borderColor: theme.accentSoft }}>
           <h2 className="text-lg font-bold text-white">
             3 enseignes favorites
           </h2>
@@ -467,7 +458,7 @@ export default function ProfilePage() {
             <h2 className="text-lg font-bold text-white">
               Dernière expérience
             </h2>
-            <div className={`rounded-xl bg-[#0F0F1A] border ${accentStyles.border} ${accentStyles.ring} p-4`}>
+            <div className="rounded-xl bg-[#0F0F1A] border p-4" style={{ borderColor: theme.accentSoft, boxShadow: theme.ring }}>
               <div className="flex items-start gap-3">
                 {lastExperience.restaurant_logo_url && (
                   <div className="relative h-12 w-12 flex-shrink-0 rounded overflow-hidden">
