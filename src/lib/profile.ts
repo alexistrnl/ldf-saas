@@ -446,15 +446,14 @@ export async function uploadAvatar(file: File): Promise<{ url: string | null; er
 }
 
 /**
- * Met à jour tous les champs du profil (avatar, display_name, username, bio, is_public, favorite_restaurant_ids)
+ * Met à jour les champs du profil (display_name, bio, avatar_variant, is_public)
+ * Ne met à jour que les champs définis (ne jamais écraser par null/undefined)
  */
 export async function updateProfile(data: {
-  avatar_url?: string | null;
   display_name?: string | null;
-  username?: string | null;
   bio?: string | null;
+  avatar_variant?: string | null;
   is_public?: boolean;
-  favorite_restaurant_ids?: string[];
 }): Promise<{ profile: UserProfile | null; error: any }> {
   console.log("[Profile] updateProfile called with:", data);
 
@@ -468,131 +467,37 @@ export async function updateProfile(data: {
     return { profile: null, error: userError };
   }
 
-  // Construire l'objet de mise à jour
-  const updateData: {
-    avatar_url?: string | null;
-    display_name?: string | null;
-    username?: string | null;
-    bio?: string | null;
-    is_public?: boolean;
-    favorite_restaurant_ids?: string[];
-  } = {};
+  // Construire l'objet de mise à jour dynamiquement
+  // Ne jamais écraser les champs existants par null/undefined
+  // Mettre à jour uniquement les champs modifiés
+  const updates: Record<string, any> = {
+    updated_at: new Date().toISOString(),
+  };
 
-  if (data.avatar_url !== undefined) {
-    updateData.avatar_url = data.avatar_url;
-  }
+  // Ajouter uniquement les champs définis
   if (data.display_name !== undefined) {
-    updateData.display_name = data.display_name || null;
-  }
-  if (data.username !== undefined) {
-    updateData.username = data.username || null;
+    updates.display_name = data.display_name;
   }
   if (data.bio !== undefined) {
-    updateData.bio = data.bio || null;
+    updates.bio = data.bio;
+  }
+  if (data.avatar_variant !== undefined) {
+    updates.avatar_variant = data.avatar_variant;
   }
   if (data.is_public !== undefined) {
-    updateData.is_public = data.is_public;
-  }
-  if (data.favorite_restaurant_ids !== undefined) {
-    // S'assurer que c'est un tableau valide (max 3 éléments)
-    const ids = Array.isArray(data.favorite_restaurant_ids)
-      ? data.favorite_restaurant_ids.slice(0, 3)
-      : [];
-    updateData.favorite_restaurant_ids = ids;
+    updates.is_public = data.is_public;
   }
 
-  // Vérifier d'abord si le profil existe, sinon le créer
-  const { data: existingProfile, error: checkError } = await supabase
+  // Log clair avant l'update
+  console.log("[Profile] Updating profile - user.id:", user.id, "updates:", JSON.stringify(updates, null, 2));
+
+  // Mettre à jour le profil (pas d'upsert, juste update)
+  const { data: updatedProfile, error } = await supabase
     .from("profiles")
-    .select("id")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (checkError && checkError.code !== "PGRST116") {
-    console.error("[Profile] Check profile error:", checkError);
-    return { profile: null, error: checkError };
-  }
-
-  // Construire les données filtrées (pour création ET update)
-  const filteredData: Record<string, any> = {};
-  if (updateData.avatar_url !== undefined) filteredData.avatar_url = updateData.avatar_url;
-  if (updateData.username !== undefined) filteredData.username = updateData.username;
-  if (updateData.is_public !== undefined) filteredData.is_public = updateData.is_public;
-  if (updateData.favorite_restaurant_ids !== undefined) {
-    filteredData.favorite_restaurant_ids = updateData.favorite_restaurant_ids;
-  }
-  if (updateData.bio !== undefined) filteredData.bio = updateData.bio;
-  if (updateData.display_name !== undefined) filteredData.display_name = updateData.display_name;
-
-  if (!existingProfile) {
-    // Créer le profil s'il n'existe pas
-    console.log("[Profile] Profile doesn't exist, creating new one...");
-    let { data: newProfile, error: createError } = await supabase
-      .from("profiles")
-      .insert({ id: user.id, ...filteredData })
-      .select("id, username, display_name, avatar_url, avatar_variant, bio, is_public, favorite_restaurant_ids, created_at, updated_at")
-      .single();
-
-    // Si erreur "column does not exist", retirer bio/display_name et réessayer
-    if (createError && createError.message?.includes("column") && createError.message?.includes("does not exist")) {
-      console.warn("[Profile] Column does not exist during create, retrying without optional columns:", createError.message);
-      const retryCreateData: Record<string, any> = { id: user.id, ...filteredData };
-      if (createError.message.includes("bio")) delete retryCreateData.bio;
-      if (createError.message.includes("display_name")) delete retryCreateData.display_name;
-      
-      const retryResult = await supabase
-        .from("profiles")
-        .insert(retryCreateData)
-        .select("id, username, display_name, avatar_url, avatar_variant, bio, is_public, favorite_restaurant_ids, created_at, updated_at")
-        .single();
-      
-      newProfile = retryResult.data;
-      createError = retryResult.error;
-    }
-
-    if (createError) {
-      console.error("[Profile] Create profile error:", createError);
-      return { profile: null, error: createError };
-    }
-
-    return { profile: newProfile as UserProfile, error: null };
-  }
-
-  // Mettre à jour le profil existant
-
-  console.log("[Profile] Updating profile with data:", filteredData);
-
-  let { data: updatedProfile, error } = await supabase
-    .from("profiles")
-    .update(filteredData)
+    .update(updates)
     .eq("id", user.id)
     .select("id, username, display_name, avatar_url, avatar_variant, bio, is_public, favorite_restaurant_ids, created_at, updated_at")
     .single();
-
-  // Si erreur "column does not exist", retirer bio/display_name et réessayer
-  if (error && error.message?.includes("column") && error.message?.includes("does not exist")) {
-    console.warn("[Profile] Column does not exist, retrying without optional columns:", error.message);
-    
-    const retryData: Record<string, any> = { ...filteredData };
-    // Retirer bio et display_name si l'erreur les concerne
-    if (error.message.includes("bio")) {
-      delete retryData.bio;
-    }
-    if (error.message.includes("display_name")) {
-      delete retryData.display_name;
-    }
-    
-    // Réessayer sans les colonnes problématiques
-    const retryResult = await supabase
-      .from("profiles")
-      .update(retryData)
-      .eq("id", user.id)
-      .select("id, username, display_name, avatar_url, avatar_variant, bio, is_public, favorite_restaurant_ids, created_at, updated_at")
-      .single();
-    
-    updatedProfile = retryResult.data;
-    error = retryResult.error;
-  }
 
   if (error) {
     console.error("[Profile] Update profile error:", {
@@ -600,7 +505,7 @@ export async function updateProfile(data: {
       message: error.message,
       details: error.details,
       hint: error.hint,
-      updateData: filteredData,
+      updates: updates,
     });
     
     return { profile: null, error };

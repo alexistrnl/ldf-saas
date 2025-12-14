@@ -9,12 +9,19 @@ import { useProfile } from "@/context/ProfileContext";
 import Spinner from "@/components/Spinner";
 
 const AVAILABLE_AVATARS = [
-  { key: "violet", label: "Violet", url: "/avatar/avatar-violet.png" },
-  { key: "bleu", label: "Bleu", url: "/avatar/avatar-bleu.png" },
-  { key: "orange", label: "Orange", url: "/avatar/avatar-orange.png" },
-  { key: "rouge", label: "Rouge", url: "/avatar/avatar-rouge.png" },
-  { key: "vert", label: "Vert", url: "/avatar/avatar-vert.png" },
+  { key: "violet", label: "Violet", url: "/avatar/avatar-violet.png", variant: "violet" as const },
+  { key: "bleu", label: "Bleu", url: "/avatar/avatar-bleu.png", variant: "blue" as const },
+  { key: "orange", label: "Orange", url: "/avatar/avatar-orange.png", variant: "pink" as const },
+  { key: "rouge", label: "Rouge", url: "/avatar/avatar-rouge.png", variant: "red" as const },
+  { key: "vert", label: "Vert", url: "/avatar/avatar-vert.png", variant: "green" as const },
 ];
+
+// Fonction helper pour convertir avatar URL en avatar_variant
+function getAvatarVariantFromUrl(avatarUrl: string | null): string | null {
+  if (!avatarUrl) return null;
+  const avatar = AVAILABLE_AVATARS.find(av => av.url === avatarUrl);
+  return avatar ? avatar.variant : null;
+}
 
 type EditProfileModalProps = {
   isOpen: boolean;
@@ -168,14 +175,15 @@ export default function EditProfileModal({
         }
       }
 
-      // Mettre à jour le profil
+      // Convertir avatarUrl en avatar_variant
+      const avatarVariant = getAvatarVariantFromUrl(avatarUrl);
+
+      // Mettre à jour le profil (seulement les champs modifiés)
       const { profile: updatedProfile, error: updateError } = await updateProfile({
-        avatar_url: avatarUrl,
         display_name: displayName.trim() || null,
-        username: cleanedUsername || null,
         bio: bio.trim() || null,
+        avatar_variant: avatarVariant,
         is_public: isPublic,
-        favorite_restaurant_ids: favoriteRestaurantIds,
       });
 
       if (updateError) {
