@@ -32,7 +32,7 @@ const AVATAR_COLOR_MAP: Record<AvatarVariant, string> = {
  * Retourne le thème complet basé sur avatar_variant
  * SOURCE DE VÉRITÉ UNIQUE pour l'avatar et les accents
  */
-export function getAvatarThemeFromVariant(variant: AvatarVariant | null | undefined): {
+export function getAvatarThemeFromVariant(variant: AvatarVariant | string | null | undefined): {
   variant: AvatarVariant;
   accent: string;           // Couleur d'accent principale (hex)
   accentSoft: string;       // Couleur d'accent avec alpha (rgba)
@@ -40,8 +40,30 @@ export function getAvatarThemeFromVariant(variant: AvatarVariant | null | undefi
   avatarSrc: string;        // URL de l'image avatar
   glow: string;             // Style inline pour glow autour de l'avatar
 } {
-  // Fallback sur purple si variant manquant
-  const safeVariant: AvatarVariant = (variant && variant in AVATAR_URL_MAP) ? variant : "purple";
+  // Normaliser la valeur : convertir en string, lowercase, trim
+  let normalizedVariant: AvatarVariant = "purple"; // fallback
+  
+  if (variant) {
+    const v = variant.toString().toLowerCase().trim();
+    // Mapping explicite des valeurs possibles
+    if (v === "red" && v in AVATAR_URL_MAP) {
+      normalizedVariant = "red";
+    } else if (v === "purple" && v in AVATAR_URL_MAP) {
+      normalizedVariant = "purple";
+    } else if (v === "blue" && v in AVATAR_URL_MAP) {
+      normalizedVariant = "blue";
+    } else if (v === "green" && v in AVATAR_URL_MAP) {
+      normalizedVariant = "green";
+    } else if (v === "orange" && v in AVATAR_URL_MAP) {
+      normalizedVariant = "orange";
+    } else if (v in AVATAR_URL_MAP) {
+      // Si c'est déjà une valeur valide dans le map
+      normalizedVariant = v as AvatarVariant;
+    }
+    // Sinon, reste sur "purple" (fallback)
+  }
+  
+  const safeVariant: AvatarVariant = normalizedVariant;
   
   const accentHex = AVATAR_COLOR_MAP[safeVariant];
   

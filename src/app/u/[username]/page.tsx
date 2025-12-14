@@ -59,17 +59,22 @@ async function getPublicProfile(username: string): Promise<PublicProfileData | n
     return null;
   }
 
-  // S'assurer que le profil a les types corrects avec display_name et bio
+  // S'assurer que le profil a les types corrects avec display_name, bio et avatar_variant
   // Normaliser les valeurs vides (trim) pour display_name et bio
   const typedProfile: UserProfile = {
     id: profile.id,
     username: profile.username,
     avatar_url: profile.avatar_url,
+    avatar_variant: profile.avatar_variant || null,
     display_name: (profile.display_name && profile.display_name.trim().length > 0) ? profile.display_name.trim() : null,
     bio: (profile.bio && profile.bio.trim().length > 0) ? profile.bio.trim() : null,
     is_public: profile.is_public ?? false,
     favorite_restaurant_ids: profile.favorite_restaurant_ids || null,
+    updated_at: profile.updated_at || null,
   };
+  
+  // Log pour confirmer avatar_variant
+  console.log("[PublicProfile] username", username, "avatar_variant", typedProfile.avatar_variant);
 
   const userId = typedProfile.id;
 
@@ -218,8 +223,12 @@ export default async function PublicProfilePage({
   }
 
   const { profile, stats, favoriteRestaurants, lastExperience } = data;
+  
   // Utiliser avatar_variant comme source de vérité unique
-  const theme = getAvatarThemeFromVariant(profile.avatar_variant as any);
+  // Log pour debug
+  console.log("[PublicProfile] Rendering - avatar_variant:", profile.avatar_variant);
+  
+  const theme = getAvatarThemeFromVariant(profile.avatar_variant);
 
   return (
     <main className="min-h-screen w-full overflow-x-hidden bg-[#020617]">
@@ -300,7 +309,8 @@ export default async function PublicProfilePage({
                 <Link
                   key={restaurant.id}
                   href={restaurant.slug ? `/restaurants/${restaurant.slug}` : `#`}
-                  className="flex flex-col items-center gap-2 rounded-xl bg-[#0F0F1A] border border-white/5 p-3 hover:bg-[#151520] transition-colors"
+                  className="flex flex-col items-center gap-2 rounded-xl bg-[#0F0F1A] border p-3 hover:bg-[#151520] transition-colors"
+                  style={{ borderColor: theme.accentSoft }}
                 >
                   {restaurant.logo_url ? (
                     <div className="relative h-12 w-12 rounded overflow-hidden">
