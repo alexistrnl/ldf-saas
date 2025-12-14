@@ -213,7 +213,7 @@ export default function EditProfileModal({
       if (currentUser) {
         const { data: freshProfile, error: fetchError } = await supabase
           .from("profiles")
-          .select("id, username, display_name, bio, is_public, favorite_restaurant_ids, avatar_url, updated_at")
+          .select("id, username, display_name, bio, is_public, favorite_restaurant_ids, avatar_url, avatar_variant, updated_at")
           .eq("id", currentUser.id)
           .single();
 

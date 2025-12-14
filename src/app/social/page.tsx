@@ -54,7 +54,7 @@ export default function SocialPage() {
         // Toujours faire une requête fraîche (pas de cache)
         const { data, error: searchError } = await supabase
           .from("profiles")
-          .select("id, username, avatar_url, favorite_restaurant_ids")
+          .select("id, username, avatar_url, avatar_variant, favorite_restaurant_ids")
           .eq("is_public", true)
           .ilike("username", `%${cleanQuery}%`)
           .not("username", "is", null)

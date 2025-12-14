@@ -4,7 +4,7 @@
  * Utilise des classes hardcodées pour éviter la purge Tailwind
  */
 
-export type AvatarVariant = "violet" | "bleu" | "orange" | "rouge" | "vert";
+export type AvatarVariant = "red" | "violet" | "blue" | "green" | "pink";
 
 export type AvatarTheme = {
   text: string;        // Classe pour le texte (ex: text-violet-400)
@@ -20,11 +20,30 @@ export type AvatarTheme = {
   ringSoft: string;     // Classe pour rings très subtils (/10)
 };
 
+export type AccentStyles = {
+  border: string;      // Classe border pour les accents
+  ring: string;        // Classe ring pour les accents
+  shadow: string;       // Classe shadow pour les accents (optionnel)
+};
+
 /**
  * Mapping des classes Tailwind par variante d'avatar
  * IMPORTANT: Classes hardcodées pour éviter la purge Tailwind
  */
 const THEME_MAP: Record<AvatarVariant, AvatarTheme> = {
+  red: {
+    text: "text-red-400",
+    textHover: "hover:text-red-300",
+    bgSoft: "bg-red-500/10",
+    border: "border-red-500/30",
+    borderLeft: "border-l-red-500/60",
+    ring: "ring-red-500/30",
+    buttonOutline: "border-red-500/50 text-red-400 hover:bg-red-500/10",
+    buttonFilled: "bg-red-500 text-white hover:bg-red-600",
+    borderSoft: "border-red-500/20",
+    borderExtraSoft: "border-red-500/15",
+    ringSoft: "ring-red-500/10",
+  },
   violet: {
     text: "text-violet-400",
     textHover: "hover:text-violet-300",
@@ -38,7 +57,7 @@ const THEME_MAP: Record<AvatarVariant, AvatarTheme> = {
     borderExtraSoft: "border-violet-500/15",
     ringSoft: "ring-violet-500/10",
   },
-  bleu: {
+  blue: {
     text: "text-blue-400",
     textHover: "hover:text-blue-300",
     bgSoft: "bg-blue-500/10",
@@ -51,33 +70,7 @@ const THEME_MAP: Record<AvatarVariant, AvatarTheme> = {
     borderExtraSoft: "border-blue-500/15",
     ringSoft: "ring-blue-500/10",
   },
-  orange: {
-    text: "text-orange-400",
-    textHover: "hover:text-orange-300",
-    bgSoft: "bg-orange-500/10",
-    border: "border-orange-500/30",
-    borderLeft: "border-l-orange-500/60",
-    ring: "ring-orange-500/30",
-    buttonOutline: "border-orange-500/50 text-orange-400 hover:bg-orange-500/10",
-    buttonFilled: "bg-orange-500 text-white hover:bg-orange-600",
-    borderSoft: "border-orange-500/20",
-    borderExtraSoft: "border-orange-500/15",
-    ringSoft: "ring-orange-500/10",
-  },
-  rouge: {
-    text: "text-red-400",
-    textHover: "hover:text-red-300",
-    bgSoft: "bg-red-500/10",
-    border: "border-red-500/30",
-    borderLeft: "border-l-red-500/60",
-    ring: "ring-red-500/30",
-    buttonOutline: "border-red-500/50 text-red-400 hover:bg-red-500/10",
-    buttonFilled: "bg-red-500 text-white hover:bg-red-600",
-    borderSoft: "border-red-500/20",
-    borderExtraSoft: "border-red-500/15",
-    ringSoft: "ring-red-500/10",
-  },
-  vert: {
+  green: {
     text: "text-emerald-400",
     textHover: "hover:text-emerald-300",
     bgSoft: "bg-emerald-500/10",
@@ -90,7 +83,60 @@ const THEME_MAP: Record<AvatarVariant, AvatarTheme> = {
     borderExtraSoft: "border-emerald-500/15",
     ringSoft: "ring-emerald-500/10",
   },
+  pink: {
+    text: "text-pink-400",
+    textHover: "hover:text-pink-300",
+    bgSoft: "bg-pink-500/10",
+    border: "border-pink-500/30",
+    borderLeft: "border-l-pink-500/60",
+    ring: "ring-pink-500/30",
+    buttonOutline: "border-pink-500/50 text-pink-400 hover:bg-pink-500/10",
+    buttonFilled: "bg-pink-500 text-white hover:bg-pink-600",
+    borderSoft: "border-pink-500/20",
+    borderExtraSoft: "border-pink-500/15",
+    ringSoft: "ring-pink-500/10",
+  },
 };
+
+/**
+ * Mapping des styles d'accent pour les cartes (border + ring + shadow)
+ */
+const ACCENT_STYLES_MAP: Record<AvatarVariant, AccentStyles> = {
+  red: {
+    border: "border-red-500/30",
+    ring: "ring-1 ring-red-400/20",
+    shadow: "", // Pas de shadow arbitraire pour éviter les problèmes Tailwind
+  },
+  violet: {
+    border: "border-violet-500/30",
+    ring: "ring-1 ring-violet-400/20",
+    shadow: "",
+  },
+  blue: {
+    border: "border-blue-500/30",
+    ring: "ring-1 ring-blue-400/20",
+    shadow: "",
+  },
+  green: {
+    border: "border-emerald-500/30",
+    ring: "ring-1 ring-emerald-400/20",
+    shadow: "",
+  },
+  pink: {
+    border: "border-pink-500/30",
+    ring: "ring-1 ring-pink-400/20",
+    shadow: "",
+  },
+};
+
+/**
+ * Retourne les styles d'accent (border + ring) pour les cartes profil
+ * SOURCE DE VÉRITÉ UNIQUE pour les accents des cartes
+ */
+export function getAccentStyles(variant: AvatarVariant | null | undefined): AccentStyles {
+  const safeVariant = (variant && variant in ACCENT_STYLES_MAP) ? variant : "violet";
+  return ACCENT_STYLES_MAP[safeVariant];
+}
 
 /**
  * Déduit la variante d'avatar depuis avatar_url ou avatar_variant
@@ -102,62 +148,45 @@ function getAvatarVariant(avatarUrl: string | null | undefined, avatarVariant?: 
     return avatarVariant as AvatarVariant;
   }
 
-  // Sinon, déduire depuis avatar_url (fallback)
+  // Sinon, déduire depuis avatar_url (fallback uniquement)
   if (!avatarUrl) {
     if (process.env.NODE_ENV === "development") {
-      console.log("[AvatarTheme] Missing avatar_url, fallback to violet");
+      console.log("[AvatarTheme] Missing avatar_url and avatar_variant, fallback to violet");
     }
     return "violet";
   }
 
   const urlLower = avatarUrl.toLowerCase();
   
-  // Détection robuste : français ET anglais
-  // Ordre de priorité pour éviter les conflits
-  
+  // Détection robuste : français ET anglais, conversion vers valeurs anglaises
   // Rouge / Red
   if (urlLower.includes("rouge") || urlLower.includes("red")) {
-    const variant = "rouge";
-    if (process.env.NODE_ENV === "development") {
-      console.log(`[AvatarTheme] Detected variant: ${variant} from URL: ${avatarUrl}`);
-    }
-    return variant;
+    return "red";
   }
   
   // Violet / Purple  
   if (urlLower.includes("violet") || urlLower.includes("purple")) {
-    const variant = "violet";
-    if (process.env.NODE_ENV === "development") {
-      console.log(`[AvatarTheme] Detected variant: ${variant} from URL: ${avatarUrl}`);
-    }
-    return variant;
+    return "violet";
   }
   
-  // Orange
+  // Orange -> pas dans les nouvelles valeurs, utiliser pink comme fallback
   if (urlLower.includes("orange")) {
-    const variant = "orange";
-    if (process.env.NODE_ENV === "development") {
-      console.log(`[AvatarTheme] Detected variant: ${variant} from URL: ${avatarUrl}`);
-    }
-    return variant;
+    return "pink"; // Orange n'existe plus, utiliser pink
   }
   
   // Bleu / Blue
   if (urlLower.includes("bleu") || urlLower.includes("blue")) {
-    const variant = "bleu";
-    if (process.env.NODE_ENV === "development") {
-      console.log(`[AvatarTheme] Detected variant: ${variant} from URL: ${avatarUrl}`);
-    }
-    return variant;
+    return "blue";
   }
   
   // Vert / Green
   if (urlLower.includes("vert") || urlLower.includes("green")) {
-    const variant = "vert";
-    if (process.env.NODE_ENV === "development") {
-      console.log(`[AvatarTheme] Detected variant: ${variant} from URL: ${avatarUrl}`);
-    }
-    return variant;
+    return "green";
+  }
+  
+  // Pink
+  if (urlLower.includes("pink") || urlLower.includes("rose")) {
+    return "pink";
   }
 
   // Fallback avec log en dev
@@ -179,6 +208,12 @@ export function getAvatarAccentTheme(
   avatarVariant?: string | null
 ): AvatarTheme {
   const variant = getAvatarVariant(avatarUrl, avatarVariant);
+  
+  // Log en dev pour debug
+  if (process.env.NODE_ENV === "development") {
+    console.log("[AvatarTheme] getAvatarAccentTheme - avatar_variant:", avatarVariant, "avatar_url:", avatarUrl, "→ variant:", variant);
+  }
+  
   return THEME_MAP[variant];
 }
 

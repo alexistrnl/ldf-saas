@@ -17,6 +17,7 @@ export type UserProfile = {
   id: string;
   username: string | null;
   avatar_url: string | null;
+  avatar_variant?: string | null; // "red" | "violet" | "blue" | "green" | "pink"
   display_name?: string | null;
   bio?: string | null;
   is_public?: boolean | null;
@@ -41,7 +42,7 @@ export async function getCurrentUserProfile(): Promise<{
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("id, username, display_name, avatar_url, bio, is_public, favorite_restaurant_ids, created_at, updated_at")
+    .select("id, username, display_name, avatar_url, avatar_variant, bio, is_public, favorite_restaurant_ids, created_at, updated_at")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -529,7 +530,7 @@ export async function updateProfile(data: {
     let { data: newProfile, error: createError } = await supabase
       .from("profiles")
       .insert({ id: user.id, ...filteredData })
-      .select("id, username, display_name, avatar_url, bio, is_public, favorite_restaurant_ids, created_at, updated_at")
+      .select("id, username, display_name, avatar_url, avatar_variant, bio, is_public, favorite_restaurant_ids, created_at, updated_at")
       .single();
 
     // Si erreur "column does not exist", retirer bio/display_name et réessayer
@@ -542,7 +543,7 @@ export async function updateProfile(data: {
       const retryResult = await supabase
         .from("profiles")
         .insert(retryCreateData)
-        .select("id, username, display_name, avatar_url, bio, is_public, favorite_restaurant_ids, created_at, updated_at")
+        .select("id, username, display_name, avatar_url, avatar_variant, bio, is_public, favorite_restaurant_ids, created_at, updated_at")
         .single();
       
       newProfile = retryResult.data;
@@ -565,7 +566,7 @@ export async function updateProfile(data: {
     .from("profiles")
     .update(filteredData)
     .eq("id", user.id)
-    .select("id, username, display_name, avatar_url, bio, is_public, favorite_restaurant_ids, created_at, updated_at")
+    .select("id, username, display_name, avatar_url, avatar_variant, bio, is_public, favorite_restaurant_ids, created_at, updated_at")
     .single();
 
   // Si erreur "column does not exist", retirer bio/display_name et réessayer
@@ -586,7 +587,7 @@ export async function updateProfile(data: {
       .from("profiles")
       .update(retryData)
       .eq("id", user.id)
-      .select("id, username, display_name, avatar_url, bio, is_public, favorite_restaurant_ids, created_at, updated_at")
+      .select("id, username, display_name, avatar_url, avatar_variant, bio, is_public, favorite_restaurant_ids, created_at, updated_at")
       .single();
     
     updatedProfile = retryResult.data;

@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
 import { getAvatarTheme, hexToRgba } from "@/lib/getAvatarTheme";
-import { getAvatarAccentTheme } from "@/lib/avatarTheme";
+import { getAvatarAccentTheme, getAccentStyles } from "@/lib/avatarTheme";
 import { UserProfile } from "@/lib/profile";
 
 // Désactiver le cache pour cette page (données toujours fraîches)
@@ -46,7 +46,7 @@ async function getPublicProfile(username: string): Promise<PublicProfileData | n
   // 1. Récupérer le profil par username
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("id, username, display_name, is_public, favorite_restaurant_ids, avatar_url, bio")
+    .select("id, username, display_name, is_public, favorite_restaurant_ids, avatar_url, avatar_variant, bio")
     .eq("username", username.toLowerCase())
     .eq("is_public", true)
     .maybeSingle();
@@ -216,16 +216,12 @@ export default async function PublicProfilePage({
   const { profile, stats, favoriteRestaurants, lastExperience } = data;
   const theme = getAvatarTheme(profile.avatar_url);
   const themeColorGlow = hexToRgba(theme.color, 0.33);
-  const accentTheme = getAvatarAccentTheme(profile.avatar_url);
+  const accentTheme = getAvatarAccentTheme(profile.avatar_url, profile.avatar_variant);
+  const accentStyles = getAccentStyles(profile.avatar_variant as any);
   
-  // Debug: afficher la variante détectée en dev (temporaire pour vérifier)
+  // Debug: afficher la variante en dev
   if (process.env.NODE_ENV === "development") {
-    const detectedVariant = accentTheme.borderSoft.includes("violet") ? "violet" :
-                            accentTheme.borderSoft.includes("blue") ? "bleu" :
-                            accentTheme.borderSoft.includes("orange") ? "orange" :
-                            accentTheme.borderSoft.includes("red") ? "rouge" :
-                            accentTheme.borderSoft.includes("emerald") ? "vert" : "unknown";
-    console.log("[PublicProfile] DEBUG - avatar_url:", profile.avatar_url, "→ detected variant:", detectedVariant, "→ borderSoft:", accentTheme.borderSoft);
+    console.log("[PublicProfile] DEBUG - avatar_variant:", profile.avatar_variant, "avatar_url:", profile.avatar_url, "→ accentStyles:", accentStyles);
   }
 
   return (
@@ -279,7 +275,7 @@ export default async function PublicProfilePage({
         </section>
 
         {/* Stats rapides */}
-        <section className={`grid grid-cols-3 gap-3 rounded-xl bg-[#0F0F1A] border border-slate-800/60 ${accentTheme.borderSoft} ring-1 ${accentTheme.ringSoft} shadow-md shadow-black/20 px-4 py-4`}>
+        <section className={`grid grid-cols-3 gap-3 rounded-xl bg-[#0F0F1A] border ${accentStyles.border} ${accentStyles.ring} shadow-md shadow-black/20 px-4 py-4`}>
           <div className="flex flex-col items-center">
             <span className="text-lg font-semibold text-white">
               {stats.restaurantsCount}
@@ -307,7 +303,7 @@ export default async function PublicProfilePage({
         </section>
 
         {/* 3 enseignes favorites */}
-        <section className={`space-y-3 rounded-xl p-3 border ${accentTheme.borderExtraSoft}`}>
+        <section className={`space-y-3 rounded-xl p-3 border ${accentStyles.border}`}>
           <h2 className="text-lg font-bold text-white">
             3 enseignes favorites
           </h2>
@@ -352,7 +348,7 @@ export default async function PublicProfilePage({
             <h2 className="text-lg font-bold text-white">
               Dernière expérience
             </h2>
-            <div className={`rounded-xl bg-[#0F0F1A] border border-slate-800/60 ${accentTheme.borderSoft} ring-1 ${accentTheme.ringSoft} p-4`}>
+            <div className={`rounded-xl bg-[#0F0F1A] border ${accentStyles.border} ${accentStyles.ring} p-4`}>
               <div className="flex items-start gap-3">
                 {lastExperience.restaurant_logo_url && (
                   <div className="relative h-12 w-12 flex-shrink-0 rounded overflow-hidden">
