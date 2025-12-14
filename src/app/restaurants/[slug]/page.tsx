@@ -633,8 +633,12 @@ export default function RestaurantPage() {
           {latestDishes.length === 0 ? (
             <p className="text-sm text-slate-400">Aucun plat ajouté récemment à la carte.</p>
           ) : (
-            <div className="grid grid-cols-3 gap-3 sm:gap-4 justify-items-center">
-              {latestDishes.slice(0, 3).map((dish) => renderDishCard(dish))}
+            <div className="flex gap-4 overflow-x-auto overflow-y-hidden pb-2 snap-x snap-mandatory [-webkit-overflow-scrolling:touch] sm:grid sm:grid-cols-3 sm:gap-4 sm:overflow-x-visible sm:pb-0 sm:snap-none">
+              {latestDishes.slice(0, 3).map((dish) => (
+                <div key={dish.id} className="w-[260px] flex-shrink-0 snap-start sm:w-auto sm:flex-shrink sm:snap-none">
+                  {renderDishCard(dish)}
+                </div>
+              ))}
             </div>
           )}
         </section>
