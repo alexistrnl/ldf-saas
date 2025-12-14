@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
 import { getAvatarTheme, hexToRgba } from "@/lib/getAvatarTheme";
+import { getAvatarAccentTheme } from "@/lib/avatarTheme";
 import { useProfile } from "@/context/ProfileContext";
 import Spinner from "@/components/Spinner";
 
@@ -221,13 +222,14 @@ export default function SocialPage() {
             {profiles.map((profile) => {
               const theme = getAvatarTheme(profile.avatar_url);
               const themeColorGlow = hexToRgba(theme.color, 0.33);
+              const accentTheme = getAvatarAccentTheme(profile.avatar_url);
               const favoritesCount = favoriteCount(profile.favorite_restaurant_ids);
 
               return (
                 <button
                   key={profile.id}
                   onClick={() => handleProfileClick(profile)}
-                  className="flex items-center gap-4 rounded-2xl bg-slate-800/50 border border-white/10 p-4 hover:bg-slate-800/70 transition-colors text-left"
+                  className={`flex items-center gap-4 rounded-2xl bg-slate-800/50 border-l-4 ${accentTheme.borderLeft} border-r border-t border-b border-white/10 p-4 hover:bg-slate-800/70 transition-colors text-left`}
                 >
                   {/* Avatar */}
                   <div
@@ -255,7 +257,7 @@ export default function SocialPage() {
 
                   {/* Infos */}
                   <div className="flex flex-col flex-1 min-w-0">
-                    <span className="text-base font-semibold text-white truncate">
+                    <span className={`text-base font-semibold ${accentTheme.text} truncate`}>
                       @{profile.username}
                     </span>
                     <div className="flex items-center gap-4 mt-1">

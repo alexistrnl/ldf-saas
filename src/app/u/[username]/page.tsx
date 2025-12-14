@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
 import { getAvatarTheme, hexToRgba } from "@/lib/getAvatarTheme";
+import { getAvatarAccentTheme } from "@/lib/avatarTheme";
 import { UserProfile } from "@/lib/profile";
 
 // Désactiver le cache pour cette page (données toujours fraîches)
@@ -215,12 +216,13 @@ export default async function PublicProfilePage({
   const { profile, stats, favoriteRestaurants, lastExperience } = data;
   const theme = getAvatarTheme(profile.avatar_url);
   const themeColorGlow = hexToRgba(theme.color, 0.33);
+  const accentTheme = getAvatarAccentTheme(profile.avatar_url);
 
   return (
     <main className="min-h-screen w-full overflow-x-hidden bg-[#020617]">
       <div className="mx-auto flex w-full max-w-xl flex-col gap-6 px-4 pb-28 pt-6">
         {/* Header profil */}
-        <section className="flex items-start gap-4">
+        <section className={`flex items-start gap-4 rounded-xl p-4 border ${accentTheme.border} ${accentTheme.bgSoft}`}>
           <div
             className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-full"
             style={{ boxShadow: `0 0 20px ${themeColorGlow}` }}
@@ -246,7 +248,7 @@ export default async function PublicProfilePage({
           <div className="flex flex-col min-w-0 flex-1 gap-1">
             {profile.display_name && profile.display_name.trim().length > 0 ? (
               <>
-                <h1 className="text-lg font-semibold text-white break-words">
+                <h1 className={`text-lg font-semibold ${accentTheme.text} break-words`}>
                   {profile.display_name}
                 </h1>
                 <span className="text-xs text-slate-400 break-words">
@@ -254,7 +256,7 @@ export default async function PublicProfilePage({
                 </span>
               </>
             ) : (
-              <h1 className="text-lg font-semibold text-white break-words">
+              <h1 className={`text-lg font-semibold ${accentTheme.text} break-words`}>
                 @{profile.username}
               </h1>
             )}

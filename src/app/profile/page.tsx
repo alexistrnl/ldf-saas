@@ -8,6 +8,7 @@ import { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
 import { UserProfile } from "@/lib/profile";
 import { getAvatarTheme, hexToRgba } from "@/lib/getAvatarTheme";
+import { getAvatarAccentTheme } from "@/lib/avatarTheme";
 import { useProfile } from "@/context/ProfileContext";
 import Spinner from "@/components/Spinner";
 import EditProfileModal from "@/components/EditProfileModal";
@@ -254,6 +255,7 @@ export default function ProfilePage() {
 
   const theme = getAvatarTheme(profile?.avatar_url);
   const themeColorGlow = hexToRgba(theme.color, 0.33);
+  const accentTheme = getAvatarAccentTheme(profile?.avatar_url);
   const displayName = profile?.display_name && profile.display_name.trim().length > 0
     ? profile.display_name
     : profile?.username && profile.username.trim().length > 0
@@ -271,7 +273,7 @@ export default function ProfilePage() {
         )}
 
         {/* Header profil */}
-        <section className="flex items-start justify-between gap-3">
+        <section className={`flex items-start justify-between gap-3 rounded-xl p-4 border ${accentTheme.border} ${accentTheme.bgSoft}`}>
           <div className="flex items-start gap-4 flex-1 min-w-0">
             <div
               className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-full"
@@ -296,7 +298,7 @@ export default function ProfilePage() {
               )}
             </div>
             <div className="flex flex-col min-w-0 flex-1 gap-1">
-              <span className="text-lg font-semibold text-white break-words">
+              <span className={`text-lg font-semibold ${accentTheme.text} break-words`}>
                 {displayName}
               </span>
               {usernameDisplay && (
@@ -319,11 +321,11 @@ export default function ProfilePage() {
           <div className="flex items-center gap-2 flex-shrink-0">
             <button
               onClick={handleStartEdit}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-white/5 hover:bg-white/10 transition-all flex-shrink-0 border border-white/10"
+              className={`flex h-10 w-10 items-center justify-center rounded-full transition-all flex-shrink-0 border ${accentTheme.buttonOutline} ${accentTheme.bgSoft}`}
               aria-label="Modifier le profil"
             >
               <svg
-                className="w-5 h-5 text-slate-300"
+                className={`w-5 h-5 ${accentTheme.text}`}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -338,11 +340,11 @@ export default function ProfilePage() {
             </button>
             <button
               onClick={() => router.push("/settings")}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-white/5 hover:bg-white/10 transition-all flex-shrink-0 border border-white/10"
+              className={`flex h-10 w-10 items-center justify-center rounded-full transition-all flex-shrink-0 border ${accentTheme.buttonOutline} ${accentTheme.bgSoft}`}
               aria-label="Paramètres"
             >
               <svg
-                className="w-5 h-5 text-slate-300"
+                className={`w-5 h-5 ${accentTheme.text}`}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
