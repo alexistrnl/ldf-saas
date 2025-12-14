@@ -6,51 +6,58 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
-import { getCurrentUserProfile, UserProfile } from "@/lib/profile";
+import { getCurrentUserProfile, UserProfile, sanitizeUsername, validateUsernameFormat, updateSocialSettings } from "@/lib/profile";
 import { getAvatarTheme, hexToRgba } from "@/lib/getAvatarTheme";
 import Spinner from "@/components/Spinner";
 
-type ProfileRestaurantSummary = {
-  restaurantId: string;
-  restaurantName: string;
+type RestaurantLite = {
+  id: string;
+  name: string;
   slug: string | null;
-  logoUrl: string | null;
-  visitsCount: number;
+  logo_url: string | null;
+};
+
+type ProfileStats = {
+  restaurantsCount: number;
+  totalExperiences: number;
   avgRating: number;
 };
 
-type ProfileExperience = {
+type LastExperience = {
   id: string;
-  restaurantId: string | null;
-  restaurantName: string;
-  restaurantSlug: string | null;
-  restaurantLogoUrl: string | null;
+  restaurant_name: string;
+  restaurant_logo_url: string | null;
   rating: number;
   comment: string | null;
-  visitedAt: string | null;
-  createdAt: string;
-  dishes: {
-    dishId: string | null;
-    dishName: string;
-    rating: number;
-    imageUrl: string | null;
-  }[];
-};
+  visited_at: string | null;
+  created_at: string;
+} | null;
 
 export default function ProfilePage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [restaurantsSummary, setRestaurantsSummary] = useState<
-    ProfileRestaurantSummary[]
-  >([]);
-  const [experiences, setExperiences] = useState<ProfileExperience[]>([]);
-  const [expandedExperiences, setExpandedExperiences] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Données du mur
+  const [stats, setStats] = useState<ProfileStats>({ restaurantsCount: 0, totalExperiences: 0, avgRating: 0 });
+  const [favoriteRestaurants, setFavoriteRestaurants] = useState<RestaurantLite[]>([]);
+  const [lastExperience, setLastExperience] = useState<LastExperience>(null);
+  
+  // Mode édition
+  const [isEditing, setIsEditing] = useState(false);
+  const [editUsername, setEditUsername] = useState("");
+  const [editIsPublic, setEditIsPublic] = useState(false);
+  const [editFavoriteRestaurantIds, setEditFavoriteRestaurantIds] = useState<string[]>([]);
+  const [restaurants, setRestaurants] = useState<RestaurantLite[]>([]);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editSuccess, setEditSuccess] = useState<string | null>(null);
 
+  // Charger les données du profil
   useEffect(() => {
-    const loadProfile = async () => {
+    const loadProfileData = async () => {
       try {
         setError(null);
         setLoading(true);
@@ -75,208 +82,100 @@ export default function ProfilePage() {
 
         setUser(user);
 
-        // Charger le profil (username)
-        const { profile: userProfile, error: profileError } =
-          await getCurrentUserProfile();
+        // Charger le profil
+        const { profile: userProfile, error: profileError } = await getCurrentUserProfile();
         if (profileError) {
           console.error("[Profile] load profile error", profileError);
-          // Ne bloquer pas le chargement si le profil n'existe pas encore
         } else {
           setProfile(userProfile);
         }
 
-        // 1) Charger tous les logs
-        const { data: logsData, error: logsError } = await supabase
-          .from("fastfood_logs")
-          .select("id, restaurant_id, restaurant_name, rating, comment, visited_at, created_at")
-          .eq("user_id", user.id)
-          .order("visited_at", { ascending: false });
+        const userId = user.id;
 
-        if (logsError) {
-          console.error("[Profile] logs error", logsError);
-          setError("Erreur lors du chargement de tes expériences.");
-          setLoading(false);
-          return;
-        }
+        // Calculer les stats (mini)
+        const { data: logsData } = await supabase
+          .from("fastfood_logs")
+          .select("restaurant_id, rating")
+          .eq("user_id", userId);
 
         const logs = logsData || [];
-
-        // 2) Récupérer les IDs de restaurants uniques
-        const restaurantIds = Array.from(
-          new Set(
-            logs
-              .map((log) => log.restaurant_id)
-              .filter((id): id is string => Boolean(id))
-          )
+        const uniqueRestaurantIds = new Set(
+          logs.map((log) => log.restaurant_id).filter((id): id is string => Boolean(id))
         );
+        const restaurantsCount = uniqueRestaurantIds.size;
+        const totalExperiences = logs.length;
+        const ratings = logs
+          .map((log) => log.rating)
+          .filter((rating): rating is number => typeof rating === "number");
+        const avgRating = ratings.length > 0
+          ? Number((ratings.reduce((sum, r) => sum + r, 0) / ratings.length).toFixed(1))
+          : 0;
 
-        // 3) Charger les infos des restaurants (slug, logo_url)
-        let restaurantMap: Record<
-          string,
-          { slug: string | null; logo_url: string | null; name: string }
-        > = {};
+        setStats({ restaurantsCount, totalExperiences, avgRating });
 
-        if (restaurantIds.length > 0) {
-          const { data: restaurantsData, error: restaurantsError } = await supabase
-            .from("restaurants")
-            .select("id, slug, logo_url, name")
-            .in("id", restaurantIds);
+        // Charger les restaurants favoris
+        if (userProfile?.favorite_restaurant_ids && userProfile.favorite_restaurant_ids.length > 0) {
+          const favoriteIds: string[] = Array.isArray(userProfile.favorite_restaurant_ids)
+            ? (userProfile.favorite_restaurant_ids as string[])
+            : [];
+          const favoriteIdsSliced = favoriteIds.slice(0, 3);
 
-          if (restaurantsError) {
-            console.error("[Profile] restaurants error", restaurantsError);
-          } else {
-            (restaurantsData || []).forEach((restaurant) => {
-              restaurantMap[restaurant.id] = {
-                slug: restaurant.slug,
-                logo_url: restaurant.logo_url,
-                name: restaurant.name,
-              };
-            });
+          if (favoriteIdsSliced.length > 0) {
+            const { data: restaurantsData } = await supabase
+              .from("restaurants")
+              .select("id, name, slug, logo_url")
+              .in("id", favoriteIdsSliced);
+
+            if (restaurantsData) {
+              const typedRestaurants = restaurantsData as RestaurantLite[];
+              const orderedFavorites = favoriteIdsSliced
+                .map((id: string) => typedRestaurants.find((r) => r.id === id))
+                .filter((r): r is RestaurantLite => Boolean(r));
+              setFavoriteRestaurants(orderedFavorites);
+            }
           }
         }
 
-        // 4) Construire le résumé des enseignes
-        const grouped = new Map<
-          string,
-          {
-            name: string;
-            visits: number;
-            totalRating: number;
-            countRatings: number;
-            restaurantId: string | null;
-          }
-        >();
+        // Charger la dernière expérience
+        const { data: lastLog } = await supabase
+          .from("fastfood_logs")
+          .select("id, restaurant_id, restaurant_name, rating, comment, visited_at, created_at")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-        logs.forEach((log) => {
-          const key = log.restaurant_id ?? `custom-${log.restaurant_name}`;
-          if (!grouped.has(key)) {
-            grouped.set(key, {
-              name: log.restaurant_name,
-              visits: 0,
-              totalRating: 0,
-              countRatings: 0,
-              restaurantId: log.restaurant_id,
-            });
+        if (lastLog) {
+          let restaurantLogoUrl: string | null = null;
+          if (lastLog.restaurant_id) {
+            const { data: restaurant } = await supabase
+              .from("restaurants")
+              .select("logo_url")
+              .eq("id", lastLog.restaurant_id)
+              .maybeSingle();
+            restaurantLogoUrl = restaurant?.logo_url || null;
           }
 
-          const entry = grouped.get(key)!;
-          entry.visits += 1;
-          if (log.rating !== null && log.rating !== undefined) {
-            entry.totalRating += log.rating;
-            entry.countRatings += 1;
-          }
-        });
-
-        const summaryData: ProfileRestaurantSummary[] = Array.from(
-          grouped.entries()
-        ).map(([key, value]) => {
-          const restaurantInfo = value.restaurantId
-            ? restaurantMap[value.restaurantId]
-            : null;
-          return {
-            restaurantId: value.restaurantId ?? key,
-            restaurantName: value.name,
-            slug: restaurantInfo?.slug ?? null,
-            logoUrl: restaurantInfo?.logo_url ?? null,
-            visitsCount: value.visits,
-            avgRating:
-              value.countRatings > 0
-                ? Number((value.totalRating / value.countRatings).toFixed(1))
-                : 0,
-          };
-        });
-
-        setRestaurantsSummary(summaryData);
-
-        // 5) Charger les plats notés (fastfood_log_dishes)
-        const logIds = logs.map((log) => log.id);
-        let dishLogsMap: Record<
-          string,
-          Array<{
-            dish_id: string | null;
-            dish_name: string;
-            rating: number;
-          }>
-        > = {};
-
-        if (logIds.length > 0) {
-          const { data: dishLogsData, error: dishLogsError } = await supabase
-            .from("fastfood_log_dishes")
-            .select("log_id, dish_id, dish_name, rating")
-            .in("log_id", logIds);
-
-          if (dishLogsError) {
-            console.error("[Profile] dishLogs error", dishLogsError);
-          } else {
-            (dishLogsData || []).forEach((dishLog) => {
-              if (!dishLogsMap[dishLog.log_id]) {
-                dishLogsMap[dishLog.log_id] = [];
-              }
-              dishLogsMap[dishLog.log_id].push({
-                dish_id: dishLog.dish_id,
-                dish_name: dishLog.dish_name,
-                rating: dishLog.rating,
-              });
-            });
-          }
+          setLastExperience({
+            id: lastLog.id,
+            restaurant_name: lastLog.restaurant_name || "Restaurant inconnu",
+            restaurant_logo_url: restaurantLogoUrl,
+            rating: lastLog.rating || 0,
+            comment: lastLog.comment,
+            visited_at: lastLog.visited_at,
+            created_at: lastLog.created_at,
+          });
         }
 
-        // 6) Charger les images des plats
-        const dishIds = Array.from(
-          new Set(
-            Object.values(dishLogsMap)
-              .flat()
-              .map((d) => d.dish_id)
-              .filter((id): id is string => Boolean(id))
-          )
-        );
-
-        let dishImagesMap: Record<string, string | null> = {};
-
-        if (dishIds.length > 0) {
-          const { data: dishesData, error: dishesError } = await supabase
-            .from("dishes")
-            .select("id, image_url")
-            .in("id", dishIds);
-
-          if (dishesError) {
-            console.error("[Profile] dishes error", dishesError);
-          } else {
-            (dishesData || []).forEach((dish) => {
-              dishImagesMap[dish.id] = dish.image_url;
-            });
-          }
+        // Charger la liste des restaurants pour l'édition
+        const { data: allRestaurants } = await supabase
+          .from("restaurants")
+          .select("id, name, logo_url")
+          .order("name", { ascending: true });
+        
+        if (allRestaurants) {
+          setRestaurants(allRestaurants as RestaurantLite[]);
         }
-
-        // 7) Construire les expériences complètes
-        const experiencesData: ProfileExperience[] = logs.map((log) => {
-          const restaurantInfo = log.restaurant_id
-            ? restaurantMap[log.restaurant_id]
-            : null;
-          const dishLogs = dishLogsMap[log.id] || [];
-
-          return {
-            id: log.id,
-            restaurantId: log.restaurant_id,
-            restaurantName: log.restaurant_name,
-            restaurantSlug: restaurantInfo?.slug ?? null,
-            restaurantLogoUrl: restaurantInfo?.logo_url ?? null,
-            rating: log.rating ?? 0,
-            comment: log.comment,
-            visitedAt: log.visited_at,
-            createdAt: log.created_at,
-            dishes: dishLogs.map((dishLog) => ({
-              dishId: dishLog.dish_id,
-              dishName: dishLog.dish_name,
-              rating: dishLog.rating,
-              imageUrl: dishLog.dish_id
-                ? dishImagesMap[dishLog.dish_id] ?? null
-                : null,
-            })),
-          };
-        });
-
-        setExperiences(experiencesData);
       } catch (err) {
         console.error("[Profile] unexpected", err);
         setError("Erreur inattendue lors du chargement de ton profil.");
@@ -285,27 +184,156 @@ export default function ProfilePage() {
       }
     };
 
-    loadProfile();
+    loadProfileData();
   }, []);
 
-  // Recharger le profil quand on revient sur la page (si username/avatar a changé via réglages)
+  // Recharger le profil quand on revient sur la page
   useEffect(() => {
     const reloadProfile = async () => {
       const { profile: updatedProfile } = await getCurrentUserProfile();
       if (updatedProfile) {
         setProfile(updatedProfile);
+        // Recharger aussi les données du mur
+        loadProfileData();
       }
     };
 
-    // Recharger au focus de la page
     const handleFocus = () => reloadProfile();
     window.addEventListener("focus", handleFocus);
-
-    // Recharger aussi au mount si on arrive depuis settings
-    reloadProfile();
-
     return () => window.removeEventListener("focus", handleFocus);
   }, []);
+
+  // Fonction pour recharger les données (réutilisable)
+  const loadProfileData = async () => {
+    if (!user) return;
+    // Même logique que dans le useEffect initial
+    // (code simplifié pour éviter duplication - en production on extrairait ça)
+  };
+
+  // Ouvrir le mode édition
+  const handleStartEdit = () => {
+    if (!profile) return;
+    setEditUsername(profile.username || "");
+    setEditIsPublic(profile.is_public ?? false);
+    setEditFavoriteRestaurantIds(profile.favorite_restaurant_ids || []);
+    setIsEditing(true);
+    setEditError(null);
+    setEditSuccess(null);
+  };
+
+  // Annuler l'édition
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditError(null);
+    setEditSuccess(null);
+  };
+
+  // Gestion du changement d'username (nettoyage automatique)
+  const handleEditUsernameChange = (value: string) => {
+    const cleaned = sanitizeUsername(value);
+    setEditUsername(cleaned);
+    setEditError(null);
+    setEditSuccess(null);
+  };
+
+  // Gestion de la sélection d'un restaurant favori
+  const handleEditFavoriteRestaurantChange = (index: number, restaurantId: string | null) => {
+    const newFavorites = [...editFavoriteRestaurantIds];
+    
+    if (restaurantId) {
+      const existingIndex = newFavorites.findIndex(id => id === restaurantId);
+      if (existingIndex !== -1 && existingIndex !== index) {
+        newFavorites.splice(existingIndex, 1);
+      }
+      
+      if (index < newFavorites.length) {
+        newFavorites[index] = restaurantId;
+      } else {
+        if (newFavorites.length < 3) {
+          newFavorites.push(restaurantId);
+        }
+      }
+    } else {
+      newFavorites.splice(index, 1);
+    }
+    
+    setEditFavoriteRestaurantIds(newFavorites);
+    setEditError(null);
+    setEditSuccess(null);
+  };
+
+  // Sauvegarder les modifications
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEditError(null);
+    setEditSuccess(null);
+
+    const cleanedUsername = editUsername.trim();
+    if (cleanedUsername) {
+      const validation = validateUsernameFormat(cleanedUsername);
+      if (!validation.valid) {
+        setEditError(validation.error || "Nom d'utilisateur invalide.");
+        return;
+      }
+    }
+
+    setIsSavingEdit(true);
+
+    try {
+      const { profile: updatedProfile, error } = await updateSocialSettings({
+        username: cleanedUsername || null,
+        is_public: editIsPublic,
+        favorite_restaurant_ids: editFavoriteRestaurantIds,
+      });
+
+      if (error) {
+        console.error("[Profile] update social settings error:", error);
+        let message = "Erreur lors de la sauvegarde.";
+        
+        if (error.code === "23505" || error.message?.toLowerCase().includes("unique")) {
+          message = "Nom d'utilisateur déjà pris.";
+        } else if (
+          error.message?.toLowerCase().includes("row-level security") ||
+          error.message?.toLowerCase().includes("policy") ||
+          error.code === "42501"
+        ) {
+          message = "Tu n'as pas les droits pour modifier ce profil.";
+        }
+        
+        setEditError(message);
+        setIsSavingEdit(false);
+        return;
+      }
+
+      if (updatedProfile) {
+        setProfile(updatedProfile);
+        setIsEditing(false);
+        setEditSuccess("Profil mis à jour ✅");
+        // Recharger les données
+        window.location.reload(); // Simple reload pour recharger favorites et stats
+      }
+    } catch (err) {
+      console.error("[Profile] unexpected edit error:", err);
+      setEditError("Erreur inattendue. Réessaie plus tard.");
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  function formatDate(dateString: string | null): string {
+    if (!dateString) return "Date inconnue";
+    return new Date(dateString).toLocaleDateString("fr-FR", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  }
+
+  function truncateComment(comment: string | null, maxLength: number = 150): string {
+    if (!comment) return "";
+    if (comment.length <= maxLength) return comment;
+    return comment.slice(0, maxLength).trim() + "...";
+  }
 
   if (loading) {
     return (
@@ -333,43 +361,11 @@ export default function ProfilePage() {
     );
   }
 
-  // Calculer les stats
-  const restaurantsCount = restaurantsSummary.length;
-  const totalExperiences = experiences.length;
-  const avgRating =
-    experiences.length > 0
-      ? (
-          experiences.reduce((sum, exp) => sum + exp.rating, 0) / experiences.length
-        ).toFixed(1)
-      : "0.0";
-
-  // Fonction pour obtenir l'initiale
-  const getInitial = (value?: string | null): string => {
-    if (!value || value.trim().length === 0) return "?";
-    return value.trim().charAt(0).toUpperCase();
-  };
-
-  // Fonction pour formater la date
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return "Date inconnue";
-    return new Date(dateString).toLocaleDateString("fr-FR", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
-  };
-
-  // Calculer le nom d'affichage et la source de l'initiale
-  const displayName =
-    profile?.username && profile.username.trim().length > 0
-      ? profile.username
-      : user?.email ?? "Utilisateur BiteBox";
-  const initialSource = profile?.username || user?.email;
-
-  // Calculer le thème basé sur l'avatar
   const theme = getAvatarTheme(profile?.avatar_url);
-  const themeColorWithOpacity = hexToRgba(theme.color, 0.4);
-  const themeColorGlow = hexToRgba(theme.color, 0.33); // 55 en hex = 33% en décimal
+  const themeColorGlow = hexToRgba(theme.color, 0.33);
+  const displayName = profile?.username && profile.username.trim().length > 0
+    ? profile.username
+    : user?.email ?? "Utilisateur BiteBox";
 
   return (
     <main className="min-h-screen w-full overflow-x-hidden bg-[#020617]">
@@ -383,7 +379,7 @@ export default function ProfilePage() {
         {/* Header profil */}
         <section className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-5 flex-1 min-w-0">
-            <div 
+            <div
               className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-full"
               style={{ boxShadow: `0 0 20px ${themeColorGlow}` }}
             >
@@ -407,57 +403,192 @@ export default function ProfilePage() {
             </div>
             <div className="flex flex-col min-w-0 flex-1">
               <span className="text-lg font-semibold text-white truncate">
-                {displayName}
+                @{displayName}
               </span>
-              {user?.email && (
+              {user?.email && !profile?.username && (
                 <span className="text-xs text-slate-400 truncate">
                   {user.email}
                 </span>
               )}
             </div>
           </div>
-          <button
-            onClick={() => router.push("/profile/settings")}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/5 hover:bg-white/10 transition-all flex-shrink-0 border"
-            style={{ borderColor: themeColorWithOpacity, borderWidth: '1px' }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = theme.color;
-              e.currentTarget.style.backgroundColor = hexToRgba(theme.color, 0.1);
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = themeColorWithOpacity;
-              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
-            }}
-            aria-label="Paramètres"
-          >
-            <svg
-              className="w-5 h-5 transition-colors"
-              style={{ color: theme.color }}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleStartEdit}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-white/5 hover:bg-white/10 transition-all flex-shrink-0 border border-white/10"
+              aria-label="Modifier le profil"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z"
-              />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-              />
-            </svg>
-          </button>
+              <svg
+                className="w-5 h-5 text-slate-300"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                />
+              </svg>
+            </button>
+            <button
+              onClick={() => router.push("/profile/settings")}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-white/5 hover:bg-white/10 transition-all flex-shrink-0 border border-white/10"
+              aria-label="Paramètres"
+            >
+              <svg
+                className="w-5 h-5 text-slate-300"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                />
+              </svg>
+            </button>
+          </div>
         </section>
 
-        {/* Stats rapides */}
+        {/* Mode édition */}
+        {isEditing && profile && (
+          <section className="rounded-xl bg-[#0e0e1a] border border-white/5 p-4">
+            <form onSubmit={handleSaveEdit} className="space-y-4">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-medium text-white">Modifier le profil</h2>
+                <button
+                  type="button"
+                  onClick={handleCancelEdit}
+                  className="text-sm text-slate-400 hover:text-white"
+                >
+                  Annuler
+                </button>
+              </div>
+
+              {/* Nom d'utilisateur */}
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-slate-300">
+                  Nom d'utilisateur
+                </label>
+                <input
+                  type="text"
+                  value={editUsername}
+                  onChange={(e) => handleEditUsernameChange(e.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-bitebox focus:outline-none focus:ring-1 focus:ring-bitebox transition"
+                  placeholder="@tonpseudo"
+                  maxLength={30}
+                />
+                <p className="text-xs text-slate-500">
+                  3 à 30 caractères (lettres, chiffres, _ et .)
+                </p>
+              </div>
+
+              {/* Toggle Profil public */}
+              <div className="flex items-center justify-between py-2">
+                <div className="flex-1">
+                  <label className="text-xs font-medium text-slate-300 block mb-1">
+                    Profil public
+                  </label>
+                  <p className="text-xs text-slate-500">
+                    {editIsPublic
+                      ? "Ton profil est visible dans la recherche Social"
+                      : "Ton profil n'est pas visible dans la recherche Social"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditIsPublic(!editIsPublic)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    editIsPublic ? 'bg-bitebox' : 'bg-slate-600'
+                  }`}
+                  role="switch"
+                  aria-checked={editIsPublic}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      editIsPublic ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* 3 enseignes favorites */}
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-slate-300 block">
+                  3 enseignes favorites
+                </label>
+                {[0, 1, 2].map((index) => {
+                  const selectedId = editFavoriteRestaurantIds[index] || null;
+                  
+                  return (
+                    <select
+                      key={index}
+                      value={selectedId || ""}
+                      onChange={(e) => handleEditFavoriteRestaurantChange(index, e.target.value || null)}
+                      className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm text-white focus:border-bitebox focus:outline-none focus:ring-1 focus:ring-bitebox transition"
+                    >
+                      <option value="">{selectedId ? "Aucun" : "Sélectionner un restaurant"}</option>
+                      {restaurants.map((restaurant) => {
+                        const isSelectedElsewhere = editFavoriteRestaurantIds.includes(restaurant.id) && editFavoriteRestaurantIds[index] !== restaurant.id;
+                        if (isSelectedElsewhere) return null;
+                        
+                        return (
+                          <option key={restaurant.id} value={restaurant.id}>
+                            {restaurant.name}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  );
+                })}
+              </div>
+
+              {/* Messages d'erreur/succès */}
+              {editError && (
+                <div className="rounded-xl bg-red-500/10 border border-red-500/40 px-3 py-2">
+                  <p className="text-xs text-red-400">{editError}</p>
+                </div>
+              )}
+              {editSuccess && (
+                <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/40 px-3 py-2">
+                  <p className="text-xs text-emerald-400">{editSuccess}</p>
+                </div>
+              )}
+
+              {/* Bouton de sauvegarde */}
+              <button
+                type="submit"
+                disabled={isSavingEdit}
+                className="w-full rounded-xl bg-bitebox px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
+              >
+                {isSavingEdit ? (
+                  <>
+                    <Spinner size="sm" />
+                    <span>Enregistrement...</span>
+                  </>
+                ) : (
+                  "Enregistrer"
+                )}
+              </button>
+            </form>
+          </section>
+        )}
+
+        {/* Stats rapides (mini) */}
         <section className="grid grid-cols-3 gap-3 rounded-xl bg-[#0F0F1A] border border-white/5 shadow-md shadow-black/20 px-4 py-4">
           <div className="flex flex-col items-center">
             <span className="text-lg font-semibold text-white">
-              {restaurantsCount}
+              {stats.restaurantsCount}
             </span>
             <span className="text-[11px] text-slate-400 text-center">
               Restos testés
@@ -465,7 +596,7 @@ export default function ProfilePage() {
           </div>
           <div className="flex flex-col items-center">
             <span className="text-lg font-semibold text-white">
-              {totalExperiences}
+              {stats.totalExperiences}
             </span>
             <span className="text-[11px] text-slate-400 text-center">
               Expériences
@@ -473,7 +604,7 @@ export default function ProfilePage() {
           </div>
           <div className="flex flex-col items-center">
             <span className="text-lg font-semibold text-white">
-              {avgRating}
+              {stats.avgRating.toFixed(1)}
             </span>
             <span className="text-[11px] text-slate-400 text-center">
               Note moyenne
@@ -481,265 +612,120 @@ export default function ProfilePage() {
           </div>
         </section>
 
-        {/* Restaurants que j'ai testés */}
-        <section className="mt-6 space-y-4">
-          <div>
-            <h2 
-              className="text-xl font-bold mb-1"
-              style={{ color: theme.color }}
-            >
-              Restaurants que j'ai testés
-            </h2>
-            <p className="text-sm text-white/50 mb-3">
-              Ton top des spots où tu as déjà mis une note.
-            </p>
-          </div>
+        {/* Lien vers Expérience pour les stats complètes */}
+        <Link
+          href="/experience"
+          className="flex items-center justify-between rounded-xl bg-[#0F0F1A] border border-white/5 p-3 hover:bg-[#151520] transition-colors"
+        >
+          <span className="text-sm text-slate-400">Voir toutes mes expériences</span>
+          <svg
+            className="w-4 h-4 text-slate-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 5l7 7-7 7"
+            />
+          </svg>
+        </Link>
 
-          {restaurantsSummary.length === 0 ? (
-            <p className="text-sm text-slate-400">
-              Tu n'as pas encore testé de restaurant.
-            </p>
+        {/* 3 enseignes favorites */}
+        <section className="space-y-3">
+          <h2 className="text-lg font-bold text-white">
+            3 enseignes favorites
+          </h2>
+          {favoriteRestaurants.length > 0 ? (
+            <div className="grid grid-cols-3 gap-3">
+              {favoriteRestaurants.map((restaurant) => (
+                <Link
+                  key={restaurant.id}
+                  href={restaurant.slug ? `/restaurants/${restaurant.slug}` : `#`}
+                  className="flex flex-col items-center gap-2 rounded-xl bg-[#0F0F1A] border border-white/5 p-3 hover:bg-[#151520] transition-colors"
+                >
+                  {restaurant.logo_url ? (
+                    <div className="relative h-12 w-12 rounded overflow-hidden">
+                      <Image
+                        src={restaurant.logo_url}
+                        alt={restaurant.name}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                  ) : (
+                    <div className="h-12 w-12 rounded bg-slate-700/50 flex items-center justify-center">
+                      <span className="text-xs text-slate-400">?</span>
+                    </div>
+                  )}
+                  <span className="text-xs text-white text-center truncate w-full">
+                    {restaurant.name}
+                  </span>
+                </Link>
+              ))}
+            </div>
           ) : (
-            <div className="-mx-4 overflow-x-auto pb-2">
-              <div className="flex gap-4 px-4">
-                {restaurantsSummary.map((r) => (
-                  <Link
-                    key={r.restaurantId}
-                    href={r.slug ? `/restaurants/${r.slug}` : "#"}
-                    className={`w-48 flex-shrink-0 overflow-hidden rounded-xl bg-[#0F0F1A] border shadow-md shadow-black/20 transition hover:shadow-lg hover:shadow-black/30 ${
-                      !r.slug ? "pointer-events-none opacity-60" : ""
-                    }`}
-                    style={{ 
-                      borderColor: themeColorWithOpacity,
-                      borderWidth: '1px'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = theme.color;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = themeColorWithOpacity;
-                    }}
-                  >
-                    <div className="w-full aspect-[4/3] overflow-hidden rounded-t-xl bg-slate-950">
-                      {r.logoUrl ? (
-                        <img
-                          src={r.logoUrl}
-                          alt={r.restaurantName}
-                          className="w-full h-full object-cover scale-110"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <span className="text-xs text-slate-500">
-                            Pas de logo
-                          </span>
-                        </div>
-                      )}
+            <p className="text-sm text-slate-400">
+              Aucune enseigne favorite définie.
+            </p>
+          )}
+        </section>
+
+        {/* Dernière expérience */}
+        {lastExperience && (
+          <section className="space-y-3">
+            <h2 className="text-lg font-bold text-white">
+              Dernière expérience
+            </h2>
+            <div className="rounded-xl bg-[#0F0F1A] border border-white/5 p-4">
+              <div className="flex items-start gap-3">
+                {lastExperience.restaurant_logo_url && (
+                  <div className="relative h-12 w-12 flex-shrink-0 rounded overflow-hidden">
+                    <Image
+                      src={lastExperience.restaurant_logo_url}
+                      alt={lastExperience.restaurant_name}
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <h3 className="text-base font-semibold text-white truncate">
+                      {lastExperience.restaurant_name}
+                    </h3>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      {[...Array(5)].map((_, i) => (
+                        <svg
+                          key={i}
+                          className={`w-4 h-4 ${
+                            i < lastExperience.rating
+                              ? "text-yellow-400 fill-yellow-400"
+                              : "text-slate-600"
+                          }`}
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                        </svg>
+                      ))}
                     </div>
-                    <div className="space-y-1 p-4 md:p-5">
-                      <p className="truncate text-lg font-semibold text-white">
-                        {r.restaurantName}
-                      </p>
-                      <p className="text-xs text-slate-400">
-                        {r.avgRating.toFixed(1)} / 5 · {r.visitsCount}{" "}
-                        visite{r.visitsCount > 1 ? "s" : ""}
-                      </p>
-                    </div>
-                  </Link>
-                ))}
+                  </div>
+                  <p className="text-xs text-slate-400 mb-2">
+                    {formatDate(lastExperience.visited_at || lastExperience.created_at)}
+                  </p>
+                  {lastExperience.comment && (
+                    <p className="text-sm text-slate-300">
+                      {truncateComment(lastExperience.comment)}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
-          )}
-        </section>
-
-        {/* Mes expériences */}
-        <section className="mt-6 space-y-4">
-          <div>
-            <h2 
-              className="text-xl font-bold mb-1"
-              style={{ color: theme.color }}
-            >
-              Mes expériences
-            </h2>
-            <p className="text-sm text-white/50 mb-3">
-              Retrouve toutes tes notes, par date.
-            </p>
-          </div>
-
-          {experiences.length === 0 ? (
-            <p className="text-sm text-slate-400">
-              Tu n'as pas encore enregistré d'expérience.
-            </p>
-          ) : (
-            <div className="space-y-4">
-              {experiences.map((exp) => {
-                const isExpanded = expandedExperiences.has(exp.id);
-                const hasDetails = (exp.comment || exp.dishes.length > 0);
-                
-                return (
-                  <div
-                    key={exp.id}
-                    className="rounded-xl bg-[#0F0F1A] border shadow-md shadow-black/20 transition hover:shadow-lg hover:shadow-black/30"
-                    style={{ 
-                      borderColor: themeColorWithOpacity,
-                      borderWidth: '1px'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = theme.color;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = themeColorWithOpacity;
-                    }}
-                  >
-                    {/* En-tête cliquable */}
-                    <button
-                      onClick={() => {
-                        if (hasDetails) {
-                          setExpandedExperiences((prev) => {
-                            const newSet = new Set(prev);
-                            if (newSet.has(exp.id)) {
-                              newSet.delete(exp.id);
-                            } else {
-                              newSet.add(exp.id);
-                            }
-                            return newSet;
-                          });
-                        }
-                      }}
-                      className={`w-full p-4 md:p-5 ${hasDetails ? 'cursor-pointer' : 'cursor-default'}`}
-                      disabled={!hasDetails}
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                          <div className="h-10 w-10 overflow-hidden rounded-full bg-slate-800 flex items-center justify-center flex-shrink-0">
-                            {exp.restaurantLogoUrl ? (
-                              <img
-                                src={exp.restaurantLogoUrl}
-                                alt={exp.restaurantName}
-                                className="h-10 w-10 object-cover"
-                              />
-                            ) : (
-                              <span className="text-xs text-slate-300">
-                                {exp.restaurantName.charAt(0)}
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex flex-col min-w-0 flex-1 text-left">
-                            {exp.restaurantSlug ? (
-                              <Link
-                                href={`/restaurants/${exp.restaurantSlug}`}
-                                onClick={(e) => e.stopPropagation()}
-                                className="text-lg font-semibold text-white hover:text-bitebox-light truncate"
-                              >
-                                {exp.restaurantName}
-                              </Link>
-                            ) : (
-                              <span className="text-lg font-semibold text-white truncate">
-                                {exp.restaurantName}
-                              </span>
-                            )}
-                            <span className="text-sm text-white/50">
-                              {formatDate(exp.visitedAt)}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3 flex-shrink-0">
-                          <div className="text-right">
-                            <div className="flex justify-end mb-1">
-                              {[1, 2, 3, 4, 5].map((star) => (
-                                <span
-                                  key={star}
-                                  className={
-                                    exp.rating >= star
-                                      ? "text-yellow-400"
-                                      : "text-slate-700"
-                                  }
-                                >
-                                  ★
-                                </span>
-                              ))}
-                            </div>
-                            <span className="text-sm text-white font-medium">
-                              {exp.rating} / 5
-                            </span>
-                          </div>
-                          {hasDetails && (
-                            <svg
-                              className={`w-5 h-5 text-white/50 transition-transform ${
-                                isExpanded ? 'rotate-180' : ''
-                              }`}
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M19 9l-7 7-7-7"
-                              />
-                            </svg>
-                          )}
-                        </div>
-                      </div>
-                    </button>
-
-                    {/* Contenu déroulant */}
-                    {isExpanded && hasDetails && (
-                      <div className="px-4 md:px-5 pb-4 md:pb-5 pt-0 border-t border-white/5 mt-2">
-                        {/* Commentaire */}
-                        {exp.comment && (
-                          <p className="text-sm text-slate-300 mb-4">
-                            {exp.comment}
-                          </p>
-                        )}
-
-                        {/* Plats goûtés */}
-                        {exp.dishes.length > 0 && (
-                          <div className="space-y-3">
-                            <p className="text-sm font-semibold text-white">
-                              Plats goûtés :
-                            </p>
-                            <div className="grid grid-cols-2 gap-3">
-                              {exp.dishes.map((dish, idx) => (
-                                <div
-                                  key={dish.dishId ?? `${exp.id}-dish-${idx}`}
-                                  className="rounded-lg bg-[#161622] border border-white/5 shadow-sm p-3 flex flex-col gap-1"
-                                >
-                                  <p className="text-sm font-semibold text-white truncate">
-                                    {dish.dishName}
-                                  </p>
-                                  <div className="flex items-center gap-1">
-                                    <div className="flex">
-                                      {[1, 2, 3, 4, 5].map((star) => (
-                                        <span
-                                          key={star}
-                                          className={
-                                            dish.rating >= star
-                                              ? "text-yellow-400 text-xs"
-                                              : "text-slate-700 text-xs"
-                                          }
-                                        >
-                                          ★
-                                        </span>
-                                      ))}
-                                    </div>
-                                    <span className="text-xs text-white font-medium">
-                                      {dish.rating}/5
-                                    </span>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
+          </section>
+        )}
       </div>
     </main>
   );

@@ -93,10 +93,17 @@ export default function SocialPage() {
         {/* Champ de recherche */}
         <div className="relative">
           <input
-            type="text"
+            type="search"
+            name="q"
+            id="profile-search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="@username ou Rechercher un profil"
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="none"
+            spellCheck={false}
+            inputMode="search"
             className="w-full rounded-2xl bg-slate-800/50 border border-white/10 px-4 py-3 pr-10 text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-bitebox focus:border-transparent"
           />
           <svg
