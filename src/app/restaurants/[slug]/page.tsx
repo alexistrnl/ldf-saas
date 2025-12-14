@@ -633,7 +633,7 @@ export default function RestaurantPage() {
           {latestDishes.length === 0 ? (
             <p className="text-sm text-slate-400">Aucun plat ajouté récemment à la carte.</p>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 justify-items-center">
+            <div className="grid grid-cols-3 gap-3 sm:gap-4 justify-items-center">
               {latestDishes.slice(0, 3).map((dish) => renderDishCard(dish))}
             </div>
           )}
