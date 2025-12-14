@@ -17,6 +17,8 @@ export type UserProfile = {
   id: string;
   username: string | null;
   avatar_url: string | null;
+  display_name?: string | null;
+  bio?: string | null;
   is_public?: boolean | null;
   favorite_restaurant_ids?: string[] | null;
   created_at?: string;
@@ -364,6 +366,189 @@ export async function updateSocialSettings(data: {
   }
 
   console.log("[Profile] Social settings updated successfully:", updatedProfile);
+  return { profile: updatedProfile as UserProfile, error: null };
+}
+
+/**
+ * Upload un avatar vers Supabase Storage
+ */
+export async function uploadAvatar(file: File): Promise<{ url: string | null; error: any }> {
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return { url: null, error: userError || new Error("User not authenticated") };
+  }
+
+  try {
+    // Vérifier le type de fichier
+    if (!file.type.startsWith("image/")) {
+      return { url: null, error: new Error("Le fichier doit être une image") };
+    }
+
+    // Vérifier la taille (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      return { url: null, error: new Error("L'image est trop grande (max 5MB)") };
+    }
+
+    const userId = user.id;
+    const fileExt = file.name.split(".").pop() || "jpg";
+    const fileName = `${userId}/${Date.now()}.${fileExt}`;
+    const filePath = `avatars/${fileName}`;
+
+    // Upload vers le bucket "avatars" (ou "fastfood-images" si "avatars" n'existe pas)
+    const { data, error: uploadError } = await supabase.storage
+      .from("avatars")
+      .upload(filePath, file, {
+        cacheControl: "3600",
+        upsert: false,
+      });
+
+    if (uploadError) {
+      // Si le bucket "avatars" n'existe pas, essayer "fastfood-images"
+      if (uploadError.message.includes("not found") || uploadError.message.includes("Bucket")) {
+        const { data: fallbackData, error: fallbackError } = await supabase.storage
+          .from("fastfood-images")
+          .upload(`avatars/${fileName}`, file, {
+            cacheControl: "3600",
+            upsert: false,
+          });
+
+        if (fallbackError) {
+          console.error("[Profile] upload avatar fallback error", fallbackError);
+          return { url: null, error: fallbackError };
+        }
+
+        const { data: publicUrlData } = supabase.storage
+          .from("fastfood-images")
+          .getPublicUrl(`avatars/${fileName}`);
+
+        return { url: publicUrlData.publicUrl, error: null };
+      }
+
+      console.error("[Profile] upload avatar error", uploadError);
+      return { url: null, error: uploadError };
+    }
+
+    // Récupérer l'URL publique
+    const { data: publicUrlData } = supabase.storage
+      .from("avatars")
+      .getPublicUrl(filePath);
+
+    return { url: publicUrlData.publicUrl, error: null };
+  } catch (err) {
+    console.error("[Profile] upload avatar unexpected error", err);
+    return { url: null, error: err };
+  }
+}
+
+/**
+ * Met à jour tous les champs du profil (avatar, display_name, username, bio, is_public, favorite_restaurant_ids)
+ */
+export async function updateProfile(data: {
+  avatar_url?: string | null;
+  display_name?: string | null;
+  username?: string | null;
+  bio?: string | null;
+  is_public?: boolean;
+  favorite_restaurant_ids?: string[];
+}): Promise<{ profile: UserProfile | null; error: any }> {
+  console.log("[Profile] updateProfile called with:", data);
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    console.error("[Profile] getUser error:", userError);
+    return { profile: null, error: userError };
+  }
+
+  // Construire l'objet de mise à jour
+  const updateData: {
+    avatar_url?: string | null;
+    display_name?: string | null;
+    username?: string | null;
+    bio?: string | null;
+    is_public?: boolean;
+    favorite_restaurant_ids?: string[];
+  } = {};
+
+  if (data.avatar_url !== undefined) {
+    updateData.avatar_url = data.avatar_url;
+  }
+  if (data.display_name !== undefined) {
+    updateData.display_name = data.display_name || null;
+  }
+  if (data.username !== undefined) {
+    updateData.username = data.username || null;
+  }
+  if (data.bio !== undefined) {
+    updateData.bio = data.bio || null;
+  }
+  if (data.is_public !== undefined) {
+    updateData.is_public = data.is_public;
+  }
+  if (data.favorite_restaurant_ids !== undefined) {
+    // S'assurer que c'est un tableau valide (max 3 éléments)
+    const ids = Array.isArray(data.favorite_restaurant_ids)
+      ? data.favorite_restaurant_ids.slice(0, 3)
+      : [];
+    updateData.favorite_restaurant_ids = ids;
+  }
+
+  // Vérifier d'abord si le profil existe, sinon le créer
+  const { data: existingProfile, error: checkError } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (checkError && checkError.code !== "PGRST116") {
+    console.error("[Profile] Check profile error:", checkError);
+    return { profile: null, error: checkError };
+  }
+
+  if (!existingProfile) {
+    // Créer le profil s'il n'existe pas
+    console.log("[Profile] Profile doesn't exist, creating new one...");
+    const { data: newProfile, error: createError } = await supabase
+      .from("profiles")
+      .insert({ id: user.id, ...updateData })
+      .select("*")
+      .single();
+
+    if (createError) {
+      console.error("[Profile] Create profile error:", createError);
+      return { profile: null, error: createError };
+    }
+
+    return { profile: newProfile as UserProfile, error: null };
+  }
+
+  // Mettre à jour le profil existant
+  console.log("[Profile] Updating profile...");
+  const { data: updatedProfile, error } = await supabase
+    .from("profiles")
+    .update(updateData)
+    .eq("id", user.id)
+    .select("*")
+    .single();
+
+  if (error) {
+    console.error("[Profile] Update profile error:", {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    });
+    return { profile: null, error };
+  }
+
+  console.log("[Profile] Profile updated successfully:", updatedProfile);
   return { profile: updatedProfile as UserProfile, error: null };
 }
 
