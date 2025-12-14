@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
 import { UserProfile, updateProfile, sanitizeUsername, validateUsernameFormat } from "@/lib/profile";
+import { useProfile } from "@/context/ProfileContext";
 import Spinner from "@/components/Spinner";
 
 const AVAILABLE_AVATARS = [
@@ -33,6 +35,8 @@ export default function EditProfileModal({
   profile,
   onSave,
 }: EditProfileModalProps) {
+  const router = useRouter();
+  const { setProfile: setContextProfile, refreshProfile } = useProfile();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -181,7 +185,8 @@ export default function EditProfileModal({
         console.error("[EditProfileModal] Error details:", updateError.details);
         console.error("[EditProfileModal] Error hint:", updateError.hint);
         
-        let message = "Erreur lors de la sauvegarde.";
+        // Afficher le message d'erreur de Supabase
+        let message = updateError.message || "Erreur lors de la sauvegarde.";
 
         if (updateError.code === "23505" || updateError.message?.toLowerCase().includes("unique")) {
           message = "Nom d'utilisateur déjà pris.";
@@ -193,8 +198,6 @@ export default function EditProfileModal({
           message = "Permissions insuffisantes (RLS). Tu n'as pas les droits pour modifier ce profil.";
         } else if (updateError.message?.toLowerCase().includes("column") && updateError.message?.toLowerCase().includes("does not exist")) {
           message = `Erreur: ${updateError.message}. Certaines colonnes (bio, display_name) n'existent peut-être pas dans la base de données.`;
-        } else if (updateError.message) {
-          message = `Erreur: ${updateError.message}`;
         }
 
         setError(message);
@@ -202,8 +205,21 @@ export default function EditProfileModal({
         return;
       }
 
-      // Succès
+      // Succès : mettre à jour le contexte avec le profil retourné
+      if (updatedProfile) {
+        setContextProfile(updatedProfile);
+      } else {
+        // Si pas de profil retourné, rafraîchir depuis la DB
+        await refreshProfile();
+      }
+
+      // Rafraîchir la page pour s'assurer que tout est à jour
+      router.refresh();
+
+      // Appeler le callback onSave
       onSave();
+      
+      // Fermer le modal
       onClose();
     } catch (err) {
       console.error("[EditProfileModal] unexpected error", err);

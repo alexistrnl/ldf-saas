@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
 import { getAvatarTheme, hexToRgba } from "@/lib/getAvatarTheme";
+import { useProfile } from "@/context/ProfileContext";
 import Spinner from "@/components/Spinner";
 
 type PublicProfile = {
@@ -16,6 +17,8 @@ type PublicProfile = {
 
 export default function SocialPage() {
   const router = useRouter();
+  const pathname = usePathname();
+  const { profile: currentProfile } = useProfile();
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [profiles, setProfiles] = useState<PublicProfile[]>([]);
@@ -31,7 +34,7 @@ export default function SocialPage() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Recherche des profils
+  // Recherche des profils - toujours depuis Supabase (pas de cache)
   useEffect(() => {
     const searchProfiles = async () => {
       if (!debouncedQuery.trim()) {
@@ -47,6 +50,7 @@ export default function SocialPage() {
         // Nettoyer la requête (enlever le @ si présent)
         const cleanQuery = debouncedQuery.trim().replace(/^@/, '');
         
+        // Toujours faire une requête fraîche (pas de cache)
         const { data, error: searchError } = await supabase
           .from("profiles")
           .select("id, username, avatar_url, favorite_restaurant_ids")
@@ -60,7 +64,21 @@ export default function SocialPage() {
           setError("Erreur lors de la recherche.");
           setProfiles([]);
         } else {
-          setProfiles(data || []);
+          // Si le profil connecté correspond à la recherche, utiliser les données du contexte à jour
+          const profilesData = (data || []).map((profile) => {
+            // Si c'est le profil connecté, utiliser les données du contexte (plus à jour)
+            if (currentProfile && profile.id === currentProfile.id) {
+              return {
+                id: currentProfile.id,
+                username: currentProfile.username,
+                avatar_url: currentProfile.avatar_url,
+                favorite_restaurant_ids: currentProfile.favorite_restaurant_ids,
+              } as PublicProfile;
+            }
+            return profile as PublicProfile;
+          });
+          
+          setProfiles(profilesData);
         }
       } catch (err) {
         console.error("[Social] unexpected error", err);
@@ -72,7 +90,23 @@ export default function SocialPage() {
     };
 
     searchProfiles();
-  }, [debouncedQuery]);
+  }, [debouncedQuery, currentProfile]);
+
+  // Recharger la recherche si on revient sur la page avec une recherche active
+  useEffect(() => {
+    const handleFocus = () => {
+      // Si une recherche est active, la relancer en déclenchant un changement de debouncedQuery
+      if (debouncedQuery.trim()) {
+        // Déclencher une recherche fraîche en modifiant temporairement la query
+        const currentQuery = searchQuery;
+        setSearchQuery("");
+        setTimeout(() => setSearchQuery(currentQuery), 10);
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [debouncedQuery, searchQuery]);
 
   const handleProfileClick = (profile: PublicProfile) => {
     if (profile.username) {

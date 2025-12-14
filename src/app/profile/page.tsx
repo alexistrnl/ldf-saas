@@ -6,8 +6,9 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
-import { getCurrentUserProfile, UserProfile } from "@/lib/profile";
+import { UserProfile } from "@/lib/profile";
 import { getAvatarTheme, hexToRgba } from "@/lib/getAvatarTheme";
+import { useProfile } from "@/context/ProfileContext";
 import Spinner from "@/components/Spinner";
 import EditProfileModal from "@/components/EditProfileModal";
 
@@ -36,8 +37,8 @@ type LastExperience = {
 
 export default function ProfilePage() {
   const router = useRouter();
+  const { profile, loading: profileLoading, error: profileError } = useProfile();
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -49,7 +50,7 @@ export default function ProfilePage() {
   // Modal édition
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
-  // Charger les données du profil
+  // Charger l'utilisateur et les données complémentaires
   useEffect(() => {
     const loadProfileData = async () => {
       try {
@@ -76,14 +77,6 @@ export default function ProfilePage() {
 
         setUser(user);
 
-        // Charger le profil
-        const { profile: userProfile, error: profileError } = await getCurrentUserProfile();
-        if (profileError) {
-          console.error("[Profile] load profile error", profileError);
-        } else {
-          setProfile(userProfile);
-        }
-
         const userId = user.id;
 
         // Calculer les stats (mini)
@@ -108,9 +101,9 @@ export default function ProfilePage() {
         setStats({ restaurantsCount, totalExperiences, avgRating });
 
         // Charger les restaurants favoris
-        if (userProfile?.favorite_restaurant_ids && userProfile.favorite_restaurant_ids.length > 0) {
-          const favoriteIds: string[] = Array.isArray(userProfile.favorite_restaurant_ids)
-            ? (userProfile.favorite_restaurant_ids as string[])
+        if (profile?.favorite_restaurant_ids && profile.favorite_restaurant_ids.length > 0) {
+          const favoriteIds: string[] = Array.isArray(profile.favorite_restaurant_ids)
+            ? (profile.favorite_restaurant_ids as string[])
             : [];
           const favoriteIdsSliced = favoriteIds.slice(0, 3);
 
@@ -169,24 +162,49 @@ export default function ProfilePage() {
       }
     };
 
-    loadProfileData();
-  }, []);
+    // Attendre que le profil soit chargé depuis le contexte avant de charger les stats
+    // Ne charger que si on n'est plus en train de charger le profil
+    if (!profileLoading) {
+      loadProfileData();
+    }
+  }, [profile, profileLoading]);
 
   // Recharger le profil quand on revient sur la page
   useEffect(() => {
-    const reloadProfile = async () => {
-      const { profile: updatedProfile } = await getCurrentUserProfile();
-      if (updatedProfile) {
-        setProfile(updatedProfile);
-        // Recharger aussi les données du mur
-        window.location.reload();
+    // Les données du profil viennent maintenant du ProfileContext
+    // On recharge seulement les stats/activité quand l'utilisateur revient sur la page
+    const handleFocus = async () => {
+      if (user) {
+        // Recharger les stats et l'expérience dernière sans recharger le profil (vient du contexte)
+        const userId = user.id;
+        
+        const { data: logsData } = await supabase
+          .from("fastfood_logs")
+          .select("restaurant_id, rating")
+          .eq("user_id", userId);
+        
+        const logs = logsData || [];
+        const uniqueRestaurantIds = new Set(
+          logs.map((log) => log.restaurant_id).filter((id): id is string => Boolean(id))
+        );
+        const restaurantsCount = uniqueRestaurantIds.size;
+        const totalExperiences = logs.length;
+        const avgRating =
+          logs.length > 0
+            ? logs.reduce((sum, log) => sum + (log.rating || 0), 0) / logs.length
+            : 0;
+        
+        setStats({
+          restaurantsCount,
+          totalExperiences,
+          avgRating: Math.round(avgRating * 10) / 10,
+        });
       }
     };
-
-    const handleFocus = () => reloadProfile();
+    
     window.addEventListener("focus", handleFocus);
     return () => window.removeEventListener("focus", handleFocus);
-  }, []);
+  }, [user]);
 
   // Ouvrir la modal d'édition
   const handleStartEdit = () => {
@@ -208,7 +226,7 @@ export default function ProfilePage() {
     return comment.slice(0, maxLength).trim() + "...";
   }
 
-  if (loading) {
+  if (loading || profileLoading) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-50 flex items-center justify-center">
         <Spinner size="lg" />
@@ -496,7 +514,34 @@ export default function ProfilePage() {
         onClose={() => setIsEditModalOpen(false)}
         profile={profile}
         onSave={() => {
-          window.location.reload();
+          // Le contexte sera mis à jour par EditProfileModal
+          // On recharge juste les stats ici
+          if (user) {
+            const loadStats = async () => {
+              const { data: logsData } = await supabase
+                .from("fastfood_logs")
+                .select("restaurant_id, rating")
+                .eq("user_id", user.id);
+              
+              const logs = logsData || [];
+              const uniqueRestaurantIds = new Set(
+                logs.map((log) => log.restaurant_id).filter((id): id is string => Boolean(id))
+              );
+              const restaurantsCount = uniqueRestaurantIds.size;
+              const totalExperiences = logs.length;
+              const avgRating =
+                logs.length > 0
+                  ? logs.reduce((sum, log) => sum + (log.rating || 0), 0) / logs.length
+                  : 0;
+              
+              setStats({
+                restaurantsCount,
+                totalExperiences,
+                avgRating: Math.round(avgRating * 10) / 10,
+              });
+            };
+            loadStats();
+          }
         }}
       />
     </main>

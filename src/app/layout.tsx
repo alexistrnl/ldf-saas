@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import ConditionalAppShell from "@/components/ConditionalAppShell";
+import { ProfileProvider } from "@/context/ProfileContext";
 
 export const metadata: Metadata = {
   title: "BiteBox",
@@ -42,7 +43,9 @@ export default function RootLayout({
   return (
     <html lang="fr">
       <body className="min-h-screen bg-slate-950 text-slate-50">
-        <ConditionalAppShell>{children}</ConditionalAppShell>
+        <ProfileProvider>
+          <ConditionalAppShell>{children}</ConditionalAppShell>
+        </ProfileProvider>
       </body>
     </html>
   );
