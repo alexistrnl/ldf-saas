@@ -433,7 +433,7 @@ export default function ProfilePage() {
               </svg>
             </button>
             <button
-              onClick={() => router.push("/profile/settings")}
+              onClick={() => router.push("/settings")}
               className="flex h-10 w-10 items-center justify-center rounded-full bg-white/5 hover:bg-white/10 transition-all flex-shrink-0 border border-white/10"
               aria-label="Paramètres"
             >
