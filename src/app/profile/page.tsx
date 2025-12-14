@@ -293,6 +293,15 @@ export default function ProfilePage() {
               )}
             </div>
           </div>
+
+        {/* Bio */}
+        {profile?.bio && profile.bio.trim().length > 0 && (
+          <section className="px-1">
+            <p className="text-sm text-slate-300 leading-relaxed line-clamp-3">
+              {profile.bio}
+            </p>
+          </section>
+        )}
           <div className="flex items-center gap-2">
             <button
               onClick={handleStartEdit}

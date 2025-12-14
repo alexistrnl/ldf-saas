@@ -512,25 +512,7 @@ export async function updateProfile(data: {
     return { profile: null, error: checkError };
   }
 
-  if (!existingProfile) {
-    // Créer le profil s'il n'existe pas
-    console.log("[Profile] Profile doesn't exist, creating new one...");
-    const { data: newProfile, error: createError } = await supabase
-      .from("profiles")
-      .insert({ id: user.id, ...updateData })
-      .select("*")
-      .single();
-
-    if (createError) {
-      console.error("[Profile] Create profile error:", createError);
-      return { profile: null, error: createError };
-    }
-
-    return { profile: newProfile as UserProfile, error: null };
-  }
-
-  // Mettre à jour le profil existant
-  // Créer une copie filtrée de updateData pour éviter les références undefined
+  // Construire les données filtrées (pour création ET update)
   const filteredData: Record<string, any> = {};
   if (updateData.avatar_url !== undefined) filteredData.avatar_url = updateData.avatar_url;
   if (updateData.username !== undefined) filteredData.username = updateData.username;
@@ -541,13 +523,49 @@ export async function updateProfile(data: {
   if (updateData.bio !== undefined) filteredData.bio = updateData.bio;
   if (updateData.display_name !== undefined) filteredData.display_name = updateData.display_name;
 
+  if (!existingProfile) {
+    // Créer le profil s'il n'existe pas
+    console.log("[Profile] Profile doesn't exist, creating new one...");
+    let { data: newProfile, error: createError } = await supabase
+      .from("profiles")
+      .insert({ id: user.id, ...filteredData })
+      .select("id, username, display_name, avatar_url, bio, is_public, favorite_restaurant_ids, created_at, updated_at")
+      .single();
+
+    // Si erreur "column does not exist", retirer bio/display_name et réessayer
+    if (createError && createError.message?.includes("column") && createError.message?.includes("does not exist")) {
+      console.warn("[Profile] Column does not exist during create, retrying without optional columns:", createError.message);
+      const retryCreateData = { id: user.id, ...filteredData };
+      if (createError.message.includes("bio")) delete retryCreateData.bio;
+      if (createError.message.includes("display_name")) delete retryCreateData.display_name;
+      
+      const retryResult = await supabase
+        .from("profiles")
+        .insert(retryCreateData)
+        .select("id, username, display_name, avatar_url, bio, is_public, favorite_restaurant_ids, created_at, updated_at")
+        .single();
+      
+      newProfile = retryResult.data;
+      createError = retryResult.error;
+    }
+
+    if (createError) {
+      console.error("[Profile] Create profile error:", createError);
+      return { profile: null, error: createError };
+    }
+
+    return { profile: newProfile as UserProfile, error: null };
+  }
+
+  // Mettre à jour le profil existant
+
   console.log("[Profile] Updating profile with data:", filteredData);
 
   let { data: updatedProfile, error } = await supabase
     .from("profiles")
     .update(filteredData)
     .eq("id", user.id)
-    .select("*")
+    .select("id, username, display_name, avatar_url, bio, is_public, favorite_restaurant_ids, created_at, updated_at")
     .single();
 
   // Si erreur "column does not exist", retirer bio/display_name et réessayer
@@ -568,7 +586,7 @@ export async function updateProfile(data: {
       .from("profiles")
       .update(retryData)
       .eq("id", user.id)
-      .select("*")
+      .select("id, username, display_name, avatar_url, bio, is_public, favorite_restaurant_ids, created_at, updated_at")
       .single();
     
     updatedProfile = retryResult.data;

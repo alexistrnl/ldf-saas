@@ -41,7 +41,7 @@ async function getPublicProfile(username: string): Promise<PublicProfileData | n
   // 1. Récupérer le profil par username
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("id, username, is_public, favorite_restaurant_ids, avatar_url")
+    .select("id, username, display_name, is_public, favorite_restaurant_ids, avatar_url, bio")
     .eq("username", username.toLowerCase())
     .eq("is_public", true)
     .maybeSingle();
@@ -50,7 +50,19 @@ async function getPublicProfile(username: string): Promise<PublicProfileData | n
     return null;
   }
 
-  const userId = profile.id;
+  // S'assurer que le profil a les types corrects avec display_name et bio
+  // Normaliser les valeurs vides (trim) pour display_name et bio
+  const typedProfile: UserProfile = {
+    id: profile.id,
+    username: profile.username,
+    avatar_url: profile.avatar_url,
+    display_name: (profile.display_name && profile.display_name.trim().length > 0) ? profile.display_name.trim() : null,
+    bio: (profile.bio && profile.bio.trim().length > 0) ? profile.bio.trim() : null,
+    is_public: profile.is_public ?? false,
+    favorite_restaurant_ids: profile.favorite_restaurant_ids || null,
+  };
+
+  const userId = typedProfile.id;
 
   // 2. Calculer les stats
   const { data: logs, error: logsError } = await supabase
@@ -85,14 +97,14 @@ async function getPublicProfile(username: string): Promise<PublicProfileData | n
   // Normaliser favorite_restaurant_ids : gérer null, undefined, tableau, ou string Postgres
   let favoriteIds: string[] = [];
   
-  if (profile.favorite_restaurant_ids) {
-    if (Array.isArray(profile.favorite_restaurant_ids)) {
+  if (typedProfile.favorite_restaurant_ids) {
+    if (Array.isArray(typedProfile.favorite_restaurant_ids)) {
       // Cas normal : tableau
-      favoriteIds = profile.favorite_restaurant_ids as string[];
-    } else if (typeof profile.favorite_restaurant_ids === 'string') {
+      favoriteIds = typedProfile.favorite_restaurant_ids;
+    } else if (typeof typedProfile.favorite_restaurant_ids === 'string') {
       // Cas Postgres string format (ex: "{uuid1,uuid2}") - à parser
       try {
-        const cleaned = profile.favorite_restaurant_ids
+        const cleaned = typedProfile.favorite_restaurant_ids
           .replace(/^{|}$/g, '') // Enlever { }
           .split(',')
           .map(id => id.trim())
@@ -164,7 +176,7 @@ async function getPublicProfile(username: string): Promise<PublicProfileData | n
   }
 
   return {
-    profile: profile as UserProfile,
+    profile: typedProfile,
     stats: {
       restaurantsCount,
       totalExperiences,
@@ -235,10 +247,26 @@ export default async function PublicProfilePage({
           </div>
           <div className="flex flex-col min-w-0 flex-1">
             <h1 className="text-lg font-semibold text-white truncate">
-              @{profile.username}
+              {profile.display_name && profile.display_name.trim().length > 0
+                ? profile.display_name
+                : `@${profile.username}`}
             </h1>
+            {profile.display_name && profile.display_name.trim().length > 0 && (
+              <span className="text-xs text-slate-400 truncate">
+                @{profile.username}
+              </span>
+            )}
           </div>
         </section>
+
+        {/* Bio */}
+        {profile.bio && profile.bio.trim().length > 0 && (
+          <section className="px-1">
+            <p className="text-sm text-slate-300 leading-relaxed line-clamp-3">
+              {profile.bio}
+            </p>
+          </section>
+        )}
 
         {/* Stats rapides */}
         <section className="grid grid-cols-3 gap-3 rounded-xl bg-[#0F0F1A] border border-white/5 shadow-md shadow-black/20 px-4 py-4">
