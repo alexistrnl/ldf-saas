@@ -41,7 +41,7 @@ export async function getCurrentUserProfile(): Promise<{
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("*")
+    .select("id, username, display_name, avatar_url, bio, is_public, favorite_restaurant_ids, created_at, updated_at")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -605,7 +605,7 @@ export async function updateProfile(data: {
     return { profile: null, error };
   }
 
-  console.log("[Profile] Profile updated successfully:", updatedProfile);
+  console.log("[Profile] Profile updated successfully - saved row:", updatedProfile);
   return { profile: updatedProfile as UserProfile, error: null };
 }
 

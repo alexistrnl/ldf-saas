@@ -94,9 +94,9 @@ export default function SocialPage() {
 
   // Recharger la recherche si on revient sur la page avec une recherche active
   useEffect(() => {
-    const handleFocus = () => {
-      // Si une recherche est active, la relancer en déclenchant un changement de debouncedQuery
-      if (debouncedQuery.trim()) {
+    const handleVisibilityChange = () => {
+      // Si la page redevient visible et qu'une recherche est active, la relancer
+      if (!document.hidden && debouncedQuery.trim()) {
         // Déclencher une recherche fraîche en modifiant temporairement la query
         const currentQuery = searchQuery;
         setSearchQuery("");
@@ -104,8 +104,23 @@ export default function SocialPage() {
       }
     };
 
+    const handleFocus = () => {
+      // Si une recherche est active, la relancer
+      if (debouncedQuery.trim()) {
+        const currentQuery = searchQuery;
+        setSearchQuery("");
+        setTimeout(() => setSearchQuery(currentQuery), 10);
+      }
+    };
+
+    // Utiliser visibilitychange pour détecter quand l'onglet redevient actif
+    document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("focus", handleFocus);
-    return () => window.removeEventListener("focus", handleFocus);
+    
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleFocus);
+    };
   }, [debouncedQuery, searchQuery]);
 
   const handleProfileClick = (profile: PublicProfile) => {

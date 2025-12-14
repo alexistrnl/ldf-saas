@@ -514,34 +514,10 @@ export default function ProfilePage() {
         onClose={() => setIsEditModalOpen(false)}
         profile={profile}
         onSave={() => {
-          // Le contexte sera mis à jour par EditProfileModal
-          // On recharge juste les stats ici
-          if (user) {
-            const loadStats = async () => {
-              const { data: logsData } = await supabase
-                .from("fastfood_logs")
-                .select("restaurant_id, rating")
-                .eq("user_id", user.id);
-              
-              const logs = logsData || [];
-              const uniqueRestaurantIds = new Set(
-                logs.map((log) => log.restaurant_id).filter((id): id is string => Boolean(id))
-              );
-              const restaurantsCount = uniqueRestaurantIds.size;
-              const totalExperiences = logs.length;
-              const avgRating =
-                logs.length > 0
-                  ? logs.reduce((sum, log) => sum + (log.rating || 0), 0) / logs.length
-                  : 0;
-              
-              setStats({
-                restaurantsCount,
-                totalExperiences,
-                avgRating: Math.round(avgRating * 10) / 10,
-              });
-            };
-            loadStats();
-          }
+          // Le contexte sera mis à jour par EditProfileModal avec les données fraîches
+          // Le useEffect dépend de profile, donc il se déclenchera automatiquement
+          // On peut juste recharger les favoris si nécessaire
+          // (le useEffect se déclenchera car profile a changé)
         }}
       />
     </main>

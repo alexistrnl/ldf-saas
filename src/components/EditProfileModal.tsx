@@ -205,12 +205,33 @@ export default function EditProfileModal({
         return;
       }
 
-      // Succès : mettre à jour le contexte avec le profil retourné
-      if (updatedProfile) {
+      // Succès : faire un refetch direct depuis la DB (source de vérité)
+      const {
+        data: { user: currentUser },
+      } = await supabase.auth.getUser();
+
+      if (currentUser) {
+        const { data: freshProfile, error: fetchError } = await supabase
+          .from("profiles")
+          .select("id, username, display_name, bio, is_public, favorite_restaurant_ids, avatar_url, updated_at")
+          .eq("id", currentUser.id)
+          .single();
+
+        if (fetchError) {
+          console.error("[EditProfileModal] Refetch error after save:", fetchError);
+          // Si le refetch échoue, utiliser les données retournées par updateProfile
+          if (updatedProfile) {
+            console.log("[EditProfileModal] Using updatedProfile as fallback:", updatedProfile);
+            setContextProfile(updatedProfile);
+          }
+        } else {
+          console.log("[EditProfileModal] Fresh profile refetched from DB:", freshProfile);
+          // Utiliser les données fraîches de la DB (source de vérité)
+          setContextProfile(freshProfile as UserProfile);
+        }
+      } else if (updatedProfile) {
+        // Fallback : utiliser les données retournées par updateProfile
         setContextProfile(updatedProfile);
-      } else {
-        // Si pas de profil retourné, rafraîchir depuis la DB
-        await refreshProfile();
       }
 
       // Rafraîchir la page pour s'assurer que tout est à jour

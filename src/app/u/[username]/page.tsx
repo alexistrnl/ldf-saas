@@ -5,6 +5,10 @@ import { createClient } from "@supabase/supabase-js";
 import { getAvatarTheme, hexToRgba } from "@/lib/getAvatarTheme";
 import { UserProfile } from "@/lib/profile";
 
+// Désactiver le cache pour cette page (données toujours fraîches)
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
