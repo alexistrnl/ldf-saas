@@ -530,6 +530,17 @@ export async function updateProfile(data: {
   }
 
   // Mettre à jour le profil existant
+  // Créer une copie filtrée de updateData pour éviter les références undefined
+  const filteredData: Record<string, any> = {};
+  if (updateData.avatar_url !== undefined) filteredData.avatar_url = updateData.avatar_url;
+  if (updateData.username !== undefined) filteredData.username = updateData.username;
+  if (updateData.is_public !== undefined) filteredData.is_public = updateData.is_public;
+  if (updateData.favorite_restaurant_ids !== undefined) {
+    filteredData.favorite_restaurant_ids = updateData.favorite_restaurant_ids;
+  }
+  if (updateData.bio !== undefined) filteredData.bio = updateData.bio;
+  if (updateData.display_name !== undefined) filteredData.display_name = updateData.display_name;
+
   console.log("[Profile] Updating profile with data:", filteredData);
 
   let { data: updatedProfile, error } = await supabase
@@ -543,7 +554,7 @@ export async function updateProfile(data: {
   if (error && error.message?.includes("column") && error.message?.includes("does not exist")) {
     console.warn("[Profile] Column does not exist, retrying without optional columns:", error.message);
     
-    const retryData = { ...filteredData };
+    const retryData: Record<string, any> = { ...filteredData };
     // Retirer bio et display_name si l'erreur les concerne
     if (error.message.includes("bio")) {
       delete retryData.bio;
