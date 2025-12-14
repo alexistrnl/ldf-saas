@@ -94,28 +94,22 @@ async function getPublicProfile(username: string): Promise<PublicProfileData | n
     : 0;
 
   // 3. Récupérer les 3 restaurants favoris
-  // Normaliser favorite_restaurant_ids : gérer null, undefined, tableau, ou string Postgres
-  let favoriteIds: string[] = [];
-  
-  if (typedProfile.favorite_restaurant_ids) {
-    if (Array.isArray(typedProfile.favorite_restaurant_ids)) {
-      // Cas normal : tableau
-      favoriteIds = typedProfile.favorite_restaurant_ids;
-    } else if (typeof typedProfile.favorite_restaurant_ids === 'string') {
-      // Cas Postgres string format (ex: "{uuid1,uuid2}") - à parser
-      try {
-        const cleaned = typedProfile.favorite_restaurant_ids
-          .replace(/^{|}$/g, '') // Enlever { }
-          .split(',')
-          .map(id => id.trim())
-          .filter(id => id.length > 0);
-        favoriteIds = cleaned;
-      } catch (e) {
-        console.error("[PublicProfile] Error parsing favorite_restaurant_ids:", e);
-        favoriteIds = [];
-      }
+  // Fonction utilitaire pour normaliser favorite_restaurant_ids
+  function normalizeFavoriteIds(raw: unknown): string[] {
+    if (Array.isArray(raw)) {
+      return raw.filter((x): x is string => typeof x === "string");
     }
+    if (typeof raw === "string") {
+      const cleaned = raw.replace(/^{|}$/g, "");
+      return cleaned
+        .split(",")
+        .map((id) => id.trim())
+        .filter((id) => id.length > 0);
+    }
+    return [];
   }
+
+  const favoriteIds = normalizeFavoriteIds(profile.favorite_restaurant_ids);
   
   // Limiter à 3 favoris max
   const favoriteIdsSliced = favoriteIds.slice(0, 3);

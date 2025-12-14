@@ -535,7 +535,7 @@ export async function updateProfile(data: {
     // Si erreur "column does not exist", retirer bio/display_name et réessayer
     if (createError && createError.message?.includes("column") && createError.message?.includes("does not exist")) {
       console.warn("[Profile] Column does not exist during create, retrying without optional columns:", createError.message);
-      const retryCreateData = { id: user.id, ...filteredData };
+      const retryCreateData: Record<string, any> = { id: user.id, ...filteredData };
       if (createError.message.includes("bio")) delete retryCreateData.bio;
       if (createError.message.includes("display_name")) delete retryCreateData.display_name;
       
