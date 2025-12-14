@@ -6,6 +6,7 @@ import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
 import { UserProfile, updateProfile, sanitizeUsername, validateUsernameFormat } from "@/lib/profile";
 import { useProfile } from "@/context/ProfileContext";
+import { AvatarVariant } from "@/lib/avatarTheme";
 import Spinner from "@/components/Spinner";
 
 const AVAILABLE_AVATARS = [
@@ -16,11 +17,10 @@ const AVAILABLE_AVATARS = [
   { key: "vert", label: "Vert", url: "/avatar/avatar-vert.png", variant: "green" as const },
 ];
 
-// Fonction helper pour convertir avatar URL en avatar_variant
-function getAvatarVariantFromUrl(avatarUrl: string | null): string | null {
-  if (!avatarUrl) return null;
-  const avatar = AVAILABLE_AVATARS.find(av => av.url === avatarUrl);
-  return avatar ? avatar.variant : null;
+// Fonction helper pour obtenir l'URL d'un avatar depuis son variant
+function getAvatarUrlFromVariant(variant: AvatarVariant): string {
+  const avatar = AVAILABLE_AVATARS.find(av => av.variant === variant);
+  return avatar ? avatar.url : AVAILABLE_AVATARS[0].url; // fallback sur violet
 }
 
 type EditProfileModalProps = {
@@ -48,7 +48,7 @@ export default function EditProfileModal({
   const [error, setError] = useState<string | null>(null);
 
   // États du formulaire
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarVariant, setAvatarVariant] = useState<AvatarVariant>("purple");
   const [displayName, setDisplayName] = useState("");
   const [username, setUsername] = useState("");
   const [bio, setBio] = useState("");
@@ -62,18 +62,13 @@ export default function EditProfileModal({
   // Pré-remplir les champs avec les valeurs existantes
   useEffect(() => {
     if (profile && isOpen) {
-      // Si avatar_url existe et correspond à un des avatars prédéfinis, l'utiliser
-      // Sinon, utiliser l'avatar violet par défaut
-      const defaultAvatar = AVAILABLE_AVATARS[0].url;
-      const currentAvatar = profile.avatar_url;
+      // Initialiser avatarVariant depuis profile.avatar_variant
+      const newVariant = (profile.avatar_variant && AVAILABLE_AVATARS.some(av => av.variant === profile.avatar_variant))
+        ? (profile.avatar_variant as AvatarVariant)
+        : "purple"; // Fallback sur purple si avatar_variant manquant ou invalide
       
-      // Vérifier si l'avatar actuel est un des avatars prédéfinis
-      if (currentAvatar) {
-        const isPredefinedAvatar = AVAILABLE_AVATARS.some(avatar => avatar.url === currentAvatar);
-        setAvatarUrl(isPredefinedAvatar ? currentAvatar : defaultAvatar);
-      } else {
-        setAvatarUrl(defaultAvatar);
-      }
+      setAvatarVariant(newVariant);
+      console.log("[AvatarPicker] db=", profile.avatar_variant, "local=", newVariant);
       
       setDisplayName(profile.display_name || "");
       setUsername(profile.username || "");
@@ -122,8 +117,8 @@ export default function EditProfileModal({
     };
   }, [isOpen]);
 
-  const handleAvatarSelect = (avatarUrl: string) => {
-    setAvatarUrl(avatarUrl);
+  const handleAvatarSelect = (variant: AvatarVariant) => {
+    setAvatarVariant(variant);
     setError(null);
   };
 
@@ -175,9 +170,7 @@ export default function EditProfileModal({
         }
       }
 
-      // Convertir avatarUrl en avatar_variant
-      const avatarVariant = getAvatarVariantFromUrl(avatarUrl);
-
+      // Utiliser avatarVariant directement (déjà en état local)
       // Mettre à jour le profil (seulement les champs modifiés)
       const { profile: updatedProfile, error: updateError } = await updateProfile({
         display_name: displayName.trim() || null,
@@ -285,12 +278,12 @@ export default function EditProfileModal({
                 </label>
                 <div className="grid grid-cols-5 gap-3">
                   {AVAILABLE_AVATARS.map((avatar) => {
-                    const isSelected = avatarUrl === avatar.url;
+                    const isSelected = avatarVariant === avatar.variant;
                     return (
                       <button
                         key={avatar.key}
                         type="button"
-                        onClick={() => handleAvatarSelect(avatar.url)}
+                        onClick={() => handleAvatarSelect(avatar.variant)}
                         className={`relative aspect-square rounded-full overflow-hidden border-2 transition-all ${
                           isSelected
                             ? "border-bitebox ring-2 ring-bitebox ring-offset-2 ring-offset-[#020617]"
