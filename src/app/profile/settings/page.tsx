@@ -6,13 +6,19 @@ import Image from "next/image";
 import {
   getCurrentUserProfile,
   UserProfile,
-  checkUsernameAvailability,
-  updateUsername,
   updateAvatar,
+  sanitizeUsername,
+  validateUsernameFormat,
+  updateSocialSettings,
 } from "@/lib/profile";
+import { supabase } from "@/lib/supabaseClient";
 import Spinner from "@/components/Spinner";
 
-const USERNAME_REGEX = /^[a-zA-Z0-9._]{3,20}$/;
+type Restaurant = {
+  id: string;
+  name: string;
+  logo_url: string | null;
+};
 
 const AVAILABLE_AVATARS = [
   "/avatar/avatar-bleu.png",
@@ -26,18 +32,36 @@ export default function ProfileSettingsPage() {
   const router = useRouter();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  
+  // Social settings
   const [username, setUsername] = useState("");
-  const [initialUsername, setInitialUsername] = useState<string | null>(null);
-  const [isSubmittingUsername, setIsSubmittingUsername] = useState(false);
-  const [usernameError, setUsernameError] = useState<string | null>(null);
-  const [usernameSuccess, setUsernameSuccess] = useState<string | null>(null);
+  const [isPublic, setIsPublic] = useState(false);
+  const [favoriteRestaurantIds, setFavoriteRestaurantIds] = useState<string[]>([]);
+  const [initialSocialData, setInitialSocialData] = useState<{
+    username: string | null;
+    is_public: boolean;
+    favorite_restaurant_ids: string[];
+  } | null>(null);
+  const [isSavingSocial, setIsSavingSocial] = useState(false);
+  const [socialError, setSocialError] = useState<string | null>(null);
+  const [socialSuccess, setSocialSuccess] = useState<string | null>(null);
+  
+  // Restaurants list
+  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  const [restaurantsLoading, setRestaurantsLoading] = useState(true);
+  
+  // Avatar
   const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
 
+  // Charger le profil et les restaurants
   useEffect(() => {
-    const loadProfile = async () => {
+    const loadData = async () => {
       try {
         setLoading(true);
+        setRestaurantsLoading(true);
+        
+        // Charger le profil
         const { user, profile: userProfile, error } = await getCurrentUserProfile();
 
         if (error) {
@@ -48,85 +72,133 @@ export default function ProfileSettingsPage() {
 
         if (user && userProfile) {
           setProfile(userProfile);
-          if (userProfile.username) {
-            setUsername(userProfile.username);
-            setInitialUsername(userProfile.username);
-          } else {
-            setUsername("");
-            setInitialUsername(null);
-          }
+          
+          // Charger les données sociales
+          const currentUsername = userProfile.username || "";
+          const currentIsPublic = userProfile.is_public ?? false;
+          const currentFavorites = userProfile.favorite_restaurant_ids || [];
+          
+          setUsername(currentUsername);
+          setIsPublic(currentIsPublic);
+          setFavoriteRestaurantIds(currentFavorites);
+          setInitialSocialData({
+            username: currentUsername || null,
+            is_public: currentIsPublic,
+            favorite_restaurant_ids: currentFavorites,
+          });
+        }
+        
+        // Charger les restaurants
+        const { data: restaurantsData, error: restaurantsError } = await supabase
+          .from("restaurants")
+          .select("id, name, logo_url")
+          .order("name", { ascending: true });
+        
+        if (restaurantsError) {
+          console.error("[Settings] load restaurants error", restaurantsError);
+        } else {
+          setRestaurants(restaurantsData || []);
         }
       } catch (err) {
         console.error("[Settings] unexpected error", err);
       } finally {
         setLoading(false);
+        setRestaurantsLoading(false);
       }
     };
 
-    loadProfile();
+    loadData();
   }, []);
 
-  const validateUsername = (value: string): string | null => {
-    if (!value.trim()) {
-      return "Le nom d'utilisateur est obligatoire.";
-    }
-    if (value.length < 3 || value.length > 20) {
-      return "Le nom d'utilisateur doit contenir entre 3 et 20 caractères.";
-    }
-    if (!USERNAME_REGEX.test(value)) {
-      return "Le nom d'utilisateur ne peut contenir que des lettres, chiffres, underscores et points.";
-    }
-    return null;
+  // Gestion du changement d'username (nettoyage automatique)
+  const handleUsernameChange = (value: string) => {
+    const cleaned = sanitizeUsername(value);
+    setUsername(cleaned);
+    setSocialError(null);
+    setSocialSuccess(null);
   };
 
-  const handleUsernameSubmit = async (e: React.FormEvent) => {
+  // Gestion de la sélection d'un restaurant favori
+  const handleFavoriteRestaurantChange = (index: number, restaurantId: string | null) => {
+    const newFavorites = [...favoriteRestaurantIds];
+    
+    if (restaurantId) {
+      // Retirer le restaurant s'il est déjà sélectionné ailleurs
+      const existingIndex = newFavorites.findIndex(id => id === restaurantId);
+      if (existingIndex !== -1 && existingIndex !== index) {
+        newFavorites.splice(existingIndex, 1);
+      }
+      
+      // Remplacer ou ajouter à l'index
+      if (index < newFavorites.length) {
+        newFavorites[index] = restaurantId;
+      } else {
+        // Ajouter seulement si on n'a pas encore 3 favoris
+        if (newFavorites.length < 3) {
+          newFavorites.push(restaurantId);
+        }
+      }
+    } else {
+      // Retirer le favori à cet index
+      newFavorites.splice(index, 1);
+    }
+    
+    setFavoriteRestaurantIds(newFavorites);
+    setSocialError(null);
+    setSocialSuccess(null);
+  };
+
+  // Vérifier si des changements ont été faits
+  const hasSocialChanges = () => {
+    if (!initialSocialData) return false;
+    
+    const currentUsername = username.trim() || null;
+    const currentFavorites = favoriteRestaurantIds;
+    
+    return (
+      currentUsername !== initialSocialData.username ||
+      isPublic !== initialSocialData.is_public ||
+      JSON.stringify(currentFavorites.sort()) !== JSON.stringify(initialSocialData.favorite_restaurant_ids.sort())
+    );
+  };
+
+  // Sauvegarder les paramètres sociaux
+  const handleSocialSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setUsernameError(null);
-    setUsernameSuccess(null);
+    setSocialError(null);
+    setSocialSuccess(null);
 
-    const validationError = validateUsername(username);
-    if (validationError) {
-      setUsernameError(validationError);
+    // Valider le username
+    const cleanedUsername = username.trim();
+    if (cleanedUsername) {
+      const validation = validateUsernameFormat(cleanedUsername);
+      if (!validation.valid) {
+        setSocialError(validation.error || "Nom d'utilisateur invalide.");
+        return;
+      }
+    }
+
+    if (!hasSocialChanges()) {
+      setSocialSuccess("Aucune modification.");
       return;
     }
 
-    if (username === initialUsername) {
-      setUsernameSuccess("Aucune modification.");
-      return;
-    }
-
-    setIsSubmittingUsername(true);
+    setIsSavingSocial(true);
 
     try {
-      const { profile: currentProfile } = await getCurrentUserProfile();
-      if (!currentProfile?.id) {
-        setUsernameError("Tu dois être connecté.");
-        setIsSubmittingUsername(false);
-        return;
-      }
-
-      const { available, error: checkError } = await checkUsernameAvailability(
-        username,
-        currentProfile.id
-      );
-
-      if (checkError) {
-        console.warn("[Settings] check username error (continuing anyway):", checkError);
-      }
-
-      if (!checkError && !available) {
-        setUsernameError("Ce nom d'utilisateur est déjà pris.");
-        setIsSubmittingUsername(false);
-        return;
-      }
-
-      const { profile: updatedProfile, error } = await updateUsername(username);
+      const { profile: updatedProfile, error } = await updateSocialSettings({
+        username: cleanedUsername || null,
+        is_public: isPublic,
+        favorite_restaurant_ids: favoriteRestaurantIds,
+      });
 
       if (error) {
-        console.error("[Settings] update username error:", error);
-        let message = "Impossible de mettre à jour ton nom d'utilisateur. Réessaie plus tard.";
-        if (error.code === "23505" || error.code === "PGRST116") {
-          message = "Ce nom d'utilisateur est déjà pris. Choisis-en un autre.";
+        console.error("[Settings] update social settings error:", error);
+        let message = "Erreur lors de la sauvegarde.";
+        
+        // Gérer les erreurs de contrainte unique
+        if (error.code === "23505" || error.message?.toLowerCase().includes("unique")) {
+          message = "Nom d'utilisateur déjà pris.";
         } else if (
           error.message?.toLowerCase().includes("row-level security") ||
           error.message?.toLowerCase().includes("policy") ||
@@ -134,21 +206,26 @@ export default function ProfileSettingsPage() {
         ) {
           message = "Tu n'as pas les droits pour modifier ce profil. Vérifie que tu es bien connecté.";
         }
-        setUsernameError(message);
-        setIsSubmittingUsername(false);
+        
+        setSocialError(message);
+        setIsSavingSocial(false);
         return;
       }
 
       if (updatedProfile) {
         setProfile(updatedProfile);
-        setInitialUsername(username);
-        setUsernameSuccess("Nom d'utilisateur mis à jour ✅");
+        setInitialSocialData({
+          username: cleanedUsername || null,
+          is_public: isPublic,
+          favorite_restaurant_ids: favoriteRestaurantIds,
+        });
+        setSocialSuccess("Paramètres sociaux mis à jour ✅");
       }
     } catch (err) {
-      console.error("[Settings] unexpected username error:", err);
-      setUsernameError("Erreur inattendue. Réessaie plus tard.");
+      console.error("[Settings] unexpected social error:", err);
+      setSocialError("Erreur inattendue. Réessaie plus tard.");
     } finally {
-      setIsSubmittingUsername(false);
+      setIsSavingSocial(false);
     }
   };
 
@@ -212,56 +289,173 @@ export default function ProfileSettingsPage() {
           </button>
         </section>
 
-        {/* Édition du nom d'utilisateur */}
+        {/* Section Social */}
         <section className="rounded-xl bg-[#0e0e1a] border border-white/5 p-4 w-full overflow-x-hidden">
           <div className="mb-4">
             <h2 className="text-sm font-medium text-white mb-1">
-              Nom d'utilisateur
+              Social
             </h2>
             <p className="text-xs text-slate-400">
-              Choisis un nom unique pour ton profil.
+              Configure ton profil social et tes enseignes favorites.
             </p>
           </div>
 
-          <form onSubmit={handleUsernameSubmit} className="space-y-3">
-            <div className="space-y-1">
+          <form onSubmit={handleSocialSubmit} className="space-y-6">
+            {/* Nom d'utilisateur */}
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-slate-300">
+                Nom d'utilisateur
+              </label>
               <input
                 type="text"
                 value={username}
-                onChange={(e) => {
-                  setUsername(e.target.value);
-                  setUsernameError(null);
-                  setUsernameSuccess(null);
-                }}
+                onChange={(e) => handleUsernameChange(e.target.value)}
                 className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-bitebox focus:outline-none focus:ring-1 focus:ring-bitebox transition"
-                placeholder="Ex : alex_bitebox"
-                maxLength={20}
+                placeholder="@tonpseudo"
+                maxLength={30}
               />
-              {usernameError && (
-                <p className="text-xs text-red-400">{usernameError}</p>
-              )}
-              {usernameSuccess && (
-                <p className="text-xs text-emerald-400">{usernameSuccess}</p>
-              )}
-              {!usernameError && !usernameSuccess && (
+              <p className="text-xs text-slate-500">
+                3 à 30 caractères (lettres, chiffres, _ et .)
+              </p>
+            </div>
+
+            {/* Toggle Profil public */}
+            <div className="flex items-center justify-between py-2">
+              <div className="flex-1">
+                <label className="text-xs font-medium text-slate-300 block mb-1">
+                  Profil public
+                </label>
                 <p className="text-xs text-slate-500">
-                  3 à 20 caractères (lettres, chiffres, _ et .)
+                  {isPublic 
+                    ? "Ton profil est visible dans la recherche Social" 
+                    : "Ton profil n'est pas visible dans la recherche Social"}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsPublic(!isPublic);
+                  setSocialError(null);
+                  setSocialSuccess(null);
+                }}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  isPublic ? 'bg-bitebox' : 'bg-slate-600'
+                }`}
+                role="switch"
+                aria-checked={isPublic}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    isPublic ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* 3 enseignes favorites */}
+            <div className="space-y-3">
+              <label className="text-xs font-medium text-slate-300 block">
+                3 enseignes favorites
+              </label>
+              {[0, 1, 2].map((index) => {
+                const selectedId = favoriteRestaurantIds[index] || null;
+                const selectedRestaurant = selectedId 
+                  ? restaurants.find(r => r.id === selectedId)
+                  : null;
+
+                return (
+                  <div key={index} className="flex items-center gap-2">
+                    <div className="flex-1">
+                      <select
+                        value={selectedId || ""}
+                        onChange={(e) => handleFavoriteRestaurantChange(index, e.target.value || null)}
+                        className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm text-white focus:border-bitebox focus:outline-none focus:ring-1 focus:ring-bitebox transition"
+                      >
+                        <option value="">
+                          {selectedId ? "Aucun" : "Sélectionner un restaurant"}
+                        </option>
+                        {restaurants.map((restaurant) => {
+                          // Permettre la sélection du restaurant actuel ou ceux non encore sélectionnés
+                          const isSelectedElsewhere = favoriteRestaurantIds.includes(restaurant.id) && favoriteRestaurantIds[index] !== restaurant.id;
+                          if (isSelectedElsewhere) return null;
+                          
+                          return (
+                            <option key={restaurant.id} value={restaurant.id}>
+                              {restaurant.name}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+                    {selectedRestaurant && (
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {selectedRestaurant.logo_url && (
+                          <div className="relative h-8 w-8 rounded overflow-hidden">
+                            <Image
+                              src={selectedRestaurant.logo_url}
+                              alt={selectedRestaurant.name}
+                              fill
+                              className="object-cover"
+                            />
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleFavoriteRestaurantChange(index, null)}
+                          className="text-red-400 hover:text-red-300 transition"
+                          aria-label="Retirer"
+                        >
+                          <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M6 18L18 6M6 6l12 12"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              {favoriteRestaurantIds.length >= 3 && (
+                <p className="text-xs text-slate-500">
+                  Maximum 3 restaurants favoris sélectionnés
                 </p>
               )}
             </div>
 
+            {/* Messages d'erreur/succès */}
+            {socialError && (
+              <div className="rounded-xl bg-red-500/10 border border-red-500/40 px-3 py-2">
+                <p className="text-xs text-red-400">{socialError}</p>
+              </div>
+            )}
+            {socialSuccess && (
+              <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/40 px-3 py-2">
+                <p className="text-xs text-emerald-400">{socialSuccess}</p>
+              </div>
+            )}
+
+            {/* Bouton de sauvegarde */}
             <button
               type="submit"
-              disabled={isSubmittingUsername || !username.trim()}
+              disabled={isSavingSocial || !hasSocialChanges()}
               className="w-full rounded-xl bg-bitebox px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
             >
-              {isSubmittingUsername ? (
+              {isSavingSocial ? (
                 <>
                   <Spinner size="sm" />
                   <span>Enregistrement...</span>
                 </>
               ) : (
-                "Enregistrer"
+                "Enregistrer les paramètres sociaux"
               )}
             </button>
           </form>

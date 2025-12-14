@@ -14,6 +14,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     pathname === '/reset-password'
   const isAdminPage = pathname?.startsWith('/admin')
   const isDesktopInfoPage = pathname === '/desktop-info'
+  const isConfirmationPage = pathname === '/confirmation'
   
   // Routes où la bottom nav ne doit pas apparaître (flow "Ajouter une note")
   // - /add-note : page générale d'ajout de note
@@ -23,8 +24,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   // Masquer header et bottom nav sur les pages d'auth et desktop-info
   // Masquer bottom nav sur admin (mais garder le header)
   // Masquer bottom nav sur le flow "Ajouter une note" (pour ne pas recouvrir le bouton de validation)
+  // Masquer bottom nav sur la page de confirmation
   const showHeader = !isAuthPage && !isDesktopInfoPage
-  const showBottomNav = !isAuthPage && !isAdminPage && !isAddNotePage && !isDesktopInfoPage
+  const showBottomNav = !isAuthPage && !isAdminPage && !isAddNotePage && !isDesktopInfoPage && !isConfirmationPage
 
   return (
     <div className={`min-h-screen ${isDesktopInfoPage ? '' : 'bg-[#020617] text-white'}`}>
