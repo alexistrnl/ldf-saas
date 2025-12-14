@@ -253,8 +253,8 @@ export default function ProfilePage() {
         )}
 
         {/* Header profil */}
-        <section className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-5 flex-1 min-w-0">
+        <section className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-4 flex-1 min-w-0">
             <div
               className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-full"
               style={{ boxShadow: `0 0 20px ${themeColorGlow}` }}
@@ -277,32 +277,28 @@ export default function ProfilePage() {
                 />
               )}
             </div>
-            <div className="flex flex-col min-w-0 flex-1">
-              <span className="text-lg font-semibold text-white truncate">
+            <div className="flex flex-col min-w-0 flex-1 gap-1">
+              <span className="text-lg font-semibold text-white break-words">
                 {displayName}
               </span>
               {usernameDisplay && (
-                <span className="text-xs text-slate-400 truncate">
+                <span className="text-xs text-slate-400 break-words">
                   @{usernameDisplay}
                 </span>
               )}
               {!usernameDisplay && user?.email && (
-                <span className="text-xs text-slate-400 truncate">
+                <span className="text-xs text-slate-400 break-words">
                   {user.email}
                 </span>
               )}
+              {profile?.bio && profile.bio.trim().length > 0 && (
+                <p className="text-sm text-slate-300 leading-relaxed line-clamp-3 break-words mt-1">
+                  {profile.bio}
+                </p>
+              )}
             </div>
           </div>
-
-        {/* Bio */}
-        {profile?.bio && profile.bio.trim().length > 0 && (
-          <section className="px-1">
-            <p className="text-sm text-slate-300 leading-relaxed line-clamp-3">
-              {profile.bio}
-            </p>
-          </section>
-        )}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <button
               onClick={handleStartEdit}
               className="flex h-10 w-10 items-center justify-center rounded-full bg-white/5 hover:bg-white/10 transition-all flex-shrink-0 border border-white/10"

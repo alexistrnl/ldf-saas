@@ -216,7 +216,7 @@ export default async function PublicProfilePage({
     <main className="min-h-screen w-full overflow-x-hidden bg-[#020617]">
       <div className="mx-auto flex w-full max-w-xl flex-col gap-6 px-4 pb-28 pt-6">
         {/* Header profil */}
-        <section className="flex items-center gap-5">
+        <section className="flex items-start gap-4">
           <div
             className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-full"
             style={{ boxShadow: `0 0 20px ${themeColorGlow}` }}
@@ -239,28 +239,28 @@ export default async function PublicProfilePage({
               />
             )}
           </div>
-          <div className="flex flex-col min-w-0 flex-1">
-            <h1 className="text-lg font-semibold text-white truncate">
-              {profile.display_name && profile.display_name.trim().length > 0
-                ? profile.display_name
-                : `@${profile.username}`}
-            </h1>
-            {profile.display_name && profile.display_name.trim().length > 0 && (
-              <span className="text-xs text-slate-400 truncate">
+          <div className="flex flex-col min-w-0 flex-1 gap-1">
+            {profile.display_name && profile.display_name.trim().length > 0 ? (
+              <>
+                <h1 className="text-lg font-semibold text-white break-words">
+                  {profile.display_name}
+                </h1>
+                <span className="text-xs text-slate-400 break-words">
+                  @{profile.username}
+                </span>
+              </>
+            ) : (
+              <h1 className="text-lg font-semibold text-white break-words">
                 @{profile.username}
-              </span>
+              </h1>
+            )}
+            {profile.bio && profile.bio.trim().length > 0 && (
+              <p className="text-sm text-slate-300 leading-relaxed line-clamp-3 break-words mt-1">
+                {profile.bio}
+              </p>
             )}
           </div>
         </section>
-
-        {/* Bio */}
-        {profile.bio && profile.bio.trim().length > 0 && (
-          <section className="px-1">
-            <p className="text-sm text-slate-300 leading-relaxed line-clamp-3">
-              {profile.bio}
-            </p>
-          </section>
-        )}
 
         {/* Stats rapides */}
         <section className="grid grid-cols-3 gap-3 rounded-xl bg-[#0F0F1A] border border-white/5 shadow-md shadow-black/20 px-4 py-4">
