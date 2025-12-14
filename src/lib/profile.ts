@@ -26,6 +26,178 @@ export type UserProfile = {
   updated_at?: string;
 };
 
+/**
+ * Récupère le profil de l'utilisateur connecté avec stats, favoris et dernière expérience
+ * Pour affichage dans Social
+ */
+export async function getMyProfileWithData(): Promise<{
+  profile: UserProfile | null;
+  stats: {
+    restaurantsCount: number;
+    totalExperiences: number;
+    avgRating: number;
+  };
+  favoriteRestaurants: Array<{
+    id: string;
+    name: string;
+    slug: string | null;
+    logo_url: string | null;
+  }>;
+  lastExperience: {
+    id: string;
+    restaurant_name: string;
+    restaurant_logo_url: string | null;
+    rating: number;
+    comment: string | null;
+    visited_at: string | null;
+    created_at: string;
+  } | null;
+} | null> {
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return null;
+  }
+
+  // 1. Récupérer le profil
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("id, username, display_name, bio, avatar_variant, avatar_url, favorite_restaurant_ids, is_public, updated_at")
+    .eq("id", user.id)
+    .single();
+
+  if (profileError || !profile) {
+    console.error("[Profile] getMyProfileWithData error:", profileError);
+    return null;
+  }
+
+  const typedProfile: UserProfile = {
+    id: profile.id,
+    username: profile.username,
+    avatar_url: profile.avatar_url,
+    avatar_variant: profile.avatar_variant,
+    display_name: (profile.display_name && profile.display_name.trim().length > 0) ? profile.display_name.trim() : null,
+    bio: (profile.bio && profile.bio.trim().length > 0) ? profile.bio.trim() : null,
+    is_public: profile.is_public ?? false,
+    favorite_restaurant_ids: profile.favorite_restaurant_ids || null,
+    updated_at: profile.updated_at,
+  };
+
+  const userId = typedProfile.id;
+
+  // 2. Calculer les stats
+  const { data: logs, error: logsError } = await supabase
+    .from("fastfood_logs")
+    .select("restaurant_id, rating")
+    .eq("user_id", userId);
+
+  if (logsError) {
+    console.error("[Profile] Error loading logs:", logsError);
+  }
+
+  const logsData = logs || [];
+  
+  const uniqueRestaurantIds = new Set(
+    logsData.map((log) => log.restaurant_id).filter((id): id is string => Boolean(id))
+  );
+  const restaurantsCount = uniqueRestaurantIds.size;
+  const totalExperiences = logsData.length;
+  const ratings = logsData
+    .map((log) => log.rating)
+    .filter((rating): rating is number => typeof rating === "number");
+  const avgRating = ratings.length > 0
+    ? Number((ratings.reduce((sum, r) => sum + r, 0) / ratings.length).toFixed(1))
+    : 0;
+
+  // 3. Récupérer les restaurants favoris
+  function normalizeFavoriteIds(raw: unknown): string[] {
+    if (Array.isArray(raw)) {
+      return raw.filter((x): x is string => typeof x === "string");
+    }
+    if (typeof raw === "string") {
+      const cleaned = raw.replace(/^{|}$/g, "");
+      return cleaned
+        .split(",")
+        .map((id) => id.trim())
+        .filter((id) => id.length > 0);
+    }
+    return [];
+  }
+
+  const favoriteIds = normalizeFavoriteIds(typedProfile.favorite_restaurant_ids);
+  const favoriteIdsSliced = favoriteIds.slice(0, 3);
+  let favoriteRestaurants: Array<{ id: string; name: string; slug: string | null; logo_url: string | null }> = [];
+
+  if (favoriteIdsSliced.length > 0) {
+    const { data: restaurantsData } = await supabase
+      .from("restaurants")
+      .select("id, name, slug, logo_url")
+      .in("id", favoriteIdsSliced);
+
+    if (restaurantsData) {
+      const typedRestaurantsData = restaurantsData as Array<{ id: string; name: string; slug: string | null; logo_url: string | null }>;
+      favoriteRestaurants = favoriteIdsSliced
+        .map((id: string) => typedRestaurantsData.find((r) => r.id === id))
+        .filter((r): r is { id: string; name: string; slug: string | null; logo_url: string | null } => Boolean(r));
+    }
+  }
+
+  // 4. Récupérer la dernière expérience
+  const { data: lastLog } = await supabase
+    .from("fastfood_logs")
+    .select("id, restaurant_name, restaurant_id, rating, comment, visited_at, created_at")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  let lastExperience: {
+    id: string;
+    restaurant_name: string;
+    restaurant_logo_url: string | null;
+    rating: number;
+    comment: string | null;
+    visited_at: string | null;
+    created_at: string;
+  } | null = null;
+
+  if (lastLog) {
+    let restaurantLogoUrl: string | null = null;
+    if (lastLog.restaurant_id) {
+      const { data: restaurant } = await supabase
+        .from("restaurants")
+        .select("logo_url")
+        .eq("id", lastLog.restaurant_id)
+        .maybeSingle();
+      restaurantLogoUrl = restaurant?.logo_url || null;
+    }
+
+    lastExperience = {
+      id: lastLog.id,
+      restaurant_name: lastLog.restaurant_name || "Restaurant inconnu",
+      restaurant_logo_url: restaurantLogoUrl,
+      rating: lastLog.rating || 0,
+      comment: lastLog.comment,
+      visited_at: lastLog.visited_at,
+      created_at: lastLog.created_at,
+    };
+  }
+
+  return {
+    profile: typedProfile,
+    stats: {
+      restaurantsCount,
+      totalExperiences,
+      avgRating,
+    },
+    favoriteRestaurants,
+    lastExperience,
+  };
+}
+
 export async function getCurrentUserProfile(): Promise<{
   user: { id: string; email: string | undefined } | null;
   profile: UserProfile | null;
@@ -513,6 +685,7 @@ export async function updateProfile(data: {
 
   console.log("[Profile] Profile updated successfully - saved row:", updatedProfile);
   console.log("[SaveProfile] updated profile with avatar_variant:", updatedProfile?.avatar_variant, "display_name:", updatedProfile?.display_name, "bio:", updatedProfile?.bio);
+  console.log("[Profile Save] updatedProfile", updatedProfile?.updated_at, updatedProfile?.avatar_variant);
   return { profile: updatedProfile as UserProfile, error: null };
 }
 

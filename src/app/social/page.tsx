@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { getAvatarThemeFromVariant } from "@/lib/avatarTheme";
 import { useProfile } from "@/context/ProfileContext";
+import { getMyProfileWithData, UserProfile } from "@/lib/profile";
 import Spinner from "@/components/Spinner";
 
 type PublicProfile = {
@@ -14,6 +16,30 @@ type PublicProfile = {
   avatar_url: string | null;
   avatar_variant?: string | null;
   favorite_restaurant_ids: string[] | null;
+};
+
+type MyProfileData = {
+  profile: UserProfile;
+  stats: {
+    restaurantsCount: number;
+    totalExperiences: number;
+    avgRating: number;
+  };
+  favoriteRestaurants: Array<{
+    id: string;
+    name: string;
+    slug: string | null;
+    logo_url: string | null;
+  }>;
+  lastExperience: {
+    id: string;
+    restaurant_name: string;
+    restaurant_logo_url: string | null;
+    rating: number;
+    comment: string | null;
+    visited_at: string | null;
+    created_at: string;
+  } | null;
 };
 
 export default function SocialPage() {
@@ -25,6 +51,11 @@ export default function SocialPage() {
   const [profiles, setProfiles] = useState<PublicProfile[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Mon profil (carte en haut)
+  const [myProfileData, setMyProfileData] = useState<MyProfileData | null>(null);
+  const [myProfileLoading, setMyProfileLoading] = useState(true);
+  const [myProfileError, setMyProfileError] = useState<string | null>(null);
 
   // Debounce de 300ms
   useEffect(() => {
@@ -182,6 +213,163 @@ export default function SocialPage() {
             {error}
           </div>
         )}
+
+        {/* Carte "Mon profil" */}
+        <section className="rounded-xl bg-[#0e0e1a] border border-white/5 p-4 space-y-4">
+          <h2 className="text-sm font-medium text-white mb-2">Mon profil</h2>
+          
+          {myProfileLoading ? (
+            <div className="flex justify-center py-8">
+              <Spinner size="sm" />
+            </div>
+          ) : myProfileError ? (
+            <div className="rounded-xl bg-red-500/10 border border-red-500/40 px-3 py-2 text-xs text-red-300">
+              {myProfileError}
+            </div>
+          ) : myProfileData && myProfileData.profile ? (
+              <>
+                {/* Header profil */}
+                <div className="flex items-start gap-4 rounded-xl p-4 border" style={{ borderColor: getAvatarThemeFromVariant(myProfileData.profile.avatar_variant as any).accentSoft, backgroundColor: getAvatarThemeFromVariant(myProfileData.profile.avatar_variant as any).accentSoft }}>
+                  <div
+                    className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-full border"
+                    style={{ boxShadow: getAvatarThemeFromVariant(myProfileData.profile.avatar_variant as any).glow, borderColor: getAvatarThemeFromVariant(myProfileData.profile.avatar_variant as any).accentSoft }}
+                  >
+                    <Image
+                      src={getAvatarThemeFromVariant(myProfileData.profile.avatar_variant as any).avatarSrc}
+                      alt={myProfileData.profile.username || "Avatar"}
+                      fill
+                      className="object-cover object-center scale-150"
+                      style={{ minWidth: '100%', minHeight: '100%' }}
+                    />
+                  </div>
+                  <div className="flex flex-col min-w-0 flex-1 gap-1">
+                    {myProfileData.profile.display_name && myProfileData.profile.display_name.trim().length > 0 ? (
+                      <>
+                        <h3 className="text-base font-semibold break-words" style={{ color: getAvatarThemeFromVariant(myProfileData.profile.avatar_variant as any).accent }}>
+                          {myProfileData.profile.display_name}
+                        </h3>
+                        <span className="text-xs text-slate-400 break-words">
+                          @{myProfileData.profile.username}
+                        </span>
+                      </>
+                    ) : (
+                      <h3 className="text-base font-semibold break-words" style={{ color: getAvatarThemeFromVariant(myProfileData.profile.avatar_variant as any).accent }}>
+                        @{myProfileData.profile.username}
+                      </h3>
+                    )}
+                    {myProfileData.profile.bio && myProfileData.profile.bio.trim().length > 0 && (
+                      <p className="text-xs text-slate-300 leading-relaxed line-clamp-2 break-words mt-1">
+                        {myProfileData.profile.bio}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Stats rapides */}
+                <div className="grid grid-cols-3 gap-3 rounded-xl bg-[#0F0F1A] border shadow-md shadow-black/20 px-4 py-3" style={{ borderColor: getAvatarThemeFromVariant(myProfileData.profile.avatar_variant as any).accentSoft, boxShadow: getAvatarThemeFromVariant(myProfileData.profile.avatar_variant as any).ring }}>
+                  <div className="flex flex-col items-center">
+                    <span className="text-base font-semibold text-white">
+                      {myProfileData.stats.restaurantsCount}
+                    </span>
+                    <span className="text-[10px] text-slate-400 text-center">
+                      Restos testés
+                    </span>
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <span className="text-base font-semibold text-white">
+                      {myProfileData.stats.totalExperiences}
+                    </span>
+                    <span className="text-[10px] text-slate-400 text-center">
+                      Expériences
+                    </span>
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <span className="text-base font-semibold text-white">
+                      {myProfileData.stats.avgRating.toFixed(1)}
+                    </span>
+                    <span className="text-[10px] text-slate-400 text-center">
+                      Note moyenne
+                    </span>
+                  </div>
+                </div>
+
+                {/* 3 enseignes favorites */}
+                {myProfileData.favoriteRestaurants.length > 0 && (
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold text-white">3 enseignes favorites</h3>
+                    <div className="grid grid-cols-3 gap-2">
+                      {myProfileData.favoriteRestaurants.map((restaurant) => (
+                        <Link
+                          key={restaurant.id}
+                          href={restaurant.slug ? `/restaurants/${restaurant.slug}` : `#`}
+                          className="flex flex-col items-center gap-1.5 rounded-xl bg-[#0F0F1A] border border-white/5 p-2 hover:bg-[#151520] transition-colors"
+                        >
+                          {restaurant.logo_url ? (
+                            <div className="relative h-10 w-10 rounded overflow-hidden">
+                              <Image
+                                src={restaurant.logo_url}
+                                alt={restaurant.name}
+                                fill
+                                className="object-cover"
+                              />
+                            </div>
+                          ) : (
+                            <div className="h-10 w-10 rounded bg-slate-700 flex items-center justify-center">
+                              <span className="text-xs text-slate-400">{restaurant.name.charAt(0)}</span>
+                            </div>
+                          )}
+                          <span className="text-[10px] text-slate-300 text-center line-clamp-2">{restaurant.name}</span>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Dernière expérience */}
+                {myProfileData.lastExperience && (
+                  <div className="rounded-xl bg-[#0F0F1A] border p-3" style={{ borderColor: getAvatarThemeFromVariant(myProfileData.profile.avatar_variant as any).accentSoft, boxShadow: getAvatarThemeFromVariant(myProfileData.profile.avatar_variant as any).ring }}>
+                    <h3 className="text-sm font-semibold text-white mb-2">Dernière expérience</h3>
+                    <div className="flex items-center gap-3">
+                      {myProfileData.lastExperience.restaurant_logo_url && (
+                        <div className="relative h-10 w-10 rounded overflow-hidden flex-shrink-0">
+                          <Image
+                            src={myProfileData.lastExperience.restaurant_logo_url}
+                            alt={myProfileData.lastExperience.restaurant_name}
+                            fill
+                            className="object-cover"
+                          />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-white truncate">{myProfileData.lastExperience.restaurant_name}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-xs text-slate-400">{myProfileData.lastExperience.rating}/5</span>
+                          {myProfileData.lastExperience.comment && (
+                            <span className="text-xs text-slate-400 truncate">{myProfileData.lastExperience.comment}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Lien vers le profil complet */}
+                <Link
+                  href="/profile"
+                  className="flex items-center justify-center gap-2 rounded-xl bg-bitebox/10 border border-bitebox/30 px-4 py-2 text-sm font-medium text-bitebox hover:bg-bitebox/20 transition-colors"
+                >
+                  <span>Voir mon profil complet</span>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </Link>
+              </>
+          ) : (
+            <div className="text-center py-8 text-slate-400 text-sm">
+              Aucun profil trouvé
+            </div>
+          )}
+        </section>
 
         {/* Contenu selon l'état */}
         {!debouncedQuery.trim() ? (
