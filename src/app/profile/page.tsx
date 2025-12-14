@@ -256,6 +256,16 @@ export default function ProfilePage() {
   const theme = getAvatarTheme(profile?.avatar_url);
   const themeColorGlow = hexToRgba(theme.color, 0.33);
   const accentTheme = getAvatarAccentTheme(profile?.avatar_url);
+  
+  // Debug: afficher la variante détectée en dev (temporaire pour vérifier)
+  if (process.env.NODE_ENV === "development") {
+    const detectedVariant = accentTheme.borderSoft.includes("violet") ? "violet" :
+                            accentTheme.borderSoft.includes("blue") ? "bleu" :
+                            accentTheme.borderSoft.includes("orange") ? "orange" :
+                            accentTheme.borderSoft.includes("red") ? "rouge" :
+                            accentTheme.borderSoft.includes("emerald") ? "vert" : "unknown";
+    console.log("[Profile] DEBUG - avatar_url:", profile?.avatar_url, "→ detected variant:", detectedVariant, "→ borderSoft:", accentTheme.borderSoft);
+  }
   const displayName = profile?.display_name && profile.display_name.trim().length > 0
     ? profile.display_name
     : profile?.username && profile.username.trim().length > 0

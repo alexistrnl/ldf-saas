@@ -94,25 +94,76 @@ const THEME_MAP: Record<AvatarVariant, AvatarTheme> = {
 
 /**
  * Déduit la variante d'avatar depuis avatar_url ou avatar_variant
+ * Source de vérité unique pour la couleur d'accent
  */
 function getAvatarVariant(avatarUrl: string | null | undefined, avatarVariant?: string | null): AvatarVariant {
-  // Si avatar_variant est fourni et valide, l'utiliser
+  // Si avatar_variant est fourni et valide, l'utiliser (priorité absolue)
   if (avatarVariant && avatarVariant in THEME_MAP) {
     return avatarVariant as AvatarVariant;
   }
 
-  // Sinon, déduire depuis avatar_url
-  if (!avatarUrl) return "violet";
+  // Sinon, déduire depuis avatar_url (fallback)
+  if (!avatarUrl) {
+    if (process.env.NODE_ENV === "development") {
+      console.log("[AvatarTheme] Missing avatar_url, fallback to violet");
+    }
+    return "violet";
+  }
 
   const urlLower = avatarUrl.toLowerCase();
   
-  if (urlLower.includes("bleu")) return "bleu";
-  if (urlLower.includes("orange")) return "orange";
-  if (urlLower.includes("rouge")) return "rouge";
-  if (urlLower.includes("vert")) return "vert";
-  if (urlLower.includes("violet")) return "violet";
+  // Détection robuste : français ET anglais
+  // Ordre de priorité pour éviter les conflits
+  
+  // Rouge / Red
+  if (urlLower.includes("rouge") || urlLower.includes("red")) {
+    const variant = "rouge";
+    if (process.env.NODE_ENV === "development") {
+      console.log(`[AvatarTheme] Detected variant: ${variant} from URL: ${avatarUrl}`);
+    }
+    return variant;
+  }
+  
+  // Violet / Purple  
+  if (urlLower.includes("violet") || urlLower.includes("purple")) {
+    const variant = "violet";
+    if (process.env.NODE_ENV === "development") {
+      console.log(`[AvatarTheme] Detected variant: ${variant} from URL: ${avatarUrl}`);
+    }
+    return variant;
+  }
+  
+  // Orange
+  if (urlLower.includes("orange")) {
+    const variant = "orange";
+    if (process.env.NODE_ENV === "development") {
+      console.log(`[AvatarTheme] Detected variant: ${variant} from URL: ${avatarUrl}`);
+    }
+    return variant;
+  }
+  
+  // Bleu / Blue
+  if (urlLower.includes("bleu") || urlLower.includes("blue")) {
+    const variant = "bleu";
+    if (process.env.NODE_ENV === "development") {
+      console.log(`[AvatarTheme] Detected variant: ${variant} from URL: ${avatarUrl}`);
+    }
+    return variant;
+  }
+  
+  // Vert / Green
+  if (urlLower.includes("vert") || urlLower.includes("green")) {
+    const variant = "vert";
+    if (process.env.NODE_ENV === "development") {
+      console.log(`[AvatarTheme] Detected variant: ${variant} from URL: ${avatarUrl}`);
+    }
+    return variant;
+  }
 
-  // Fallback
+  // Fallback avec log en dev
+  if (process.env.NODE_ENV === "development") {
+    console.warn("[AvatarTheme] Could not detect variant from avatar_url, fallback to violet:", avatarUrl);
+  }
   return "violet";
 }
 

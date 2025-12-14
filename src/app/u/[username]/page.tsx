@@ -217,6 +217,16 @@ export default async function PublicProfilePage({
   const theme = getAvatarTheme(profile.avatar_url);
   const themeColorGlow = hexToRgba(theme.color, 0.33);
   const accentTheme = getAvatarAccentTheme(profile.avatar_url);
+  
+  // Debug: afficher la variante détectée en dev (temporaire pour vérifier)
+  if (process.env.NODE_ENV === "development") {
+    const detectedVariant = accentTheme.borderSoft.includes("violet") ? "violet" :
+                            accentTheme.borderSoft.includes("blue") ? "bleu" :
+                            accentTheme.borderSoft.includes("orange") ? "orange" :
+                            accentTheme.borderSoft.includes("red") ? "rouge" :
+                            accentTheme.borderSoft.includes("emerald") ? "vert" : "unknown";
+    console.log("[PublicProfile] DEBUG - avatar_url:", profile.avatar_url, "→ detected variant:", detectedVariant, "→ borderSoft:", accentTheme.borderSoft);
+  }
 
   return (
     <main className="min-h-screen w-full overflow-x-hidden bg-[#020617]">
