@@ -147,19 +147,8 @@ export default function RestaurantPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isAddExperienceOpen, setIsAddExperienceOpen] = useState(false);
-  const [topDishIndex, setTopDishIndex] = useState(0);
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
-  const [isDesktop, setIsDesktop] = useState(false);
   const [latestDishes, setLatestDishes] = useState<DishWithStats[]>([]);
-
-  useEffect(() => {
-    const checkDesktop = () => {
-      setIsDesktop(window.innerWidth >= 1024);
-    };
-    checkDesktop();
-    window.addEventListener('resize', checkDesktop);
-    return () => window.removeEventListener('resize', checkDesktop);
-  }, []);
 
   const handleAddNoteClick = () => {
     if (isMobile) {
@@ -544,19 +533,6 @@ export default function RestaurantPage() {
     })
     .slice(0, 3);
 
-  // Navigation du carrousel
-  const goToNextDish = () => {
-    setTopDishIndex((prev) => (prev + 1) % topRatedDishes.length);
-  };
-
-  const goToPrevDish = () => {
-    setTopDishIndex((prev) => (prev - 1 + topRatedDishes.length) % topRatedDishes.length);
-  };
-
-  const goToDish = (index: number) => {
-    setTopDishIndex(index);
-  };
-
   // Fonction de scroll fluide vers une section
   const scrollToSection = (categoryId: string) => {
     const el = document.getElementById(`section-${categoryId}`);
@@ -653,157 +629,87 @@ export default function RestaurantPage() {
               Le top 3 des plats notés par la communauté pour cette enseigne.
             </p>
             
-            {/* Carrousel */}
-            <div className="relative">
-              {/* Conteneur du carrousel */}
-              <div className="relative overflow-hidden rounded-2xl bg-slate-900 border border-slate-800 shadow-sm">
+            {/* Carrousel horizontal scrollable */}
+            <div className="flex gap-4 overflow-x-auto overflow-y-hidden pb-2 snap-x snap-mandatory [-webkit-overflow-scrolling:touch] sm:grid sm:grid-cols-3 sm:gap-4 sm:overflow-x-visible sm:pb-0 sm:snap-none">
+              {topRatedDishes.map((dish, index) => (
                 <div
-                  className="flex transition-transform duration-300 ease-in-out lg:flex-wrap lg:gap-6"
-                  style={{
-                    transform: isDesktop ? 'none' : `translateX(-${topDishIndex * 100}%)`,
-                  }}
+                  key={dish.id}
+                  className="w-[260px] flex-shrink-0 snap-start sm:w-auto sm:flex-shrink sm:snap-none"
                 >
-                  {topRatedDishes.map((dish, index) => (
-                    <div
-                      key={dish.id}
-                      className="min-w-full lg:min-w-[calc(33.333%-16px)] lg:flex-1 flex flex-col"
-                    >
-                      {/* Image */}
-                      {(() => {
-                    const isPng = dish.image_url?.toLowerCase().includes(".png");
-                    const isBurgerKing = restaurant?.name?.toLowerCase().includes("burger king") || restaurant?.slug?.toLowerCase().includes("burger-king");
-                    const isBlackWhite = restaurant?.name?.toLowerCase().includes("black") && restaurant?.name?.toLowerCase().includes("white");
-                    const category = categories.find(cat => cat.id === dish.category_id) || null;
-                    const { shouldZoom, zoomLevel, shouldCenter } = getPopeyesDishZoom(dish, category, restaurant);
-                    const { shouldCover: shouldCoverBurgouzz, zoomLevel: burgouzzZoomLevel } = getBurgouzzDishCover(dish, category, restaurant);
-                    return (
-                      <div className="relative w-full aspect-square rounded-xl overflow-hidden flex items-center justify-center bg-amber-50 border border-amber-200">
-                        {dish.image_url ? (
-                          shouldCoverBurgouzz ? (
-                            <img
-                              src={dish.image_url}
-                              alt={dish.name}
-                              className={`w-full h-full object-cover object-center ${burgouzzZoomLevel}`}
-                            />
-                          ) : isPng ? (
-                            <img
-                              src={dish.image_url}
-                              alt={dish.name}
-                              className={`w-full h-full object-contain ${shouldCenter ? 'object-center' : 'object-top'} ${isBlackWhite ? 'scale-150' : zoomLevel} drop-shadow-xl ${isBurgerKing ? 'pt-0 pb-4 px-4' : 'p-4'}`}
-                            />
+                  <div className="bg-slate-900/80 rounded-2xl overflow-hidden border border-slate-800/70 shadow-md flex flex-col">
+                    {/* Image */}
+                    {(() => {
+                      const isPng = dish.image_url?.toLowerCase().includes(".png");
+                      const isBurgerKing = restaurant?.name?.toLowerCase().includes("burger king") || restaurant?.slug?.toLowerCase().includes("burger-king");
+                      const isBlackWhite = restaurant?.name?.toLowerCase().includes("black") && restaurant?.name?.toLowerCase().includes("white");
+                      const category = categories.find(cat => cat.id === dish.category_id) || null;
+                      const { shouldZoom, zoomLevel, shouldCenter } = getPopeyesDishZoom(dish, category, restaurant);
+                      const { shouldCover: shouldCoverBurgouzz, zoomLevel: burgouzzZoomLevel } = getBurgouzzDishCover(dish, category, restaurant);
+                      return (
+                        <div className="relative w-full aspect-square rounded-xl overflow-hidden flex items-center justify-center bg-amber-50 border border-amber-200">
+                          {dish.image_url ? (
+                            shouldCoverBurgouzz ? (
+                              <img
+                                src={dish.image_url}
+                                alt={dish.name}
+                                className={`w-full h-full object-cover object-center ${burgouzzZoomLevel}`}
+                              />
+                            ) : isPng ? (
+                              <img
+                                src={dish.image_url}
+                                alt={dish.name}
+                                className={`w-full h-full object-contain ${shouldCenter ? 'object-center' : 'object-top'} ${isBlackWhite ? 'scale-150' : zoomLevel} drop-shadow-xl ${isBurgerKing ? 'pt-0 pb-4 px-4' : 'p-4'}`}
+                              />
+                            ) : (
+                              <img
+                                src={dish.image_url}
+                                alt={dish.name}
+                                className={`w-full h-full object-cover object-center ${shouldZoom ? zoomLevel : ''}`}
+                              />
+                            )
                           ) : (
-                            <img
-                              src={dish.image_url}
-                              alt={dish.name}
-                              className={`w-full h-full object-cover object-center ${shouldZoom ? zoomLevel : ''}`}
-                            />
-                          )
-                        ) : (
-                          <span className="text-xs text-slate-500">Pas d'image</span>
-                        )}
+                            <span className="text-xs text-slate-500">Pas d'image</span>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Contenu */}
+                    <div className="px-4 py-4 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-semibold text-slate-100 truncate">
+                          {dish.name}
+                        </p>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-bitebox/10 text-yellow-400 border border-bitebox/40 whitespace-nowrap">
+                          Top {index + 1}
+                        </span>
                       </div>
-                    );
-                      })()}
 
-                      {/* Contenu */}
-                      <div className="px-4 py-4 space-y-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-sm font-semibold text-slate-100 truncate">
-                            {dish.name}
-                          </p>
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-bitebox/10 text-yellow-400 border border-bitebox/40 whitespace-nowrap">
-                            Top {index + 1}
-                          </span>
+                      {/* Note en étoiles */}
+                      <div className="flex items-center justify-between text-[11px] text-slate-300">
+                        <div className="flex">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <span
+                              key={star}
+                              className={
+                                dish.ratingStats.avg >= star
+                                  ? "text-yellow-400"
+                                  : "text-slate-700"
+                              }
+                            >
+                              ★
+                            </span>
+                          ))}
                         </div>
-
-                        {/* Note en étoiles */}
-                        <div className="flex items-center justify-between text-[11px] text-slate-300">
-                          <div className="flex">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                              <span
-                                key={star}
-                                className={
-                                  dish.ratingStats.avg >= star
-                                    ? "text-yellow-400"
-                                    : "text-slate-700"
-                                }
-                              >
-                                ★
-                              </span>
-                            ))}
-                          </div>
-                          <span className="text-[11px] text-slate-400 ml-1">
-                            {dish.ratingStats.avg.toFixed(1)} / 5 ·{" "}
-                            {dish.ratingStats.count} avis
-                          </span>
-                        </div>
+                        <span className="text-[11px] text-slate-400 ml-1">
+                          {dish.ratingStats.avg.toFixed(1)} / 5 ·{" "}
+                          {dish.ratingStats.count} avis
+                        </span>
                       </div>
                     </div>
-                  ))}
+                  </div>
                 </div>
-
-                {/* Boutons de navigation */}
-                {topRatedDishes.length > 1 && (
-                  <>
-                    <button
-                      onClick={goToPrevDish}
-                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-slate-900/80 hover:bg-slate-800 border border-slate-700 rounded-full p-2 transition shadow-lg lg:hidden"
-                      aria-label="Plat précédent"
-                    >
-                      <svg
-                        className="w-5 h-5 text-slate-300"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M15 19l-7-7 7-7"
-                        />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={goToNextDish}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-slate-900/80 hover:bg-slate-800 border border-slate-700 rounded-full p-2 transition shadow-lg lg:hidden"
-                      aria-label="Plat suivant"
-                    >
-                      <svg
-                        className="w-5 h-5 text-slate-300"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 5l7 7-7 7"
-                        />
-                      </svg>
-                    </button>
-                  </>
-                )}
-              </div>
-
-              {/* Indicateurs de position */}
-              {topRatedDishes.length > 1 && (
-                <div className="flex justify-center gap-2 mt-4 lg:hidden">
-                  {topRatedDishes.map((_, index) => (
-                    <button
-                      key={index}
-                      onClick={() => goToDish(index)}
-                      className={`h-2 rounded-full transition-all ${
-                        index === topDishIndex
-                          ? "w-6 bg-bitebox"
-                          : "w-2 bg-slate-600 hover:bg-slate-500"
-                      }`}
-                      aria-label={`Aller au plat ${index + 1}`}
-                    />
-                  ))}
-                </div>
-              )}
+              ))}
             </div>
           </section>
         )}
