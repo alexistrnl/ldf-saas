@@ -589,31 +589,6 @@ export default function RestaurantPage() {
       </div>
 
       <div className="max-w-5xl mx-auto px-4 py-4">
-        {/* Menu d'ancrage des catégories */}
-        {categoriesWithDishes.length > 0 && (
-          <div className="mb-3 -mt-2">
-            <div className="overflow-x-auto no-scrollbar">
-              <div className="flex gap-2 sm:gap-3 justify-center">
-                {categoriesWithDishes.map((cat) => {
-                  const isActive = activeCategoryId === cat.id;
-                  return (
-                    <button
-                      key={cat.id}
-                      onClick={() => scrollToSection(cat.id)}
-                      className={`px-4 py-1.5 rounded-full text-sm font-medium transition whitespace-nowrap ${
-                        isActive
-                          ? "bg-bitebox text-white"
-                          : "bg-white/5 text-slate-300 hover:bg-white/10"
-                      }`}
-                    >
-                      {cat.name}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        )}
         {/* Bloc note + bouton */}
         <section className="mt-4 flex flex-col items-center gap-4 mb-3">
           {/* Bloc note */}
