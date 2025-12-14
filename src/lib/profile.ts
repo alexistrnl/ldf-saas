@@ -530,13 +530,39 @@ export async function updateProfile(data: {
   }
 
   // Mettre à jour le profil existant
-  console.log("[Profile] Updating profile...");
-  const { data: updatedProfile, error } = await supabase
+  console.log("[Profile] Updating profile with data:", filteredData);
+
+  let { data: updatedProfile, error } = await supabase
     .from("profiles")
-    .update(updateData)
+    .update(filteredData)
     .eq("id", user.id)
     .select("*")
     .single();
+
+  // Si erreur "column does not exist", retirer bio/display_name et réessayer
+  if (error && error.message?.includes("column") && error.message?.includes("does not exist")) {
+    console.warn("[Profile] Column does not exist, retrying without optional columns:", error.message);
+    
+    const retryData = { ...filteredData };
+    // Retirer bio et display_name si l'erreur les concerne
+    if (error.message.includes("bio")) {
+      delete retryData.bio;
+    }
+    if (error.message.includes("display_name")) {
+      delete retryData.display_name;
+    }
+    
+    // Réessayer sans les colonnes problématiques
+    const retryResult = await supabase
+      .from("profiles")
+      .update(retryData)
+      .eq("id", user.id)
+      .select("*")
+      .single();
+    
+    updatedProfile = retryResult.data;
+    error = retryResult.error;
+  }
 
   if (error) {
     console.error("[Profile] Update profile error:", {
@@ -544,7 +570,9 @@ export async function updateProfile(data: {
       message: error.message,
       details: error.details,
       hint: error.hint,
+      updateData: filteredData,
     });
+    
     return { profile: null, error };
   }
 
