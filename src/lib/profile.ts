@@ -512,6 +512,7 @@ export async function updateProfile(data: {
   }
 
   console.log("[Profile] Profile updated successfully - saved row:", updatedProfile);
+  console.log("[SaveProfile] updated profile with avatar_variant:", updatedProfile?.avatar_variant, "display_name:", updatedProfile?.display_name, "bio:", updatedProfile?.bio);
   return { profile: updatedProfile as UserProfile, error: null };
 }
 

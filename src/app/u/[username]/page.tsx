@@ -43,12 +43,17 @@ type PublicProfileData = {
 
 async function getPublicProfile(username: string): Promise<PublicProfileData | null> {
   // 1. Récupérer le profil par username
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("id, username, display_name, is_public, favorite_restaurant_ids, avatar_url, avatar_variant, bio")
-    .eq("username", username.toLowerCase())
-    .eq("is_public", true)
-    .maybeSingle();
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("id, username, display_name, is_public, favorite_restaurant_ids, avatar_url, avatar_variant, bio, updated_at")
+      .eq("username", username.toLowerCase())
+      .eq("is_public", true)
+      .maybeSingle();
+    
+    // Log pour confirmer les données récupérées
+    if (profile) {
+      console.log("[PublicProfile] profile fetched from DB:", profile.username, "avatar_variant:", profile.avatar_variant, "display_name:", profile.display_name, "bio:", profile.bio);
+    }
 
   if (profileError || !profile) {
     return null;

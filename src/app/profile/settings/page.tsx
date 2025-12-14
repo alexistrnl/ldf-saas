@@ -6,13 +6,14 @@ import Image from "next/image";
 import {
   getCurrentUserProfile,
   UserProfile,
-  updateAvatar,
+  updateProfile,
   sanitizeUsername,
   validateUsernameFormat,
   updateSocialSettings,
 } from "@/lib/profile";
 import { supabase } from "@/lib/supabaseClient";
 import Spinner from "@/components/Spinner";
+import { AvatarVariant, getAvatarThemeFromVariant } from "@/lib/avatarTheme";
 
 type Restaurant = {
   id: string;
@@ -20,13 +21,22 @@ type Restaurant = {
   logo_url: string | null;
 };
 
-const AVAILABLE_AVATARS = [
-  "/avatar/avatar-bleu.png",
-  "/avatar/avatar-orange.png",
-  "/avatar/avatar-rouge.png",
-  "/avatar/avatar-vert.png",
-  "/avatar/avatar-violet.png",
+// Mapping avatar_variant → URL de l'avatar
+const AVATAR_OPTIONS: Array<{ variant: AvatarVariant; url: string; label: string }> = [
+  { variant: "blue", url: "/avatar/avatar-bleu.png", label: "Bleu" },
+  { variant: "orange", url: "/avatar/avatar-orange.png", label: "Orange" },
+  { variant: "red", url: "/avatar/avatar-rouge.png", label: "Rouge" },
+  { variant: "green", url: "/avatar/avatar-vert.png", label: "Vert" },
+  { variant: "purple", url: "/avatar/avatar-violet.png", label: "Violet" },
 ];
+
+const AVAILABLE_AVATARS = AVATAR_OPTIONS.map(opt => opt.url);
+
+// Fonction helper pour convertir avatar URL en avatar_variant
+function getAvatarVariantFromUrl(avatarUrl: string): AvatarVariant | null {
+  const option = AVATAR_OPTIONS.find(opt => opt.url === avatarUrl);
+  return option ? option.variant : null;
+}
 
 export default function ProfileSettingsPage() {
   const router = useRouter();
@@ -51,6 +61,7 @@ export default function ProfileSettingsPage() {
   const [restaurantsLoading, setRestaurantsLoading] = useState(true);
   
   // Avatar
+  const [avatarVariant, setAvatarVariant] = useState<AvatarVariant>("purple");
   const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
 
@@ -72,6 +83,11 @@ export default function ProfileSettingsPage() {
 
         if (user && userProfile) {
           setProfile(userProfile);
+          
+          // Initialiser avatar_variant depuis le profil
+          if (userProfile.avatar_variant && AVATAR_OPTIONS.some(opt => opt.variant === userProfile.avatar_variant)) {
+            setAvatarVariant(userProfile.avatar_variant as AvatarVariant);
+          }
           
           // Charger les données sociales
           const currentUsername = userProfile.username || "";
@@ -109,6 +125,14 @@ export default function ProfileSettingsPage() {
 
     loadData();
   }, []);
+
+  // Synchroniser avatarVariant avec profile.avatar_variant quand le profil change
+  useEffect(() => {
+    if (profile?.avatar_variant && AVATAR_OPTIONS.some(opt => opt.variant === profile.avatar_variant)) {
+      console.log("[Settings] profile.avatar_variant =", profile.avatar_variant, "local =", avatarVariant);
+      setAvatarVariant(profile.avatar_variant as AvatarVariant);
+    }
+  }, [profile?.avatar_variant]);
 
   // Gestion du changement d'username (nettoyage automatique)
   const handleUsernameChange = (value: string) => {
@@ -232,25 +256,47 @@ export default function ProfileSettingsPage() {
   const handleAvatarSelect = async (avatarUrl: string) => {
     if (isUpdatingAvatar) return;
 
-    setIsUpdatingAvatar(true);
+    // Convertir avatarUrl en avatar_variant
+    const newVariant = getAvatarVariantFromUrl(avatarUrl);
+    if (!newVariant) {
+      setAvatarError("Avatar invalide.");
+      return;
+    }
+
+    // Mettre à jour l'état local immédiatement (UI)
+    setAvatarVariant(newVariant);
     setAvatarError(null);
 
+    setIsUpdatingAvatar(true);
+
     try {
-      const { profile: updatedProfile, error } = await updateAvatar(avatarUrl);
+      // Sauvegarder avec updateProfile en utilisant avatar_variant
+      const { profile: updatedProfile, error } = await updateProfile({
+        avatar_variant: newVariant,
+      });
 
       if (error) {
         console.error("[Settings] update avatar error:", error);
         setAvatarError("Impossible de mettre à jour l'avatar. Réessaie plus tard.");
+        // Revenir à l'ancien variant en cas d'erreur
+        if (profile?.avatar_variant) {
+          setAvatarVariant(profile.avatar_variant as AvatarVariant);
+        }
         setIsUpdatingAvatar(false);
         return;
       }
 
       if (updatedProfile) {
+        console.log("[Settings] Avatar saved successfully, updated profile:", updatedProfile);
         setProfile(updatedProfile);
       }
     } catch (err) {
       console.error("[Settings] unexpected avatar error:", err);
       setAvatarError("Erreur inattendue lors de la mise à jour de l'avatar.");
+      // Revenir à l'ancien variant en cas d'erreur
+      if (profile?.avatar_variant) {
+        setAvatarVariant(profile.avatar_variant as AvatarVariant);
+      }
     } finally {
       setIsUpdatingAvatar(false);
     }
@@ -477,12 +523,12 @@ export default function ProfileSettingsPage() {
           )}
 
           <div className="flex justify-center gap-3">
-            {AVAILABLE_AVATARS.map((avatarUrl) => {
-              const isSelected = profile?.avatar_url === avatarUrl;
+            {AVATAR_OPTIONS.map((option) => {
+              const isSelected = avatarVariant === option.variant;
               return (
                 <button
-                  key={avatarUrl}
-                  onClick={() => handleAvatarSelect(avatarUrl)}
+                  key={option.url}
+                  onClick={() => handleAvatarSelect(option.url)}
                   disabled={isUpdatingAvatar}
                   className={`
                     relative h-14 w-14 flex-shrink-0 rounded-full overflow-hidden border-2 transition-all
@@ -493,11 +539,11 @@ export default function ProfileSettingsPage() {
                     }
                     ${isUpdatingAvatar ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
                   `}
-                  aria-label={`Sélectionner l'avatar ${avatarUrl}`}
+                  aria-label={`Sélectionner l'avatar ${option.label}`}
                 >
                   <Image
-                    src={avatarUrl}
-                    alt={`Avatar ${avatarUrl}`}
+                    src={option.url}
+                    alt={`Avatar ${option.label}`}
                     fill
                     className="object-cover"
                   />

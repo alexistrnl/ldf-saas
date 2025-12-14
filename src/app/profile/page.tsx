@@ -513,10 +513,10 @@ export default function ProfilePage() {
         onClose={() => setIsEditModalOpen(false)}
         profile={profile}
         onSave={() => {
-          // Le contexte sera mis à jour par EditProfileModal avec les données fraîches
+          // Le profil est déjà mis à jour via le contexte par EditProfileModal
           // Le useEffect dépend de profile, donc il se déclenchera automatiquement
-          // On peut juste recharger les favoris si nécessaire
-          // (le useEffect se déclenchera car profile a changé)
+          // On recharge les stats et la dernière expérience car profile a changé
+          console.log("[Profile] onSave callback called, profile updated via context");
         }}
       />
     </main>

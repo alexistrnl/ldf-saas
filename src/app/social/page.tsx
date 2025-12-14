@@ -69,13 +69,16 @@ export default function SocialPage() {
           const profilesData = (data || []).map((profile) => {
             // Si c'est le profil connecté, utiliser les données du contexte (plus à jour)
             if (currentProfile && profile.id === currentProfile.id) {
+              console.log("[Social] Using context profile for current user:", currentProfile.username, "avatar_variant:", currentProfile.avatar_variant);
               return {
                 id: currentProfile.id,
                 username: currentProfile.username,
                 avatar_url: currentProfile.avatar_url,
+                avatar_variant: currentProfile.avatar_variant || profile.avatar_variant,
                 favorite_restaurant_ids: currentProfile.favorite_restaurant_ids,
               } as PublicProfile;
             }
+            console.log("[Social] profile fetched from DB:", profile.username, "avatar_variant:", profile.avatar_variant);
             return profile as PublicProfile;
           });
           
@@ -91,13 +94,14 @@ export default function SocialPage() {
     };
 
     searchProfiles();
-  }, [debouncedQuery, currentProfile]);
+  }, [debouncedQuery, currentProfile?.id, currentProfile?.avatar_variant, currentProfile?.username]);
 
   // Recharger la recherche si on revient sur la page avec une recherche active
   useEffect(() => {
     const handleVisibilityChange = () => {
       // Si la page redevient visible et qu'une recherche est active, la relancer
       if (!document.hidden && debouncedQuery.trim()) {
+        console.log("[Social] Page visible again, re-fetching search results for:", debouncedQuery);
         // Déclencher une recherche fraîche en modifiant temporairement la query
         const currentQuery = searchQuery;
         setSearchQuery("");
@@ -108,6 +112,7 @@ export default function SocialPage() {
     const handleFocus = () => {
       // Si une recherche est active, la relancer
       if (debouncedQuery.trim()) {
+        console.log("[Social] Window focused, re-fetching search results for:", debouncedQuery);
         const currentQuery = searchQuery;
         setSearchQuery("");
         setTimeout(() => setSearchQuery(currentQuery), 10);
