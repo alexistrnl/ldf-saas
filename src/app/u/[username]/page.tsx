@@ -11,6 +11,13 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 // Client Supabase public pour les pages publiques
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+type RestaurantLite = {
+  id: string;
+  name: string;
+  slug: string | null;
+  logo_url: string | null;
+};
+
 type PublicProfileData = {
   profile: UserProfile;
   stats: {
@@ -18,12 +25,7 @@ type PublicProfileData = {
     totalExperiences: number;
     avgRating: number;
   };
-  favoriteRestaurants: Array<{
-    id: string;
-    name: string;
-    slug: string | null;
-    logo_url: string | null;
-  }>;
+  favoriteRestaurants: Array<RestaurantLite>;
   lastExperience: {
     id: string;
     restaurant_name: string;
@@ -80,20 +82,24 @@ async function getPublicProfile(username: string): Promise<PublicProfileData | n
     : 0;
 
   // 3. Récupérer les 3 restaurants favoris
-  const favoriteIds = (profile.favorite_restaurant_ids || []).slice(0, 3);
+  const favoriteIds: string[] = Array.isArray(profile.favorite_restaurant_ids)
+    ? (profile.favorite_restaurant_ids as string[])
+    : [];
+  const favoriteIdsSliced = favoriteIds.slice(0, 3);
   let favoriteRestaurants: PublicProfileData["favoriteRestaurants"] = [];
 
-  if (favoriteIds.length > 0) {
+  if (favoriteIdsSliced.length > 0) {
     const { data: restaurantsData } = await supabase
       .from("restaurants")
       .select("id, name, slug, logo_url")
-      .in("id", favoriteIds);
+      .in("id", favoriteIdsSliced);
 
     if (restaurantsData) {
+      const typedRestaurantsData = restaurantsData as RestaurantLite[];
       // Préserver l'ordre des favoris
-      favoriteRestaurants = favoriteIds
-        .map((id) => restaurantsData.find((r) => r.id === id))
-        .filter((r): r is { id: string; name: string; slug: string | null; logo_url: string | null } => Boolean(r));
+      favoriteRestaurants = favoriteIdsSliced
+        .map((id: string) => typedRestaurantsData.find((r) => r.id === id))
+        .filter((r): r is RestaurantLite => Boolean(r));
     }
   }
 
