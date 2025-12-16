@@ -19,7 +19,6 @@ export default function AdminRestaurantsContent() {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [selectedRestaurantId, setSelectedRestaurantId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("overview");
@@ -163,7 +162,6 @@ export default function AdminRestaurantsContent() {
         description: description || null,
         logo_url: finalLogoUrl,
         slug,
-        show_latest_additions: true,
       });
 
       if (insertError) {
@@ -351,88 +349,6 @@ export default function AdminRestaurantsContent() {
     setSelectedRestaurantId(restaurant.id);
     setViewMode("overview");
     cancelEditRestaurant();
-  };
-
-  const handleToggleShowLatestAdditions = async (restaurantId: string, nextValue: boolean) => {
-    try {
-      setError(null);
-      setSuccessMessage(null);
-
-      // Guard strict : vérifier que restaurantId existe
-      if (!restaurantId) {
-        const errorMsg = "Restaurant id missing";
-        if (process.env.NODE_ENV !== "production") {
-          console.error("[Admin] toggle show_latest_additions:", errorMsg);
-        }
-        setError(errorMsg);
-        return;
-      }
-
-      // Requête simple : update directement sur restaurants via id
-      const { data, error: updateError } = await supabase
-        .from("restaurants")
-        .update({ show_latest_additions: nextValue })
-        .eq("id", restaurantId)
-        .select("id, show_latest_additions")
-        .single();
-
-      // Log uniquement en dev pour diagnostiquer
-      if (process.env.NODE_ENV !== "production") {
-        console.log("[Admin] toggle show_latest_additions:", { restaurantId, nextValue, data, error: updateError });
-      }
-
-      // Si l'update échoue, afficher le message d'erreur exact
-      if (updateError) {
-        if (process.env.NODE_ENV !== "production") {
-          console.error("[Admin] toggle show_latest_additions error", updateError);
-        }
-        setError(updateError.message);
-        return;
-      }
-
-      // Vérifier que data existe et a un id (type strict)
-      if (!data || !data.id) {
-        const errorMsg = "Aucune ligne mise à jour (id invalide ou RLS)";
-        if (process.env.NODE_ENV !== "production") {
-          console.error("[Admin] toggle show_latest_additions:", errorMsg);
-        }
-        setError(errorMsg);
-        return;
-      }
-
-      // Mettre à jour restaurants[] en local (id obligatoire, pas d'objet incomplet)
-      setRestaurants((prev) =>
-        prev.map((r) =>
-          r.id === data.id ? { ...r, show_latest_additions: data.show_latest_additions } : r
-        )
-      );
-
-      // Mettre à jour selectedRestaurant si présent (calculé dynamiquement, mais on peut forcer le refresh)
-      // Note: selectedRestaurant est calculé depuis restaurants.find(), donc il se mettra à jour automatiquement
-
-      // Mettre à jour editingRestaurant si présent (avec guard pour id obligatoire)
-      setEditingRestaurant((prev) => {
-        if (!prev || !prev.id || prev.id !== data.id) return prev;
-        return { ...prev, show_latest_additions: data.show_latest_additions };
-      });
-
-      setSuccessMessage(
-        data.show_latest_additions
-          ? "Le bloc 'Derniers ajouts' est maintenant affiché sur la page publique."
-          : "Le bloc 'Derniers ajouts' est maintenant masqué sur la page publique."
-      );
-
-      // Effacer le message de succès après 3 secondes
-      setTimeout(() => {
-        setSuccessMessage(null);
-      }, 3000);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Erreur inattendue lors de la mise à jour du paramètre.";
-      if (process.env.NODE_ENV !== "production") {
-        console.error("[Admin] toggle show_latest_additions unexpected", err);
-      }
-      setError(errorMessage);
-    }
   };
 
   const handleManageMenu = (restaurant: Restaurant) => {
@@ -710,9 +626,6 @@ export default function AdminRestaurantsContent() {
           validateImageFile={validateImageFile}
           error={error}
           onError={setError}
-          onToggleShowLatestAdditions={handleToggleShowLatestAdditions}
-          onSuccess={setSuccessMessage}
-          successMessage={successMessage}
         />
         </div>
       )}

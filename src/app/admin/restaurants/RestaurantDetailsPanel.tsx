@@ -160,9 +160,6 @@ type RestaurantDetailsPanelProps = {
   validateImageFile: (file: File | null) => string | null;
   error: string | null;
   onError: (error: string | null) => void;
-  onToggleShowLatestAdditions: (restaurantId: string, value: boolean) => Promise<void>;
-  onSuccess: (message: string) => void;
-  successMessage: string | null;
 };
 
 export default function RestaurantDetailsPanel({
@@ -189,9 +186,6 @@ export default function RestaurantDetailsPanel({
   validateImageFile,
   error,
   onError,
-  onToggleShowLatestAdditions,
-  onSuccess,
-  successMessage,
 }: RestaurantDetailsPanelProps) {
   const router = useRouter();
 
@@ -277,11 +271,6 @@ export default function RestaurantDetailsPanel({
                 {error}
               </div>
             )}
-            {successMessage && (
-              <div className="rounded-md bg-green-500/10 border border-green-500/40 px-3 py-2 text-sm text-green-300">
-                {successMessage}
-              </div>
-            )}
 
             {currentMode === "edit" && !selectedRestaurant && (
               <div className="flex items-center justify-center h-full">
@@ -347,43 +336,6 @@ export default function RestaurantDetailsPanel({
                     />
                   </div>
 
-                  {/* Toggle Afficher Derniers ajouts */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <label className="text-xs text-slate-300 font-medium">
-                          Afficher "Derniers ajouts"
-                        </label>
-                        <p className="text-[11px] text-slate-500 mt-1">
-                          Active/désactive l'affichage du bloc Derniers ajouts sur la page publique.
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (!editingRestaurant) return;
-                          const newValue = !(editingRestaurant.show_latest_additions ?? true);
-                          await onToggleShowLatestAdditions(editingRestaurant.id, newValue);
-                        }}
-                        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-bitebox focus:ring-offset-2 ${
-                          (editingRestaurant.show_latest_additions ?? true)
-                            ? "bg-bitebox"
-                            : "bg-slate-600"
-                        }`}
-                        role="switch"
-                        aria-checked={editingRestaurant.show_latest_additions ?? true}
-                      >
-                        <span
-                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                            (editingRestaurant.show_latest_additions ?? true)
-                              ? "translate-x-5"
-                              : "translate-x-0"
-                          }`}
-                        />
-                      </button>
-                    </div>
-                  </div>
-
                   <button
                     type="submit"
                     className="inline-flex items-center justify-center rounded-md bg-bitebox px-4 py-2 text-sm font-semibold text-white shadow hover:bg-bitebox-dark"
@@ -427,43 +379,6 @@ export default function RestaurantDetailsPanel({
                         {selectedRestaurant.description}
                       </p>
                     )}
-                  </div>
-                </div>
-
-                {/* Toggle Afficher Derniers ajouts */}
-                <div className="pt-4 border-t border-slate-800">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <label className="text-sm font-medium text-slate-200">
-                        Afficher "Derniers ajouts"
-                      </label>
-                      <p className="text-xs text-slate-400 mt-1">
-                        Active/désactive l'affichage du bloc Derniers ajouts sur la page publique.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        if (!selectedRestaurant) return;
-                        const newValue = !(selectedRestaurant.show_latest_additions ?? true);
-                        await onToggleShowLatestAdditions(selectedRestaurant.id, newValue);
-                      }}
-                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-bitebox focus:ring-offset-2 ${
-                        (selectedRestaurant.show_latest_additions ?? true)
-                          ? "bg-bitebox"
-                          : "bg-slate-600"
-                      }`}
-                      role="switch"
-                      aria-checked={selectedRestaurant.show_latest_additions ?? true}
-                    >
-                      <span
-                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                          (selectedRestaurant.show_latest_additions ?? true)
-                            ? "translate-x-5"
-                            : "translate-x-0"
-                        }`}
-                      />
-                    </button>
                   </div>
                 </div>
 
