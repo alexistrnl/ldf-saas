@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { isAdmin } from '@/lib/admin'
 import { redirect } from 'next/navigation'
 
 export async function signIn(formData: FormData) {
@@ -14,7 +15,7 @@ export async function signIn(formData: FormData) {
 
   const supabase = await createClient()
 
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data: { user }, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   })
@@ -23,7 +24,23 @@ export async function signIn(formData: FormData) {
     return { error: error.message }
   }
 
-  // Rediriger vers next ou /admin/restaurants par défaut
-  redirect(next || '/admin/restaurants')
+  if (!user) {
+    return { error: 'Erreur lors de la connexion' }
+  }
+
+  // Vérifier si next commence par /admin
+  if (next && next.startsWith('/admin')) {
+    // Si l'utilisateur essaie d'accéder à /admin, vérifier qu'il est admin
+    const userIsAdmin = await isAdmin(user.id)
+    if (!userIsAdmin) {
+      // Si non-admin, rediriger vers home au lieu de /admin
+      redirect('/home')
+    }
+    // Si admin, autoriser l'accès à next
+    redirect(next)
+  }
+
+  // Si pas de next ou next ne commence pas par /admin, rediriger vers /home
+  redirect(next || '/home')
 }
 

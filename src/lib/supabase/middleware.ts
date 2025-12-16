@@ -30,6 +30,25 @@ export async function updateSession(request: NextRequest) {
   // Rafraîchir la session si elle existe
   const { data: { user } } = await supabase.auth.getUser()
 
-  return { supabaseResponse, user }
+  // Si l'utilisateur existe, vérifier s'il est admin
+  let isAdmin = false
+  if (user) {
+    try {
+      const { data, error } = await supabase
+        .from('admin_users')
+        .select('1')
+        .eq('user_id', user.id)
+        .limit(1)
+      
+      if (!error && data?.length) {
+        isAdmin = true
+      }
+    } catch (error) {
+      // En cas d'erreur, considérer que l'utilisateur n'est pas admin
+      console.error('[Middleware] Error checking admin status:', error)
+    }
+  }
+
+  return { supabaseResponse, user, isAdmin }
 }
 

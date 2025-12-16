@@ -32,16 +32,22 @@ export async function middleware(req: NextRequest) {
   // COUCHE 1 : Authentification Supabase (rafraîchir session)
   // ============================================================
   // Toujours appeler updateSession pour rafraîchir la session
-  const { supabaseResponse, user } = await updateSession(req);
+  const { supabaseResponse, user, isAdmin } = await updateSession(req);
 
   // Protection de /admin/* : si pas d'utilisateur → redirect vers /login?next=<pathname>
+  // Si user connecté mais non admin → redirect vers /
   if (pathname.startsWith("/admin/")) {
     if (!user) {
       url.pathname = "/login";
       url.searchParams.set("next", pathname);
       return NextResponse.redirect(url);
     }
-    // Si utilisateur connecté, /admin/* est autorisé (desktop et mobile)
+    // Si utilisateur connecté mais non admin → rediriger vers /
+    if (!isAdmin) {
+      url.pathname = "/";
+      return NextResponse.redirect(url);
+    }
+    // Si admin, /admin/* est autorisé (desktop et mobile)
     // Continuer avec la réponse Supabase (cookies mis à jour)
     // et laisser passer sans vérifier desktop/mobile
     return supabaseResponse;
