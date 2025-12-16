@@ -360,7 +360,7 @@ export default function RestaurantPage() {
         key={dish.id}
         className="bg-slate-900/80 rounded-2xl overflow-hidden border border-slate-800/70 shadow-md flex flex-col"
       >
-        <div className="relative w-full aspect-square rounded-xl overflow-hidden flex items-center justify-center bg-amber-50 border border-amber-200">
+        <div className={`relative w-full aspect-square rounded-xl overflow-hidden flex items-center justify-center bg-amber-50 border border-amber-200 ${isPng && !shouldCoverBurgouzz ? 'py-2' : ''}`}>
           {dish.image_url ? (
             shouldCoverBurgouzz ? (
               <img
@@ -372,7 +372,7 @@ export default function RestaurantPage() {
               <img
                 src={dish.image_url}
                 alt={dish.name}
-                className={`w-full h-full object-contain ${shouldCenter ? 'object-center' : 'object-top'} ${isBlackWhite ? 'scale-150' : zoomLevel} drop-shadow-xl ${isBurgerKing ? 'pt-0 pb-4 px-4' : 'p-4'}`}
+                className={`w-full h-full object-contain object-center ${isBlackWhite ? 'scale-150' : zoomLevel} drop-shadow-xl ${isBurgerKing ? 'px-4' : 'px-4'}`}
               />
             ) : (
               <img
@@ -646,7 +646,7 @@ export default function RestaurantPage() {
                       const { shouldZoom, zoomLevel, shouldCenter } = getPopeyesDishZoom(dish, category, restaurant);
                       const { shouldCover: shouldCoverBurgouzz, zoomLevel: burgouzzZoomLevel } = getBurgouzzDishCover(dish, category, restaurant);
                       return (
-                        <div className="relative w-full aspect-square rounded-xl overflow-hidden flex items-center justify-center bg-amber-50 border border-amber-200">
+                        <div className={`relative w-full aspect-square rounded-xl overflow-hidden flex items-center justify-center bg-amber-50 border border-amber-200 ${isPng && !shouldCoverBurgouzz ? 'py-2' : ''}`}>
                           {dish.image_url ? (
                             shouldCoverBurgouzz ? (
                               <img
@@ -658,7 +658,7 @@ export default function RestaurantPage() {
                               <img
                                 src={dish.image_url}
                                 alt={dish.name}
-                                className={`w-full h-full object-contain ${shouldCenter ? 'object-center' : 'object-top'} ${isBlackWhite ? 'scale-150' : zoomLevel} drop-shadow-xl ${isBurgerKing ? 'pt-0 pb-4 px-4' : 'p-4'}`}
+                                className={`w-full h-full object-contain object-center ${isBlackWhite ? 'scale-150' : zoomLevel} drop-shadow-xl ${isBurgerKing ? 'px-4' : 'px-4'}`}
                               />
                             ) : (
                               <img
@@ -738,7 +738,7 @@ export default function RestaurantPage() {
                     const { shouldZoom, zoomLevel, shouldCenter } = getPopeyesDishZoom(dish, category, restaurant);
                     const { shouldCover: shouldCoverBurgouzz, zoomLevel: burgouzzZoomLevel } = getBurgouzzDishCover(dish, category, restaurant);
                     return (
-                      <div className="relative w-full aspect-square rounded-xl overflow-hidden flex items-center justify-center bg-amber-50 border border-amber-200">
+                      <div className={`relative w-full aspect-square rounded-xl overflow-hidden flex items-center justify-center bg-amber-50 border border-amber-200 ${isPng && !shouldCoverBurgouzz ? 'py-2' : ''}`}>
                         {dish.image_url ? (
                           shouldCoverBurgouzz ? (
                             <img
@@ -750,7 +750,7 @@ export default function RestaurantPage() {
                             <img
                               src={dish.image_url}
                               alt={dish.name}
-                              className={`w-full h-full object-contain ${shouldCenter ? 'object-center' : 'object-top'} ${isBlackWhite ? 'scale-150' : zoomLevel} drop-shadow-xl ${isBurgerKing ? 'pt-0 pb-4 px-4' : 'p-4'}`}
+                              className={`w-full h-full object-contain object-center ${isBlackWhite ? 'scale-150' : zoomLevel} drop-shadow-xl ${isBurgerKing ? 'px-4' : 'px-4'}`}
                             />
                           ) : (
                             <img
@@ -821,9 +821,10 @@ export default function RestaurantPage() {
           ) : (
             // Affichage groupé par sections
             <div className="space-y-6">
-              {categories.map((category) => {
+              {categories
+                .filter((category) => dishes.some((d) => d.category_id === category.id))
+                .map((category) => {
                 const categoryDishes = dishes.filter((d) => d.category_id === category.id);
-                if (categoryDishes.length === 0) return null;
                 const isBurgerKing = restaurant?.name?.toLowerCase().includes("burger king") || restaurant?.slug?.toLowerCase().includes("burger-king");
 
                 return (
@@ -845,7 +846,7 @@ export default function RestaurantPage() {
                             const { shouldZoom, zoomLevel, shouldCenter } = getPopeyesDishZoom(dish, dishCategory, restaurant);
                             const { shouldCover: shouldCoverBurgouzz, zoomLevel: burgouzzZoomLevel } = getBurgouzzDishCover(dish, dishCategory, restaurant);
                             return (
-                              <div className="relative w-full aspect-square rounded-xl overflow-hidden flex items-center justify-center bg-amber-50 border border-amber-200">
+                              <div className={`relative w-full aspect-square rounded-xl overflow-hidden flex items-center justify-center bg-amber-50 border border-amber-200 ${isPng && !shouldCoverBurgouzz ? 'py-2' : ''}`}>
                                 {dish.image_url ? (
                                   shouldCoverBurgouzz ? (
                                     <img
@@ -857,7 +858,7 @@ export default function RestaurantPage() {
                                     <img
                                       src={dish.image_url}
                                       alt={dish.name}
-                                      className={`w-full h-full object-contain ${shouldCenter ? 'object-center' : 'object-top'} ${isBlackWhite ? 'scale-150' : zoomLevel} drop-shadow-xl ${isBurgerKing ? 'pt-0 pb-4 px-4' : 'p-4'}`}
+                                      className={`w-full h-full object-contain object-center ${isBlackWhite ? 'scale-150' : zoomLevel} drop-shadow-xl ${isBurgerKing ? 'px-4' : 'px-4'}`}
                                     />
                                   ) : (
                                     <img
@@ -954,7 +955,7 @@ export default function RestaurantPage() {
                             const { shouldZoom, zoomLevel, shouldCenter } = getPopeyesDishZoom(dish, dishCategory, restaurant);
                             const { shouldCover: shouldCoverBurgouzz, zoomLevel: burgouzzZoomLevel } = getBurgouzzDishCover(dish, dishCategory, restaurant);
                             return (
-                              <div className="relative w-full aspect-square rounded-xl overflow-hidden flex items-center justify-center bg-amber-50 border border-amber-200">
+                              <div className={`relative w-full aspect-square rounded-xl overflow-hidden flex items-center justify-center bg-amber-50 border border-amber-200 ${isPng && !shouldCoverBurgouzz ? 'py-2' : ''}`}>
                                 {dish.image_url ? (
                                   shouldCoverBurgouzz ? (
                                     <img
@@ -966,7 +967,7 @@ export default function RestaurantPage() {
                                     <img
                                       src={dish.image_url}
                                       alt={dish.name}
-                                      className={`w-full h-full object-contain ${shouldCenter ? 'object-center' : 'object-top'} ${isBlackWhite ? 'scale-150' : zoomLevel} drop-shadow-xl ${isBurgerKing ? 'pt-0 pb-4 px-4' : 'p-4'}`}
+                                      className={`w-full h-full object-contain object-center ${isBlackWhite ? 'scale-150' : zoomLevel} drop-shadow-xl ${isBurgerKing ? 'px-4' : 'px-4'}`}
                                     />
                                   ) : (
                                     <img
