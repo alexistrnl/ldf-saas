@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { supabase } from '@/lib/supabaseClient'
@@ -13,6 +13,8 @@ export default function LoginForm() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const next = searchParams.get('next')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -31,7 +33,8 @@ export default function LoginForm() {
         return
       }
 
-      router.push('/home')
+      // Rediriger vers la page demandée (next) ou /home par défaut
+      router.push(next || '/home')
     } catch (err) {
       setError('Une erreur est survenue')
       setLoading(false)
