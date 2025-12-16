@@ -4,38 +4,38 @@ import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { supabase } from '@/lib/supabaseClient'
+import { signIn } from '@/app/(auth)/login/actions'
 import Spinner from '@/components/Spinner'
 
 export default function LoginForm() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
   const searchParams = useSearchParams()
   const next = searchParams.get('next')
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
 
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
+    const formData = new FormData(e.currentTarget)
+    if (next) {
+      formData.set('next', next)
+    }
 
-      if (error) {
-        setError(error.message)
+    try {
+      const result = await signIn(formData)
+      if (result?.error) {
+        setError(result.error)
         setLoading(false)
+      }
+      // Si pas d'erreur, signIn fait un redirect, donc on ne fait rien d'autre
+    } catch (err) {
+      // Si c'est une redirection, ne pas afficher d'erreur
+      if (err instanceof Error && err.message.includes('NEXT_REDIRECT')) {
         return
       }
-
-      // Rediriger vers la page demandée (next) ou /home par défaut
-      router.push(next || '/home')
-    } catch (err) {
       setError('Une erreur est survenue')
       setLoading(false)
     }
@@ -57,9 +57,8 @@ export default function LoginForm() {
           </label>
           <input
             id="email"
+            name="email"
             type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
             required
             className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-bitebox focus:border-transparent"
             placeholder="ton@email.com"
@@ -80,9 +79,8 @@ export default function LoginForm() {
           </div>
           <input
             id="password"
+            name="password"
             type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
             required
             className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-bitebox focus:border-transparent"
             placeholder="••••••••"
@@ -120,4 +118,3 @@ export default function LoginForm() {
     </>
   )
 }
-

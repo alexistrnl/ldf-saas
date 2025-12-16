@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { updateSession } from "./src/lib/supabase/middleware";
 
-export function middleware(req: NextRequest) {
+export async function middleware(req: NextRequest) {
   const ua = req.headers.get("user-agent") || "";
   const url = req.nextUrl.clone();
 
@@ -25,17 +26,34 @@ export function middleware(req: NextRequest) {
   ];
   const isAllowedDesktopRoute = 
     allowedDesktopRoutes.includes(pathname) ||
-    pathname.startsWith("/auth/") ||
-    pathname.startsWith("/admin/"); // /admin/* autorisé (la page admin gère la redirection vers /login si non connecté)
+    pathname.startsWith("/auth/");
 
   // ============================================================
-  // COUCHE 1 : Gestion desktop vs mobile/tablette
-  // Cette logique doit s'exécuter EN PREMIER, avant toute autre logique
+  // COUCHE 1 : Authentification Supabase (rafraîchir session)
+  // ============================================================
+  // Toujours appeler updateSession pour rafraîchir la session
+  const { supabaseResponse, user } = await updateSession(req);
+
+  // Protection de /admin/* : si pas d'utilisateur → redirect vers /login?next=<pathname>
+  if (pathname.startsWith("/admin/")) {
+    if (!user) {
+      url.pathname = "/login";
+      url.searchParams.set("next", pathname);
+      return NextResponse.redirect(url);
+    }
+    // Si utilisateur connecté, /admin/* est autorisé (desktop et mobile)
+    // Continuer avec la réponse Supabase (cookies mis à jour)
+    // et laisser passer sans vérifier desktop/mobile
+    return supabaseResponse;
+  }
+
+  // ============================================================
+  // COUCHE 2 : Gestion desktop vs mobile/tablette
   // ============================================================
   if (!isApi && !isNextStatic) {
     // Si desktop et route autorisée -> laisser passer
     if (!isMobileOrTablet && isAllowedDesktopRoute) {
-      return NextResponse.next();
+      return supabaseResponse;
     }
 
     // Si desktop et pas déjà sur /desktop-info -> rediriger vers /desktop-info
@@ -56,17 +74,8 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // ============================================================
-  // COUCHE 2 : Logique d'authentification ou autres redirections
-  // Cette logique s'exécute uniquement si on n'a pas déjà redirigé ci-dessus
-  // ============================================================
-  // (Aucune logique d'auth dans le middleware actuellement)
-  // La logique d'auth est gérée au niveau des pages (src/app/page.tsx)
-  // Si vous souhaitez ajouter une logique d'auth ici, elle s'exécutera
-  // uniquement pour les utilisateurs mobile/tablette non redirigés
-
-  // Sinon, laisser passer
-  return NextResponse.next();
+  // Sinon, retourner la réponse Supabase (avec cookies mis à jour)
+  return supabaseResponse;
 }
 
 // Appliquer le middleware sur toutes les routes "app" par défaut
