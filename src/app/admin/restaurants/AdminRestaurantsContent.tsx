@@ -361,48 +361,58 @@ export default function AdminRestaurantsContent() {
       // Guard strict : vérifier que restaurantId existe
       if (!restaurantId) {
         const errorMsg = "Restaurant id missing";
-        console.error("[Admin] toggle show_latest_additions:", errorMsg);
+        if (process.env.NODE_ENV !== "production") {
+          console.error("[Admin] toggle show_latest_additions:", errorMsg);
+        }
         setError(errorMsg);
         return;
       }
 
-      // Update TOUJOURS par id (UUID), jamais par slug ou name
-      // Forcer la requête à cibler une ligne unique avec .eq("id", restaurantId)
+      // Requête simple : update directement sur restaurants via id
       const { data, error: updateError } = await supabase
         .from("restaurants")
         .update({ show_latest_additions: nextValue })
         .eq("id", restaurantId)
         .select("id, show_latest_additions")
-        .maybeSingle();
+        .single();
 
-      // Log minimal en dev
-      console.log({ restaurantId, nextValue, data, error: updateError });
+      // Log uniquement en dev pour diagnostiquer
+      if (process.env.NODE_ENV !== "production") {
+        console.log("[Admin] toggle show_latest_additions:", { restaurantId, nextValue, data, error: updateError });
+      }
 
-      // Gestion d'erreur
+      // Si l'update échoue, afficher le message d'erreur exact
       if (updateError) {
-        console.error("[Admin] toggle show_latest_additions error", updateError);
+        if (process.env.NODE_ENV !== "production") {
+          console.error("[Admin] toggle show_latest_additions error", updateError);
+        }
         setError(updateError.message);
         return;
       }
 
-      // Vérifier qu'une ligne a été mise à jour
-      if (!data) {
-        const errorMsg = "Aucune ligne mise à jour (RLS ou id invalide)";
-        console.error("[Admin] toggle show_latest_additions:", errorMsg);
+      // Vérifier que data existe et a un id (type strict)
+      if (!data || !data.id) {
+        const errorMsg = "Aucune ligne mise à jour (id invalide ou RLS)";
+        if (process.env.NODE_ENV !== "production") {
+          console.error("[Admin] toggle show_latest_additions:", errorMsg);
+        }
         setError(errorMsg);
         return;
       }
 
-      // Mettre à jour IMMÉDIATEMENT l'état local avec les données récupérées de la BDD
+      // Mettre à jour restaurants[] en local (id obligatoire, pas d'objet incomplet)
       setRestaurants((prev) =>
         prev.map((r) =>
           r.id === data.id ? { ...r, show_latest_additions: data.show_latest_additions } : r
         )
       );
 
-      // Mettre à jour editingRestaurant si c'est celui qui est en cours d'édition
+      // Mettre à jour selectedRestaurant si présent (calculé dynamiquement, mais on peut forcer le refresh)
+      // Note: selectedRestaurant est calculé depuis restaurants.find(), donc il se mettra à jour automatiquement
+
+      // Mettre à jour editingRestaurant si présent (avec guard pour id obligatoire)
       setEditingRestaurant((prev) => {
-        if (!prev || prev.id !== data.id) return prev;
+        if (!prev || !prev.id || prev.id !== data.id) return prev;
         return { ...prev, show_latest_additions: data.show_latest_additions };
       });
 
@@ -417,8 +427,10 @@ export default function AdminRestaurantsContent() {
         setSuccessMessage(null);
       }, 3000);
     } catch (err) {
-      console.error("[Admin] toggle show_latest_additions unexpected", err);
       const errorMessage = err instanceof Error ? err.message : "Erreur inattendue lors de la mise à jour du paramètre.";
+      if (process.env.NODE_ENV !== "production") {
+        console.error("[Admin] toggle show_latest_additions unexpected", err);
+      }
       setError(errorMessage);
     }
   };
