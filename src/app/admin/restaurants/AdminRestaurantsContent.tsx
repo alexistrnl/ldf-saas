@@ -353,7 +353,7 @@ export default function AdminRestaurantsContent() {
     cancelEditRestaurant();
   };
 
-  const handleToggleShowLatestAdditions = async (restaurantId: string, value: boolean) => {
+  const handleToggleShowLatestAdditions = async (restaurantId: string, nextValue: boolean) => {
     try {
       setError(null);
       setSuccessMessage(null);
@@ -366,17 +366,17 @@ export default function AdminRestaurantsContent() {
         show_latest_additions: restaurantBefore?.show_latest_additions ?? true,
       });
 
-      // Update uniquement basé sur l'ID (UUID)
+      // Update TOUJOURS par id (UUID), jamais par slug ou name
       const { data, error: updateError } = await supabase
         .from("restaurants")
-        .update({ show_latest_additions: value })
+        .update({ show_latest_additions: nextValue })
         .eq("id", restaurantId)
-        .select()
+        .select("id, show_latest_additions")
         .single();
 
       if (updateError) {
         console.error("[Admin] toggle show_latest_additions error", updateError);
-        setError("Erreur lors de la mise à jour du paramètre.");
+        setError(updateError.message || "Erreur lors de la mise à jour du paramètre.");
         return;
       }
 
@@ -389,11 +389,10 @@ export default function AdminRestaurantsContent() {
       // Log après l'update
       console.log("[Admin] toggle show_latest_additions APRÈS:", {
         id: data.id,
-        slug: data.slug || "N/A",
         show_latest_additions: data.show_latest_additions,
       });
 
-      // Mettre à jour l'état local avec les données récupérées de la BDD
+      // Mettre à jour IMMÉDIATEMENT l'état local avec les données récupérées de la BDD
       setRestaurants((prev) =>
         prev.map((r) =>
           r.id === data.id ? { ...r, show_latest_additions: data.show_latest_additions } : r
@@ -418,7 +417,8 @@ export default function AdminRestaurantsContent() {
       }, 3000);
     } catch (err) {
       console.error("[Admin] toggle show_latest_additions unexpected", err);
-      setError("Erreur inattendue lors de la mise à jour du paramètre.");
+      const errorMessage = err instanceof Error ? err.message : "Erreur inattendue lors de la mise à jour du paramètre.";
+      setError(errorMessage);
     }
   };
 
