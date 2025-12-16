@@ -358,10 +358,21 @@ export default function AdminRestaurantsContent() {
       setError(null);
       setSuccessMessage(null);
 
-      const { error: updateError } = await supabase
+      // Récupérer l'état actuel avant l'update pour les logs
+      const restaurantBefore = restaurants.find((r) => r.id === restaurantId);
+      console.log("[Admin] toggle show_latest_additions AVANT:", {
+        restaurantId,
+        slug: restaurantBefore?.slug || "N/A",
+        show_latest_additions: restaurantBefore?.show_latest_additions ?? true,
+      });
+
+      // Update uniquement basé sur l'ID (UUID)
+      const { data, error: updateError } = await supabase
         .from("restaurants")
         .update({ show_latest_additions: value })
-        .eq("id", restaurantId);
+        .eq("id", restaurantId)
+        .select()
+        .single();
 
       if (updateError) {
         console.error("[Admin] toggle show_latest_additions error", updateError);
@@ -369,20 +380,33 @@ export default function AdminRestaurantsContent() {
         return;
       }
 
-      // Mettre à jour l'état local
+      if (!data) {
+        console.error("[Admin] toggle show_latest_additions: aucune donnée retournée");
+        setError("Erreur : aucune donnée retournée après la mise à jour.");
+        return;
+      }
+
+      // Log après l'update
+      console.log("[Admin] toggle show_latest_additions APRÈS:", {
+        id: data.id,
+        slug: data.slug || "N/A",
+        show_latest_additions: data.show_latest_additions,
+      });
+
+      // Mettre à jour l'état local avec les données récupérées de la BDD
       setRestaurants((prev) =>
         prev.map((r) =>
-          r.id === restaurantId ? { ...r, show_latest_additions: value } : r
+          r.id === data.id ? { ...r, show_latest_additions: data.show_latest_additions } : r
         )
       );
 
       // Mettre à jour editingRestaurant si c'est celui qui est en cours d'édition
-      if (editingRestaurant?.id === restaurantId) {
-        setEditingRestaurant({ ...editingRestaurant, show_latest_additions: value });
+      if (editingRestaurant?.id === data.id) {
+        setEditingRestaurant({ ...editingRestaurant, show_latest_additions: data.show_latest_additions });
       }
 
       setSuccessMessage(
-        value
+        data.show_latest_additions
           ? "Le bloc 'Derniers ajouts' est maintenant affiché sur la page publique."
           : "Le bloc 'Derniers ajouts' est maintenant masqué sur la page publique."
       );
