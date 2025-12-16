@@ -15,11 +15,29 @@ export function middleware(req: NextRequest) {
     pathname.startsWith("/static") ||
     pathname.match(/\.(png|jpg|jpeg|gif|svg|ico|css|js|woff2?)$/);
 
+  // Routes qui ne doivent JAMAIS être bloquées par le desktop-block (même sur PC)
+  const allowedDesktopRoutes = [
+    "/login",
+    "/signup",
+    "/reset-password",
+    "/confirmation",
+    "/forgot-password",
+  ];
+  const isAllowedDesktopRoute = 
+    allowedDesktopRoutes.includes(pathname) ||
+    pathname.startsWith("/auth/") ||
+    pathname.startsWith("/admin/"); // /admin/* autorisé (la page admin gère la redirection vers /login si non connecté)
+
   // ============================================================
   // COUCHE 1 : Gestion desktop vs mobile/tablette
   // Cette logique doit s'exécuter EN PREMIER, avant toute autre logique
   // ============================================================
   if (!isApi && !isNextStatic) {
+    // Si desktop et route autorisée -> laisser passer
+    if (!isMobileOrTablet && isAllowedDesktopRoute) {
+      return NextResponse.next();
+    }
+
     // Si desktop et pas déjà sur /desktop-info -> rediriger vers /desktop-info
     if (!isMobileOrTablet && pathname !== "/desktop-info") {
       url.pathname = "/desktop-info";
