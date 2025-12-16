@@ -155,18 +155,98 @@ export default function AdminRestaurantsContent() {
         finalLogoUrl = logoUrl.trim();
       }
 
-      const slug = slugify(name);
+      // Générer un slug unique
+      let slug = slugify(name);
+      let insertAttempts = 0;
+      const maxAttempts = 10;
+      let insertError: any = null;
+      let insertedData: any = null;
 
-      const { error: insertError } = await supabase.from("restaurants").insert({
-        name,
-        description: description || null,
-        logo_url: finalLogoUrl,
-        slug,
-      });
+      // Tenter l'insert avec gestion de l'unicité du slug
+      while (insertAttempts < maxAttempts) {
+        // Construire le payload avec TOUS les champs NOT NULL
+        const payload = {
+          name: name.trim(),
+          slug: slug,
+          description: description?.trim() || null,
+          logo_url: finalLogoUrl || null,
+          // show_latest_additions ne doit PAS être envoyé (feature supprimée de l'admin)
+        };
 
+        // Logging pour diagnostiquer
+        if (process.env.NODE_ENV !== "production") {
+          console.log("[Admin] Create restaurant payload", payload);
+        }
+
+        const { data, error } = await supabase
+          .from("restaurants")
+          .insert(payload)
+          .select("id, name, slug")
+          .single();
+
+        // Logging de la réponse
+        if (process.env.NODE_ENV !== "production") {
+          console.log("[Admin] Create restaurant response", { data, error });
+        }
+
+        if (error) {
+          // Si erreur de contrainte unique sur slug, essayer avec un suffixe
+          if (error.code === "23505" && error.message?.includes("slug")) {
+            insertAttempts++;
+            slug = `${slugify(name)}-${insertAttempts + 1}`;
+            insertError = error;
+            continue; // Réessayer avec un nouveau slug
+          } else {
+            // Autre erreur (RLS, validation, etc.)
+            insertError = error;
+            break;
+          }
+        } else {
+          // Succès
+          insertedData = data;
+          insertError = null;
+          break;
+        }
+      }
+
+      // Gestion des erreurs avec affichage détaillé
       if (insertError) {
-        console.error("[Admin] insert restaurant error", insertError);
-        setError("Erreur lors de la création de l'enseigne.");
+        const errorCode = insertError.code || "UNKNOWN";
+        const errorMessage = insertError.message || "Erreur inconnue";
+        const errorDetails = insertError.details || "";
+        
+        // Message d'erreur détaillé
+        let errorDisplay = `Erreur ${errorCode}: ${errorMessage}`;
+        if (errorDetails) {
+          errorDisplay += ` (${errorDetails})`;
+        }
+
+        // Messages spécifiques selon le type d'erreur
+        if (insertError.code === "42501" || errorMessage.includes("permission denied") || errorMessage.includes("RLS")) {
+          errorDisplay = `Erreur RLS: Insert bloqué par les politiques de sécurité. Code: ${errorCode}. Message: ${errorMessage}`;
+        } else if (insertError.code === "23505") {
+          errorDisplay = `Erreur d'unicité: ${errorMessage}. Code: ${errorCode}`;
+        } else if (insertError.code === "23502") {
+          errorDisplay = `Champ requis manquant: ${errorMessage}. Code: ${errorCode}`;
+        }
+
+        console.error("[Admin] insert restaurant error", {
+          code: errorCode,
+          message: errorMessage,
+          details: errorDetails,
+          fullError: insertError,
+        });
+
+        setError(errorDisplay);
+        setSaving(false);
+        return;
+      }
+
+      // Vérifier que data existe avant de continuer
+      if (!insertedData || !insertedData.id) {
+        const errorMsg = "Erreur : aucune donnée retournée après la création (RLS ou insert incomplet)";
+        console.error("[Admin] create restaurant:", errorMsg, { insertedData });
+        setError(errorMsg);
         setSaving(false);
         return;
       }
@@ -175,16 +255,8 @@ export default function AdminRestaurantsContent() {
       await fetchRestaurants();
       
       // Sélectionner la nouvelle enseigne créée
-      const { data: newRestaurants } = await supabase
-        .from("restaurants")
-        .select("*")
-        .eq("slug", slug)
-        .single();
-      
-      if (newRestaurants) {
-        setSelectedRestaurantId((newRestaurants as Restaurant).id);
-        setViewMode("overview");
-      }
+      setSelectedRestaurantId(insertedData.id);
+      setViewMode("overview");
     } catch (err) {
       console.error("[Admin] create restaurant unexpected", err);
       setError("Erreur inattendue lors de la création de l'enseigne.");
