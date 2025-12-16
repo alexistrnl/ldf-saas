@@ -23,6 +23,7 @@ export default function AdminRestaurantsContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("overview");
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [supabaseUser, setSupabaseUser] = useState<{ email?: string | null } | null>(null);
 
   // État pour la création
   const [name, setName] = useState("");
@@ -44,6 +45,15 @@ export default function AdminRestaurantsContent() {
 
   useEffect(() => {
     fetchRestaurants();
+    
+    // Vérifier l'utilisateur Supabase au chargement
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      console.log("[AdminRestaurantsContent] Supabase user on load:", user);
+      setSupabaseUser(user);
+    };
+    
+    checkUser();
   }, []);
 
   // Sélectionner automatiquement la première enseigne au chargement
@@ -177,6 +187,10 @@ export default function AdminRestaurantsContent() {
         if (process.env.NODE_ENV !== "production") {
           console.log("[CreateRestaurant] payload", payload);
         }
+
+        // Re-vérifier l'utilisateur juste avant l'insert
+        const { data: { user: userBeforeInsert } } = await supabase.auth.getUser();
+        console.log("[CreateRestaurant] Supabase user before insert:", userBeforeInsert);
 
         const { data, error } = await supabase
           .from("restaurants")
@@ -614,7 +628,18 @@ export default function AdminRestaurantsContent() {
   ) || null;
 
   return (
-    <div className="fixed inset-x-0 top-[60px] bottom-0 flex bg-slate-950 text-slate-50 overflow-hidden">
+    <div className="fixed inset-x-0 top-[60px] bottom-0 flex flex-col bg-slate-950 text-slate-50 overflow-hidden">
+      {/* Badge utilisateur Supabase */}
+      <div className="flex-shrink-0 px-6 py-2 bg-slate-900 border-b border-slate-800">
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-slate-800 border border-slate-700">
+          <span className="text-xs text-slate-400">Supabase user:</span>
+          <span className="text-xs font-medium text-slate-200">
+            {supabaseUser?.email || "NONE"}
+          </span>
+        </div>
+      </div>
+      
+      <div className="flex-1 flex overflow-hidden">
       {/* Sidebar gauche - Liste des enseignes */}
       <div className="w-80 flex-shrink-0 h-full overflow-hidden flex flex-col">
         <RestaurantListPanel
@@ -722,6 +747,7 @@ export default function AdminRestaurantsContent() {
         />
         </div>
       )}
+      </div>
     </div>
   );
 }
