@@ -15,6 +15,7 @@ type Restaurant = {
   slug: string | null;
   logo_url: string | null;
   description: string | null;
+  show_latest_additions: boolean | null;
 };
 
 type Dish = {
@@ -604,20 +605,22 @@ export default function RestaurantPage() {
         </section>
 
         {/* Derniers ajouts */}
-        <section className="mt-6">
-          <h3 className="mb-3 text-base font-semibold text-white">Derniers ajouts</h3>
-          {latestDishes.length === 0 ? (
-            <p className="text-sm text-slate-400">Aucun plat ajouté récemment à la carte.</p>
-          ) : (
-            <div className="flex gap-4 overflow-x-auto overflow-y-hidden pb-2 snap-x snap-mandatory [-webkit-overflow-scrolling:touch] sm:grid sm:grid-cols-3 sm:gap-4 sm:overflow-x-visible sm:pb-0 sm:snap-none">
-              {latestDishes.slice(0, 3).map((dish) => (
-                <div key={dish.id} className="w-[260px] flex-shrink-0 snap-start sm:w-auto sm:flex-shrink sm:snap-none">
-                  {renderDishCard(dish)}
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
+        {restaurant.show_latest_additions !== false && (
+          <section className="mt-6">
+            <h3 className="mb-3 text-base font-semibold text-white">Derniers ajouts</h3>
+            {latestDishes.length === 0 ? (
+              <p className="text-sm text-slate-400">Aucun plat ajouté récemment à la carte.</p>
+            ) : (
+              <div className="flex gap-4 overflow-x-auto overflow-y-hidden pb-2 snap-x snap-mandatory [-webkit-overflow-scrolling:touch] sm:grid sm:grid-cols-3 sm:gap-4 sm:overflow-x-visible sm:pb-0 sm:snap-none">
+                {latestDishes.slice(0, 3).map((dish) => (
+                  <div key={dish.id} className="w-[260px] flex-shrink-0 snap-start sm:w-auto sm:flex-shrink sm:snap-none">
+                    {renderDishCard(dish)}
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
 
         {/* Top 3 plats les mieux notés */}
         {topRatedDishes.length > 0 && (

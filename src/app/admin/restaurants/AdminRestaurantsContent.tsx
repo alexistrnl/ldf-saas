@@ -19,6 +19,7 @@ export default function AdminRestaurantsContent() {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [selectedRestaurantId, setSelectedRestaurantId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("overview");
@@ -162,6 +163,7 @@ export default function AdminRestaurantsContent() {
         description: description || null,
         logo_url: finalLogoUrl,
         slug,
+        show_latest_additions: true,
       });
 
       if (insertError) {
@@ -349,6 +351,50 @@ export default function AdminRestaurantsContent() {
     setSelectedRestaurantId(restaurant.id);
     setViewMode("overview");
     cancelEditRestaurant();
+  };
+
+  const handleToggleShowLatestAdditions = async (restaurantId: string, value: boolean) => {
+    try {
+      setError(null);
+      setSuccessMessage(null);
+
+      const { error: updateError } = await supabase
+        .from("restaurants")
+        .update({ show_latest_additions: value })
+        .eq("id", restaurantId);
+
+      if (updateError) {
+        console.error("[Admin] toggle show_latest_additions error", updateError);
+        setError("Erreur lors de la mise à jour du paramètre.");
+        return;
+      }
+
+      // Mettre à jour l'état local
+      setRestaurants((prev) =>
+        prev.map((r) =>
+          r.id === restaurantId ? { ...r, show_latest_additions: value } : r
+        )
+      );
+
+      // Mettre à jour editingRestaurant si c'est celui qui est en cours d'édition
+      if (editingRestaurant?.id === restaurantId) {
+        setEditingRestaurant({ ...editingRestaurant, show_latest_additions: value });
+      }
+
+      setSuccessMessage(
+        value
+          ? "Le bloc 'Derniers ajouts' est maintenant affiché sur la page publique."
+          : "Le bloc 'Derniers ajouts' est maintenant masqué sur la page publique."
+      );
+
+      // Effacer le message de succès après 3 secondes
+      setTimeout(() => {
+        setSuccessMessage(null);
+      }, 3000);
+    } catch (err) {
+      console.error("[Admin] toggle show_latest_additions unexpected", err);
+      setError("Erreur inattendue lors de la mise à jour du paramètre.");
+    }
   };
 
   const handleManageMenu = (restaurant: Restaurant) => {
@@ -626,6 +672,9 @@ export default function AdminRestaurantsContent() {
           validateImageFile={validateImageFile}
           error={error}
           onError={setError}
+          onToggleShowLatestAdditions={handleToggleShowLatestAdditions}
+          onSuccess={setSuccessMessage}
+          successMessage={successMessage}
         />
         </div>
       )}

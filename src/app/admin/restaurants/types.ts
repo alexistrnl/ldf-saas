@@ -4,6 +4,7 @@ export type Restaurant = {
   slug: string | null;
   logo_url: string | null;
   description: string | null;
+  show_latest_additions: boolean;
 };
 
 export type Dish = {
