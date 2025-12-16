@@ -175,7 +175,7 @@ export default function AdminRestaurantsContent() {
 
         // Logging pour diagnostiquer
         if (process.env.NODE_ENV !== "production") {
-          console.log("[Admin] Create restaurant payload", payload);
+          console.log("[CreateRestaurant] payload", payload);
         }
 
         const { data, error } = await supabase
@@ -186,7 +186,8 @@ export default function AdminRestaurantsContent() {
 
         // Logging de la réponse
         if (process.env.NODE_ENV !== "production") {
-          console.log("[Admin] Create restaurant response", { data, error });
+          console.log("[CreateRestaurant] error", error);
+          console.log("[CreateRestaurant] response", { data, error });
         }
 
         if (error) {
@@ -244,8 +245,10 @@ export default function AdminRestaurantsContent() {
 
       // Vérifier que data existe avant de continuer
       if (!insertedData || !insertedData.id) {
-        const errorMsg = "Erreur : aucune donnée retournée après la création (RLS ou insert incomplet)";
-        console.error("[Admin] create restaurant:", errorMsg, { insertedData });
+        const errorMsg = "Aucune donnée retournée (RLS ou insert non exécuté)";
+        if (process.env.NODE_ENV !== "production") {
+          console.error("[CreateRestaurant] no data returned", { insertedData });
+        }
         setError(errorMsg);
         setSaving(false);
         return;
@@ -258,8 +261,26 @@ export default function AdminRestaurantsContent() {
       setSelectedRestaurantId(insertedData.id);
       setViewMode("overview");
     } catch (err) {
-      console.error("[Admin] create restaurant unexpected", err);
-      setError("Erreur inattendue lors de la création de l'enseigne.");
+      // Gestion des erreurs inattendues avec affichage détaillé
+      const errorMessage = err instanceof Error ? err.message : "Erreur inconnue";
+      const errorCode = (err as any)?.code || "UNKNOWN";
+      const errorDetails = (err as any)?.details || "";
+      
+      let errorDisplay = `Erreur ${errorCode}: ${errorMessage}`;
+      if (errorDetails) {
+        errorDisplay += ` (${errorDetails})`;
+      }
+      
+      if (process.env.NODE_ENV !== "production") {
+        console.error("[CreateRestaurant] unexpected error", {
+          code: errorCode,
+          message: errorMessage,
+          details: errorDetails,
+          fullError: err,
+        });
+      }
+      
+      setError(errorDisplay);
     } finally {
       setSaving(false);
     }
