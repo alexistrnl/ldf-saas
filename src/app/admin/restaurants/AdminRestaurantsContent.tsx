@@ -401,9 +401,10 @@ export default function AdminRestaurantsContent() {
       );
 
       // Mettre à jour editingRestaurant si c'est celui qui est en cours d'édition
-      if (editingRestaurant?.id === data.id) {
-        setEditingRestaurant({ ...editingRestaurant, show_latest_additions: data.show_latest_additions });
-      }
+      setEditingRestaurant((prev) => {
+        if (!prev || prev.id !== data.id) return prev;
+        return { ...prev, show_latest_additions: data.show_latest_additions };
+      });
 
       setSuccessMessage(
         data.show_latest_additions
