@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { useRouter } from "next/navigation";
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { formatRLSError } from "@/lib/errorMessages";
 import { Restaurant, ViewMode } from "./types";
 import RestaurantListPanel from "./RestaurantListPanel";
@@ -17,6 +18,8 @@ function slugify(name: string) {
 }
 
 export default function AdminRestaurantsContent() {
+  const router = useRouter();
+  const supabase = createClientComponentClient();
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -655,19 +658,25 @@ export default function AdminRestaurantsContent() {
         <div className="flex items-center gap-3">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-slate-800 border border-slate-700">
             <span className="text-xs text-slate-400">Supabase user:</span>
-            <span className="text-xs font-medium text-slate-200">
-              {supabaseUser?.email || "NONE"}
-            </span>
-            {supabaseUser?.id && (
+            {supabaseUser ? (
               <>
-                <span className="text-xs text-slate-500">•</span>
-                <span className="text-xs text-slate-400 font-mono">
-                  {supabaseUser.id}
+                <span className="text-xs font-medium text-slate-200">
+                  {supabaseUser.email || "NONE"}
                 </span>
+                {supabaseUser.id && (
+                  <>
+                    <span className="text-xs text-slate-500">•</span>
+                    <span className="text-xs text-slate-400 font-mono">
+                      {supabaseUser.id}
+                    </span>
+                  </>
+                )}
               </>
+            ) : (
+              <span className="text-xs font-medium text-slate-200">NONE</span>
             )}
           </div>
-          {supabaseUser?.id && (
+          {supabaseUser?.id ? (
             <button
               onClick={async () => {
                 try {
@@ -684,6 +693,13 @@ export default function AdminRestaurantsContent() {
               title="Copier l'UID dans le presse-papiers"
             >
               Copy my Supabase UID
+            </button>
+          ) : (
+            <button
+              onClick={() => router.push("/login?next=/admin/restaurants")}
+              className="px-3 py-1.5 text-xs font-medium text-white bg-bitebox border border-bitebox rounded-md hover:bg-bitebox-dark transition-colors"
+            >
+              Se connecter
             </button>
           )}
         </div>

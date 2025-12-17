@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabaseClient";
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { Restaurant, Dish, DishCategory } from "./types";
+import DishImage from "@/components/DishImage";
 
 type RestaurantMenuTabProps = {
   restaurant: Restaurant;
@@ -15,6 +16,7 @@ export default function RestaurantMenuTab({
   onError,
 }: RestaurantMenuTabProps) {
   const router = useRouter();
+  const supabase = createClientComponentClient();
   const [categories, setCategories] = useState<DishCategory[]>([]);
   const [dishes, setDishes] = useState<Dish[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
@@ -845,28 +847,6 @@ export default function RestaurantMenuTab({
 
   const groupedDishes = getGroupedDishes();
 
-  // Fonction pour déterminer si une image doit être zoomée
-  const shouldZoomImage = (dish: Dish, categoryName: string): boolean => {
-    const dishNameLower = dish.name.toLowerCase();
-    const categoryNameLower = categoryName.toLowerCase();
-    
-    // Croquette camembert
-    if (dishNameLower.includes("croquette") && dishNameLower.includes("camembert")) {
-      return true;
-    }
-    
-    // Binchouzz
-    if (dishNameLower.includes("binchouzz")) {
-      return true;
-    }
-    
-    // Tous les plats de la section "sauce"
-    if (categoryNameLower.includes("sauce")) {
-      return true;
-    }
-    
-    return false;
-  };
 
   return (
     <div className="h-full min-h-0 overflow-hidden flex gap-6">
@@ -1084,11 +1064,10 @@ export default function RestaurantMenuTab({
                 />
                 {dishImagePreview && (
                   <div className="mt-2">
-                    <img
-                      src={dishImagePreview}
+                    <DishImage
+                      imageUrl={dishImagePreview}
                       alt="Aperçu"
-                      className="h-32 object-contain rounded"
-                      onError={() => setDishImagePreview(null)}
+                      containerClassName="max-w-xs"
                     />
                   </div>
                 )}
@@ -1195,11 +1174,10 @@ export default function RestaurantMenuTab({
                 />
                 {editDishImagePreview && (
                   <div className="mt-2">
-                    <img
-                      src={editDishImagePreview}
+                    <DishImage
+                      imageUrl={editDishImagePreview}
                       alt="Aperçu"
-                      className="h-32 object-contain rounded"
-                      onError={() => setEditDishImagePreview(null)}
+                      containerClassName="max-w-xs"
                     />
                   </div>
                 )}
@@ -1289,17 +1267,12 @@ export default function RestaurantMenuTab({
                           key={dish.id}
                           className="flex items-center gap-3 p-3 bg-slate-950/70 rounded-lg border border-slate-800 hover:border-slate-700 transition"
                         >
-                          {dish.image_url && (
-                            <img
-                              src={dish.image_url}
-                              alt={dish.name}
-                              className={`rounded-lg object-cover flex-shrink-0 ${
-                                shouldZoomImage(dish, sectionGroup.categoryName)
-                                  ? "w-20 h-20"
-                                  : "w-12 h-12"
-                              }`}
-                            />
-                          )}
+                          <DishImage
+                            imageUrl={dish.image_url}
+                            alt={dish.name}
+                            size="small"
+                            containerClassName="flex-shrink-0"
+                          />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-start justify-between gap-2">
                               <div className="flex-1 min-w-0">

@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabaseClient";
 import Spinner from "@/components/Spinner";
 import Image from "next/image";
 import StarRating from "@/components/StarRating";
+import DishImage from "@/components/DishImage";
 
 type Restaurant = {
   id: string;
@@ -474,27 +475,11 @@ export default function AddNoteWizard({
                         }`}
                       >
                         {/* Image */}
-                        {dish.image_url ? (
-                          <div className="relative w-full aspect-square bg-amber-50 border-b border-amber-200">
-                            {dish.image_url.toLowerCase().includes(".png") ? (
-                              <img
-                                src={dish.image_url}
-                                alt={dish.name}
-                                className="w-full h-full object-contain object-top scale-95 drop-shadow-xl p-2"
-                              />
-                            ) : (
-                              <img
-                                src={dish.image_url}
-                                alt={dish.name}
-                                className="w-full h-full object-cover object-center"
-                              />
-                            )}
-                          </div>
-                        ) : (
-                          <div className="w-full aspect-square bg-slate-800 flex items-center justify-center">
-                            <span className="text-xs text-slate-500">🍽️</span>
-                          </div>
-                        )}
+                        <DishImage
+                          imageUrl={dish.image_url}
+                          alt={dish.name}
+                          containerClassName="rounded-t-2xl rounded-b-none"
+                        />
 
                         {/* Nom */}
                         <div className="p-3">
@@ -548,27 +533,12 @@ export default function AddNoteWizard({
                     className="flex items-center gap-4 p-4 rounded-xl bg-slate-900/70 border border-slate-800"
                   >
                     {/* Image miniature */}
-                    {dish.image_url ? (
-                      <div className="relative w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-amber-50 border border-amber-200">
-                        {dish.image_url.toLowerCase().includes(".png") ? (
-                          <img
-                            src={dish.image_url}
-                            alt={dish.name}
-                            className="w-full h-full object-contain object-top scale-95 drop-shadow-xl p-1"
-                          />
-                        ) : (
-                          <img
-                            src={dish.image_url}
-                            alt={dish.name}
-                            className="w-full h-full object-cover object-center"
-                          />
-                        )}
-                      </div>
-                    ) : (
-                      <div className="w-16 h-16 rounded-lg bg-slate-800 flex items-center justify-center flex-shrink-0">
-                        <span className="text-lg">🍽️</span>
-                      </div>
-                    )}
+                    <DishImage
+                      imageUrl={dish.image_url}
+                      alt={dish.name}
+                      size="mini"
+                      containerClassName="flex-shrink-0"
+                    />
 
                     {/* Nom et étoiles */}
                     <div className="flex-1 min-w-0">
