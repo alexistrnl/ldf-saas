@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { Restaurant, Dish, DishCategory } from "./types";
 
@@ -13,6 +14,7 @@ export default function RestaurantMenuTab({
   restaurant,
   onError,
 }: RestaurantMenuTabProps) {
+  const router = useRouter();
   const [categories, setCategories] = useState<DishCategory[]>([]);
   const [dishes, setDishes] = useState<Dish[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
@@ -52,7 +54,6 @@ export default function RestaurantMenuTab({
 
   // État pour la modal de confirmation de suppression
   const [dishToDelete, setDishToDelete] = useState<Dish | null>(null);
-  const [deletingDishId, setDeletingDishId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -442,126 +443,72 @@ export default function RestaurantMenuTab({
 
   // Fermer la modal de confirmation
   const closeDeleteConfirm = () => {
-    if (!deletingDishId && !isDeleting) {
+    if (!isDeleting) {
       setDishToDelete(null);
     }
   };
 
-  // Handler pour confirmer la suppression
+  // Handler unique pour confirmer et exécuter la suppression
   const handleConfirmDelete = async () => {
-    console.log("[ADMIN] handleConfirmDelete called", dishToDelete);
-    
+    console.log("[ADMIN] delete start", { dishToDelete });
+
     if (!dishToDelete) {
       console.warn("[ADMIN] handleConfirmDelete: no dishToDelete");
+      onError("Aucun plat sélectionné pour la suppression.");
       return;
     }
 
     setIsDeleting(true);
-    try {
-      await handleDeleteDish(dishToDelete.id);
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
-  // Confirmer et exécuter la suppression
-  const handleDeleteDish = async (dishId: string) => {
-    if (!dishId) return;
+    onError(null);
+    setSuccessMessage(null);
 
     try {
-      setDeletingDishId(dishId);
-      onError(null);
-      setSuccessMessage(null);
-
-      // Logger le user pour debug
-      const { data: { user } } = await supabase.auth.getUser();
-      console.log("[ADMIN] user", user?.id, user?.email);
-      console.log("[ADMIN] Deleting dish", dishId);
-
-      // Supprimer le plat (NE PAS utiliser .single() sur delete)
-      const { data: deletedData, error } = await supabase
+      // Supprimer le plat dans Supabase
+      const { error } = await supabase
         .from("dishes")
         .delete()
-        .eq("id", dishId)
-        .eq("restaurant_id", restaurant.id)
-        .select("id");
+        .eq("id", dishToDelete.id)
+        .eq("restaurant_id", restaurant.id);
 
       if (error) {
-        // Logger l'erreur complète pour le debug
-        console.error("[ADMIN] Delete failed", error);
-        console.error("[ADMIN] Delete error details", {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          fullError: error,
-        });
-
-        // Afficher l'erreur exacte avec code et message
-        const errorMessage = error.code 
-          ? `Suppression refusée: ${error.code} ${error.message || "Impossible de supprimer ce plat."}`
-          : `Suppression refusée: ${error.message || "Impossible de supprimer ce plat."}`;
+        console.error("[ADMIN] delete error", error);
+        const errorMessage = error.message || "Erreur lors de la suppression du plat.";
         onError(errorMessage);
-        setDeletingDishId(null);
         return;
-      }
-
-      // Test de vérité : vérifier que le plat a bien été supprimé
-      // Si deletedData est vide, la suppression a peut-être échoué silencieusement (RLS)
-      if (!deletedData || deletedData.length === 0) {
-        console.warn("[ADMIN] Delete returned empty data, checking if dish still exists...");
-        // Vérifier si le plat existe encore
-        const { data: stillExists, error: checkError } = await supabase
-          .from("dishes")
-          .select("id")
-          .eq("id", dishId)
-          .limit(1);
-
-        if (checkError) {
-          console.error("[ADMIN] check dish existence error", checkError);
-          onError("Erreur lors de la vérification de la suppression.");
-          setDeletingDishId(null);
-          return;
-        }
-
-        if (stillExists && stillExists.length > 0) {
-          // Le plat existe encore -> suppression refusée (RLS/permissions)
-          console.error("[ADMIN] Dish still exists after delete - RLS/permission issue");
-          onError("Action refusée : vous n'avez pas les droits pour supprimer ce plat.");
-          setDeletingDishId(null);
-          return;
-        }
       }
 
       console.log("[ADMIN] Dish deleted successfully");
 
-      // UI update: retirer du state local immédiatement
-      setDishes((prev) => prev.filter((d) => d.id !== dishId));
-
-      // Fermer la modal de confirmation
+      // Fermer la modale immédiatement
       setDishToDelete(null);
+
+      // Mettre à jour la liste des plats sans recharger la page (feedback immédiat)
+      setDishes((prev) => prev.filter((d) => d.id !== dishToDelete.id));
 
       // Afficher message de succès
       setSuccessMessage("Plat supprimé avec succès");
 
-      // Refetch la liste des plats pour garantir la cohérence (source of truth)
-      await fetchDishes();
-
-      if (editingDish?.id === dishId) {
+      // Annuler l'édition si le plat supprimé était en cours d'édition
+      if (editingDish?.id === dishToDelete.id) {
         cancelEditDish();
       }
+
+      // Refetch pour garantir la cohérence (source of truth)
+      await fetchDishes();
 
       // Masquer le message de succès après 3 secondes
       setTimeout(() => {
         setSuccessMessage(null);
       }, 3000);
+
+      // Refresh de la page pour garantir la persistance
+      router.refresh();
     } catch (err) {
-      // Logger l'erreur complète pour le debug
-      console.error("[ADMIN] delete dish unexpected", err);
+      console.error("[ADMIN] delete dish unexpected error", err);
       const errorMessage = err instanceof Error ? err.message : "Erreur inattendue lors de la suppression du plat.";
       onError(errorMessage);
     } finally {
-      setDeletingDishId(null);
+      setIsDeleting(false);
     }
   };
 
@@ -1238,18 +1185,18 @@ export default function RestaurantMenuTab({
               <button
                 type="button"
                 onClick={closeDeleteConfirm}
-                disabled={isDeleting || !!deletingDishId}
+                disabled={isDeleting}
                 className="px-4 py-2 text-sm bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Annuler
               </button>
               <button
                 type="button"
-                onClick={() => { console.log("[ADMIN] confirm delete click"); alert("click OK"); }}
-                disabled={isDeleting || !!deletingDishId}
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
                 className="px-4 py-2 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
-                {isDeleting || deletingDishId ? (
+                {isDeleting ? (
                   <>
                     <span className="animate-spin">⏳</span>
                     <span>Suppression...</span>
