@@ -56,6 +56,23 @@ export default function RestaurantMenuTab({
   const [dishToDelete, setDishToDelete] = useState<Dish | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  
+  // État pour le panneau de debug de suppression
+  const [deleteDebug, setDeleteDebug] = useState<{
+    status: "idle" | "deleting" | "success" | "failed" | "zero-rows";
+    table: string;
+    dishId: string | null;
+    count: number | null;
+    error: { code: string | null; message: string | null } | null;
+    data: Array<{ id: string }> | null;
+  }>({
+    status: "idle",
+    table: "dishes",
+    dishId: null,
+    count: null,
+    error: null,
+    data: null,
+  });
 
   useEffect(() => {
     if (restaurant) {
@@ -464,6 +481,15 @@ export default function RestaurantMenuTab({
   // Ouvrir la modal de confirmation de suppression
   const openDeleteConfirm = (dish: Dish) => {
     setDishToDelete(dish);
+    // Réinitialiser le debug
+    setDeleteDebug({
+      status: "idle",
+      table: "dishes",
+      dishId: dish.id,
+      count: null,
+      error: null,
+      data: null,
+    });
   };
 
   // Fermer la modal de confirmation
@@ -489,6 +515,16 @@ export default function RestaurantMenuTab({
     onError(null);
     setSuccessMessage(null);
 
+    // Mettre à jour le debug : status = "deleting"
+    setDeleteDebug({
+      status: "deleting",
+      table: "dishes",
+      dishId,
+      count: null,
+      error: null,
+      data: null,
+    });
+
     try {
       // Suppression vérifiable : même table que fetchDishes, avec preuve (count: 'exact' + select)
       // Table: "dishes" (identique à fetchDishes)
@@ -510,16 +546,30 @@ export default function RestaurantMenuTab({
         data 
       });
 
-      // Condition STRICTE 1: Si error => toast erreur + return
+      // Condition STRICTE 1: Si error => status="failed" + afficher message UI "Suppression impossible"
       if (error) {
         console.error("[ADMIN] delete error", error);
         const errorMessage = `Suppression impossible: ${error.message || "Erreur lors de la suppression du plat."}`;
         onError(errorMessage);
+        
+        // Mettre à jour le debug : status = "failed"
+        setDeleteDebug({
+          status: "failed",
+          table: "dishes",
+          dishId,
+          count: null,
+          error: {
+            code: error.code || null,
+            message: error.message || null,
+          },
+          data: null,
+        });
+        
         // La modale reste ouverte mais utilisable (Annuler marche)
         return;
       }
 
-      // Condition STRICTE 2: Si count === 0 (ou data vide) => toast erreur + return
+      // Condition STRICTE 2: Si count === 0 (ou data vide) => status="zero-rows" + afficher "0 ligne supprimée (mauvais id / droits RLS)"
       // count peut être null/undefined si count: 'exact' n'est pas supporté, donc on vérifie aussi data
       const hasData = data && data.length > 0;
       const hasCount = count !== null && count !== undefined;
@@ -527,15 +577,36 @@ export default function RestaurantMenuTab({
 
       if (isCountZero || (!hasData && !hasCount)) {
         console.warn("[ADMIN] Delete returned 0 rows", { dishId, count, data, hasData, hasCount });
-        const errorMessage = "0 ligne supprimée (mauvais id/table ou droits)";
+        const errorMessage = "0 ligne supprimée (mauvais id / droits RLS)";
         onError(errorMessage);
+        
+        // Mettre à jour le debug : status = "zero-rows"
+        setDeleteDebug({
+          status: "zero-rows",
+          table: "dishes",
+          dishId,
+          count: count ?? 0,
+          error: null,
+          data: data || [],
+        });
+        
         // La modale reste ouverte mais utilisable (Annuler marche)
         return;
       }
 
-      // Condition STRICTE 3: Seulement si count > 0 => toast succès + fermer modale + retirer du state + refetch
+      // Condition STRICTE 3: Seulement si count > 0 => status="success", fermer modale + retirer du state + refetch
       if (hasCount && count > 0) {
         console.log("[ADMIN] Dish deleted successfully", { dishId, count, deletedId: data?.[0]?.id });
+
+        // Mettre à jour le debug : status = "success"
+        setDeleteDebug({
+          status: "success",
+          table: "dishes",
+          dishId,
+          count,
+          error: null,
+          data: data || [],
+        });
 
         // Retirer du state local (optimistic update)
         setDishes((prev) => prev.filter((d) => d.id !== dishId));
@@ -565,6 +636,16 @@ export default function RestaurantMenuTab({
         // Fallback: si data existe mais count n'est pas disponible (ancienne version Supabase)
         console.log("[ADMIN] Dish deleted successfully (count unavailable, using data)", { dishId, deletedId: data[0]?.id });
 
+        // Mettre à jour le debug : status = "success" (avec data mais sans count)
+        setDeleteDebug({
+          status: "success",
+          table: "dishes",
+          dishId,
+          count: null,
+          error: null,
+          data: data || [],
+        });
+
         // Retirer du state local (optimistic update)
         setDishes((prev) => prev.filter((d) => d.id !== dishId));
 
@@ -593,12 +674,37 @@ export default function RestaurantMenuTab({
         // Cas inattendu : ni count ni data ne confirment la suppression
         console.warn("[ADMIN] Delete status unclear", { dishId, count, data });
         onError("Impossible de confirmer la suppression. Vérifiez les logs.");
+        
+        // Mettre à jour le debug : status = "failed"
+        setDeleteDebug({
+          status: "failed",
+          table: "dishes",
+          dishId,
+          count,
+          error: { code: null, message: "Status unclear" },
+          data: data || null,
+        });
+        
         // La modale reste ouverte mais utilisable (Annuler marche)
       }
     } catch (err) {
       console.error("[ADMIN] Delete failed", err);
       const errorMessage = err instanceof Error ? err.message : "Erreur inattendue lors de la suppression du plat.";
       onError(errorMessage);
+      
+      // Mettre à jour le debug : status = "failed"
+      setDeleteDebug({
+        status: "failed",
+        table: "dishes",
+        dishId,
+        count: null,
+        error: {
+          code: null,
+          message: errorMessage,
+        },
+        data: null,
+      });
+      
       // La modale reste ouverte mais utilisable (Annuler marche)
     } finally {
       setIsDeleting(false);
@@ -1285,6 +1391,41 @@ export default function RestaurantMenuTab({
               Voulez-vous vraiment supprimer le plat <strong className="text-white">"{dishToDelete.name}"</strong> ?
               Cette action est irréversible.
             </p>
+
+            {/* Panneau de debug */}
+            <div className="mb-4 p-3 bg-slate-950/70 rounded-lg border border-slate-700/50">
+              <div className="text-xs font-mono text-slate-400 space-y-1">
+                <div>Table: <span className="text-slate-300">{deleteDebug.table}</span></div>
+                <div>dishId: <span className="text-slate-300">{deleteDebug.dishId || "—"}</span></div>
+                <div>status: <span className={`font-semibold ${
+                  deleteDebug.status === "idle" ? "text-slate-400" :
+                  deleteDebug.status === "deleting" ? "text-yellow-400" :
+                  deleteDebug.status === "success" ? "text-green-400" :
+                  deleteDebug.status === "failed" ? "text-red-400" :
+                  "text-orange-400"
+                }`}>{deleteDebug.status}</span></div>
+                <div>count: <span className="text-slate-300">{deleteDebug.count !== null ? deleteDebug.count : "—"}</span></div>
+                <div>error: <span className="text-slate-300">
+                  {deleteDebug.error ? (
+                    <>
+                      {deleteDebug.error.code && <span className="text-red-400">{deleteDebug.error.code}</span>}
+                      {deleteDebug.error.code && deleteDebug.error.message && " "}
+                      {deleteDebug.error.message && <span>{deleteDebug.error.message}</span>}
+                    </>
+                  ) : "—"}
+                </span></div>
+                <div>data: <span className="text-slate-300">
+                  {deleteDebug.data ? (
+                    deleteDebug.data.length > 0 ? (
+                      <span className="text-green-400">[{deleteDebug.data.map(d => d.id).join(", ")}]</span>
+                    ) : (
+                      <span className="text-orange-400">[]</span>
+                    )
+                  ) : "—"}
+                </span></div>
+              </div>
+            </div>
+
             <div className="flex gap-3 justify-end">
               <button
                 type="button"
@@ -1292,7 +1433,7 @@ export default function RestaurantMenuTab({
                 disabled={isDeleting}
                 className="px-4 py-2 text-sm bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Annuler
+                Fermer
               </button>
               <button
                 type="button"
