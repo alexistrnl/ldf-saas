@@ -50,6 +50,10 @@ export default function RestaurantMenuTab({
   const [editDishIsLimitedEdition, setEditDishIsLimitedEdition] = useState(false);
   const [editDishCategoryId, setEditDishCategoryId] = useState<string | null>(null);
 
+  // État pour la modal de confirmation de suppression
+  const [dishToDelete, setDishToDelete] = useState<Dish | null>(null);
+  const [deletingDishId, setDeletingDishId] = useState<string | null>(null);
+
   useEffect(() => {
     if (restaurant) {
       fetchCategories();
@@ -429,18 +433,31 @@ export default function RestaurantMenuTab({
     }
   };
 
-  const handleDeleteDish = async (dish: Dish) => {
-    const ok = window.confirm(`Voulez-vous vraiment supprimer le plat "${dish.name}" ?`);
-    if (!ok) return;
+  // Ouvrir la modal de confirmation de suppression
+  const openDeleteConfirm = (dish: Dish) => {
+    setDishToDelete(dish);
+  };
+
+  // Fermer la modal de confirmation
+  const closeDeleteConfirm = () => {
+    if (!deletingDishId) {
+      setDishToDelete(null);
+    }
+  };
+
+  // Confirmer et exécuter la suppression
+  const handleDeleteDish = async (dishId: string) => {
+    if (!dishId) return;
 
     try {
+      setDeletingDishId(dishId);
       onError(null);
 
       // Supprimer le plat avec .select("id") pour vérifier la réponse
       const { data: deletedData, error } = await supabase
         .from("dishes")
         .delete()
-        .eq("id", dish.id)
+        .eq("id", dishId)
         .eq("restaurant_id", restaurant.id)
         .select("id");
 
@@ -454,11 +471,16 @@ export default function RestaurantMenuTab({
           fullError: error,
         });
 
-        // Afficher l'erreur exacte avec code et message
-        const errorMessage = error.code 
-          ? `Erreur ${error.code}: ${error.message || "Impossible de supprimer ce plat."}`
-          : error.message || "Impossible de supprimer ce plat.";
-        onError(errorMessage);
+        // Gestion spéciale pour les erreurs RLS (42501)
+        if (error.code === "42501" || error.message?.toLowerCase().includes("permission denied") || error.message?.toLowerCase().includes("row-level security")) {
+          onError("Action refusée : vous n'avez pas les droits pour supprimer ce plat.");
+        } else {
+          // Afficher l'erreur exacte avec code et message
+          const errorMessage = error.code 
+            ? `Erreur ${error.code}: ${error.message || "Impossible de supprimer ce plat."}`
+            : error.message || "Impossible de supprimer ce plat.";
+          onError(errorMessage);
+        }
         return;
       }
 
@@ -469,7 +491,7 @@ export default function RestaurantMenuTab({
         const { data: stillExists, error: checkError } = await supabase
           .from("dishes")
           .select("id")
-          .eq("id", dish.id)
+          .eq("id", dishId)
           .limit(1);
 
         if (checkError) {
@@ -481,18 +503,21 @@ export default function RestaurantMenuTab({
         if (stillExists && stillExists.length > 0) {
           // Le plat existe encore -> suppression refusée (RLS/permissions)
           console.error("[Admin] Dish still exists after delete - RLS/permission issue");
-          onError("Suppression refusée : vous n'avez pas les droits pour supprimer ce plat.");
+          onError("Action refusée : vous n'avez pas les droits pour supprimer ce plat.");
           return;
         }
       }
 
       // Mettre à jour le state local immédiatement pour retirer le plat de l'UI
-      setDishes((prev) => prev.filter((d) => d.id !== dish.id));
+      setDishes((prev) => prev.filter((d) => d.id !== dishId));
+
+      // Fermer la modal de confirmation
+      setDishToDelete(null);
 
       // Refetch la liste des plats pour garantir la cohérence (source of truth)
       await fetchDishes();
 
-      if (editingDish?.id === dish.id) {
+      if (editingDish?.id === dishId) {
         cancelEditDish();
       }
     } catch (err) {
@@ -500,6 +525,8 @@ export default function RestaurantMenuTab({
       console.error("[Admin] delete dish unexpected", err);
       const errorMessage = err instanceof Error ? err.message : "Erreur inattendue lors de la suppression du plat.";
       onError(errorMessage);
+    } finally {
+      setDeletingDishId(null);
     }
   };
 
@@ -1135,7 +1162,7 @@ export default function RestaurantMenuTab({
                                   ✏️
                                 </button>
                                 <button
-                                  onClick={() => handleDeleteDish(dish)}
+                                  onClick={() => openDeleteConfirm(dish)}
                                   className="px-2 py-1 text-xs bg-red-500/80 text-white rounded hover:bg-red-500"
                                   title="Supprimer"
                                 >
@@ -1154,6 +1181,46 @@ export default function RestaurantMenuTab({
           )}
         </div>
       </div>
+
+      {/* Modal de confirmation de suppression */}
+      {dishToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6 max-w-md w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold text-white mb-2">
+              Confirmer la suppression
+            </h3>
+            <p className="text-sm text-slate-300 mb-6">
+              Voulez-vous vraiment supprimer le plat <strong className="text-white">"{dishToDelete.name}"</strong> ?
+              Cette action est irréversible.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={closeDeleteConfirm}
+                disabled={!!deletingDishId}
+                className="px-4 py-2 text-sm bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeleteDish(dishToDelete.id)}
+                disabled={!!deletingDishId}
+                className="px-4 py-2 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {deletingDishId ? (
+                  <>
+                    <span className="animate-spin">⏳</span>
+                    <span>Suppression...</span>
+                  </>
+                ) : (
+                  "Valider la suppression"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
