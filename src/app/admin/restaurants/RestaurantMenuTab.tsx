@@ -53,6 +53,7 @@ export default function RestaurantMenuTab({
   // État pour la modal de confirmation de suppression
   const [dishToDelete, setDishToDelete] = useState<Dish | null>(null);
   const [deletingDishId, setDeletingDishId] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (restaurant) {
@@ -452,8 +453,14 @@ export default function RestaurantMenuTab({
     try {
       setDeletingDishId(dishId);
       onError(null);
+      setSuccessMessage(null);
 
-      // Supprimer le plat avec .select("id") pour vérifier la réponse
+      // Logger le user pour debug
+      const { data: { user } } = await supabase.auth.getUser();
+      console.log("[ADMIN] user", user?.id, user?.email);
+      console.log("[ADMIN] Deleting dish", dishId);
+
+      // Supprimer le plat (NE PAS utiliser .single() sur delete)
       const { data: deletedData, error } = await supabase
         .from("dishes")
         .delete()
@@ -463,7 +470,8 @@ export default function RestaurantMenuTab({
 
       if (error) {
         // Logger l'erreur complète pour le debug
-        console.error("[Admin] delete dish error", {
+        console.error("[ADMIN] Delete failed", error);
+        console.error("[ADMIN] Delete error details", {
           code: error.code,
           message: error.message,
           details: error.details,
@@ -471,22 +479,19 @@ export default function RestaurantMenuTab({
           fullError: error,
         });
 
-        // Gestion spéciale pour les erreurs RLS (42501)
-        if (error.code === "42501" || error.message?.toLowerCase().includes("permission denied") || error.message?.toLowerCase().includes("row-level security")) {
-          onError("Action refusée : vous n'avez pas les droits pour supprimer ce plat.");
-        } else {
-          // Afficher l'erreur exacte avec code et message
-          const errorMessage = error.code 
-            ? `Erreur ${error.code}: ${error.message || "Impossible de supprimer ce plat."}`
-            : error.message || "Impossible de supprimer ce plat.";
-          onError(errorMessage);
-        }
+        // Afficher l'erreur exacte avec code et message
+        const errorMessage = error.code 
+          ? `Suppression refusée: ${error.code} ${error.message || "Impossible de supprimer ce plat."}`
+          : `Suppression refusée: ${error.message || "Impossible de supprimer ce plat."}`;
+        onError(errorMessage);
+        setDeletingDishId(null);
         return;
       }
 
       // Test de vérité : vérifier que le plat a bien été supprimé
       // Si deletedData est vide, la suppression a peut-être échoué silencieusement (RLS)
       if (!deletedData || deletedData.length === 0) {
+        console.warn("[ADMIN] Delete returned empty data, checking if dish still exists...");
         // Vérifier si le plat existe encore
         const { data: stillExists, error: checkError } = await supabase
           .from("dishes")
@@ -495,24 +500,31 @@ export default function RestaurantMenuTab({
           .limit(1);
 
         if (checkError) {
-          console.error("[Admin] check dish existence error", checkError);
+          console.error("[ADMIN] check dish existence error", checkError);
           onError("Erreur lors de la vérification de la suppression.");
+          setDeletingDishId(null);
           return;
         }
 
         if (stillExists && stillExists.length > 0) {
           // Le plat existe encore -> suppression refusée (RLS/permissions)
-          console.error("[Admin] Dish still exists after delete - RLS/permission issue");
+          console.error("[ADMIN] Dish still exists after delete - RLS/permission issue");
           onError("Action refusée : vous n'avez pas les droits pour supprimer ce plat.");
+          setDeletingDishId(null);
           return;
         }
       }
 
-      // Mettre à jour le state local immédiatement pour retirer le plat de l'UI
+      console.log("[ADMIN] Dish deleted successfully");
+
+      // UI update: retirer du state local immédiatement
       setDishes((prev) => prev.filter((d) => d.id !== dishId));
 
       // Fermer la modal de confirmation
       setDishToDelete(null);
+
+      // Afficher message de succès
+      setSuccessMessage("Plat supprimé avec succès");
 
       // Refetch la liste des plats pour garantir la cohérence (source of truth)
       await fetchDishes();
@@ -520,9 +532,14 @@ export default function RestaurantMenuTab({
       if (editingDish?.id === dishId) {
         cancelEditDish();
       }
+
+      // Masquer le message de succès après 3 secondes
+      setTimeout(() => {
+        setSuccessMessage(null);
+      }, 3000);
     } catch (err) {
       // Logger l'erreur complète pour le debug
-      console.error("[Admin] delete dish unexpected", err);
+      console.error("[ADMIN] delete dish unexpected", err);
       const errorMessage = err instanceof Error ? err.message : "Erreur inattendue lors de la suppression du plat.";
       onError(errorMessage);
     } finally {
@@ -854,6 +871,12 @@ export default function RestaurantMenuTab({
           {dishImageError && (
             <div className="mb-4 p-3 bg-red-500/10 border border-red-500/40 rounded-lg text-sm text-red-300">
               {dishImageError}
+            </div>
+          )}
+
+          {successMessage && (
+            <div className="mb-4 p-3 bg-green-500/10 border border-green-500/40 rounded-lg text-sm text-green-300">
+              {successMessage}
             </div>
           )}
 
