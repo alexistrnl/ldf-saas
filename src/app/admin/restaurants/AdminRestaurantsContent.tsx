@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { formatRLSError } from "@/lib/errorMessages";
 import { Restaurant, ViewMode } from "./types";
 import RestaurantListPanel from "./RestaurantListPanel";
 import RestaurantDetailsPanel from "./RestaurantDetailsPanel";
@@ -230,27 +231,33 @@ export default function AdminRestaurantsContent() {
         const errorMessage = insertError.message || "Erreur inconnue";
         const errorDetails = insertError.details || "";
         
-        // Message d'erreur détaillé
-        let errorDisplay = `Erreur ${errorCode}: ${errorMessage}`;
-        if (errorDetails) {
-          errorDisplay += ` (${errorDetails})`;
-        }
-
-        // Messages spécifiques selon le type d'erreur
-        if (insertError.code === "42501" || errorMessage.includes("permission denied") || errorMessage.includes("RLS")) {
-          errorDisplay = `Erreur RLS: Insert bloqué par les politiques de sécurité. Code: ${errorCode}. Message: ${errorMessage}`;
-        } else if (insertError.code === "23505") {
-          errorDisplay = `Erreur d'unicité: ${errorMessage}. Code: ${errorCode}`;
-        } else if (insertError.code === "23502") {
-          errorDisplay = `Champ requis manquant: ${errorMessage}. Code: ${errorCode}`;
-        }
-
+        // Logger l'erreur technique pour le debug (toujours)
         console.error("[Admin] insert restaurant error", {
           code: errorCode,
           message: errorMessage,
           details: errorDetails,
           fullError: insertError,
         });
+
+        // Gestion spéciale pour les erreurs RLS (42501)
+        if (insertError.code === "42501" || errorMessage.includes("permission denied") || errorMessage.includes("RLS") || errorMessage.includes("row-level security")) {
+          const userFriendlyMessage = await formatRLSError(insertError);
+          setError(userFriendlyMessage);
+          setSaving(false);
+          return;
+        }
+
+        // Messages spécifiques pour les autres types d'erreur
+        let errorDisplay = `Erreur ${errorCode}: ${errorMessage}`;
+        if (errorDetails) {
+          errorDisplay += ` (${errorDetails})`;
+        }
+
+        if (insertError.code === "23505") {
+          errorDisplay = `Erreur d'unicité: ${errorMessage}. Code: ${errorCode}`;
+        } else if (insertError.code === "23502") {
+          errorDisplay = `Champ requis manquant: ${errorMessage}. Code: ${errorCode}`;
+        }
 
         setError(errorDisplay);
         setSaving(false);
@@ -389,6 +396,14 @@ export default function AdminRestaurantsContent() {
 
       if (updateError) {
         console.error("[Admin] update restaurant error", updateError);
+        
+        // Gestion spéciale pour les erreurs RLS (42501)
+        if (updateError.code === "42501" || updateError.message?.toLowerCase().includes("permission denied") || updateError.message?.toLowerCase().includes("RLS") || updateError.message?.toLowerCase().includes("row-level security")) {
+          const userFriendlyMessage = await formatRLSError(updateError);
+          setError(userFriendlyMessage);
+          return;
+        }
+        
         setError("Erreur lors de la mise à jour de l'enseigne.");
         return;
       }
@@ -425,6 +440,14 @@ export default function AdminRestaurantsContent() {
 
       if (error) {
         console.error("[Admin] delete restaurant error", error);
+        
+        // Gestion spéciale pour les erreurs RLS (42501)
+        if (error.code === "42501" || error.message?.toLowerCase().includes("permission denied") || error.message?.toLowerCase().includes("RLS") || error.message?.toLowerCase().includes("row-level security")) {
+          const userFriendlyMessage = await formatRLSError(error);
+          setError(userFriendlyMessage);
+          return;
+        }
+        
         setError("Erreur lors de la suppression de l'enseigne.");
         return;
       }

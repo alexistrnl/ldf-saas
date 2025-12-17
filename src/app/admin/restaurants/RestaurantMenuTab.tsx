@@ -436,26 +436,70 @@ export default function RestaurantMenuTab({
     try {
       onError(null);
 
-      const { error } = await supabase
+      // Supprimer le plat avec .select("id") pour vérifier la réponse
+      const { data: deletedData, error } = await supabase
         .from("dishes")
         .delete()
         .eq("id", dish.id)
-        .eq("restaurant_id", restaurant.id);
+        .eq("restaurant_id", restaurant.id)
+        .select("id");
 
       if (error) {
-        console.error("[Admin] delete dish error", error);
-        onError(error.message || "Impossible de supprimer ce plat.");
+        // Logger l'erreur complète pour le debug
+        console.error("[Admin] delete dish error", {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          fullError: error,
+        });
+
+        // Afficher l'erreur exacte avec code et message
+        const errorMessage = error.code 
+          ? `Erreur ${error.code}: ${error.message || "Impossible de supprimer ce plat."}`
+          : error.message || "Impossible de supprimer ce plat.";
+        onError(errorMessage);
         return;
       }
 
+      // Test de vérité : vérifier que le plat a bien été supprimé
+      // Si deletedData est vide, la suppression a peut-être échoué silencieusement (RLS)
+      if (!deletedData || deletedData.length === 0) {
+        // Vérifier si le plat existe encore
+        const { data: stillExists, error: checkError } = await supabase
+          .from("dishes")
+          .select("id")
+          .eq("id", dish.id)
+          .limit(1);
+
+        if (checkError) {
+          console.error("[Admin] check dish existence error", checkError);
+          onError("Erreur lors de la vérification de la suppression.");
+          return;
+        }
+
+        if (stillExists && stillExists.length > 0) {
+          // Le plat existe encore -> suppression refusée (RLS/permissions)
+          console.error("[Admin] Dish still exists after delete - RLS/permission issue");
+          onError("Suppression refusée : vous n'avez pas les droits pour supprimer ce plat.");
+          return;
+        }
+      }
+
+      // Mettre à jour le state local immédiatement pour retirer le plat de l'UI
       setDishes((prev) => prev.filter((d) => d.id !== dish.id));
+
+      // Refetch la liste des plats pour garantir la cohérence (source of truth)
+      await fetchDishes();
 
       if (editingDish?.id === dish.id) {
         cancelEditDish();
       }
     } catch (err) {
+      // Logger l'erreur complète pour le debug
       console.error("[Admin] delete dish unexpected", err);
-      onError("Erreur inattendue lors de la suppression du plat.");
+      const errorMessage = err instanceof Error ? err.message : "Erreur inattendue lors de la suppression du plat.";
+      onError(errorMessage);
     }
   };
 
