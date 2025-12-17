@@ -417,8 +417,6 @@ export default function AdminRestaurantsContent() {
   };
 
   const handleDelete = async (restaurant: Restaurant) => {
-    if (!confirm(`Supprimer l'enseigne "${restaurant.name}" ?`)) return;
-
     try {
       setError(null);
 

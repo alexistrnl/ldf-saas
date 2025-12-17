@@ -65,6 +65,22 @@ export default function RestaurantMenuTab({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [restaurant]);
 
+  // Gestion de la touche ESC pour fermer la modale
+  useEffect(() => {
+    if (!dishToDelete) return;
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !isDeleting) {
+        setDishToDelete(null);
+      }
+    };
+
+    window.addEventListener("keydown", handleEscape);
+    return () => {
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, [dishToDelete, isDeleting]);
+
   const fetchCategories = async () => {
     try {
       setLoadingCategories(true);
@@ -231,8 +247,6 @@ export default function RestaurantMenuTab({
       );
       return;
     }
-
-    if (!confirm(`Supprimer la section "${category.name}" ?`)) return;
 
     try {
       onError(null);
@@ -450,9 +464,9 @@ export default function RestaurantMenuTab({
 
   // Handler unique pour confirmer et exécuter la suppression
   const handleConfirmDelete = async () => {
-    console.log("[ADMIN] delete start", { dishToDelete });
+    console.log("[ADMIN] Confirm delete clicked", { dishId: dishToDelete?.id });
 
-    if (!dishToDelete) {
+    if (!dishToDelete?.id) {
       console.warn("[ADMIN] handleConfirmDelete: no dishToDelete");
       onError("Aucun plat sélectionné pour la suppression.");
       return;
@@ -480,6 +494,7 @@ export default function RestaurantMenuTab({
         console.error("[ADMIN] delete error", error);
         const errorMessage = `Suppression impossible: ${error.message || "Erreur lors de la suppression du plat."}`;
         onError(errorMessage);
+        // La modale reste ouverte mais utilisable (Annuler marche)
         return;
       }
 
@@ -493,6 +508,7 @@ export default function RestaurantMenuTab({
         console.warn("[ADMIN] Delete returned 0 rows", { dishId, count, data, hasData, hasCount });
         const errorMessage = "0 ligne supprimée : (RLS / mauvais id / mauvaise table / pas connecté)";
         onError(errorMessage);
+        // La modale reste ouverte mais utilisable (Annuler marche)
         return;
       }
 
@@ -503,7 +519,7 @@ export default function RestaurantMenuTab({
         // Fix UI immédiat : retirer le plat du state local (optimistic update)
         setDishes((prev) => prev.filter((d) => d.id !== dishId));
 
-        // Fermer la modale immédiatement
+        // Fermer la modale après succès
         setDishToDelete(null);
 
         // Annuler l'édition si le plat supprimé était en cours d'édition
@@ -528,15 +544,18 @@ export default function RestaurantMenuTab({
         // Cas inattendu : count > 1 (ne devrait pas arriver)
         console.warn("[ADMIN] Unexpected delete count", { dishId, count });
         onError(`Suppression inattendue : ${count} lignes supprimées au lieu de 1.`);
+        // La modale reste ouverte mais utilisable (Annuler marche)
       } else {
         // Cas inattendu : ni count ni data ne confirment la suppression
         console.warn("[ADMIN] Delete status unclear", { dishId, count, data });
         onError("Impossible de confirmer la suppression. Vérifiez les logs.");
+        // La modale reste ouverte mais utilisable (Annuler marche)
       }
     } catch (err) {
-      console.error("[ADMIN] delete dish unexpected error", err);
+      console.error("[ADMIN] Delete failed", err);
       const errorMessage = err instanceof Error ? err.message : "Erreur inattendue lors de la suppression du plat.";
       onError(errorMessage);
+      // La modale reste ouverte mais utilisable (Annuler marche)
     } finally {
       setIsDeleting(false);
     }
@@ -1202,8 +1221,19 @@ export default function RestaurantMenuTab({
 
       {/* Modal de confirmation de suppression */}
       {dishToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6 max-w-md w-full mx-4 shadow-xl">
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+          onClick={(e) => {
+            // Fermer au clic sur l'overlay (pas sur le contenu)
+            if (e.target === e.currentTarget && !isDeleting) {
+              closeDeleteConfirm();
+            }
+          }}
+        >
+          <div 
+            className="bg-slate-900 rounded-2xl border border-slate-800 p-6 max-w-md w-full mx-4 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h3 className="text-lg font-semibold text-white mb-2">
               Confirmer la suppression
             </h3>
