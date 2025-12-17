@@ -458,51 +458,81 @@ export default function RestaurantMenuTab({
       return;
     }
 
+    const dishId = dishToDelete.id;
     setIsDeleting(true);
     onError(null);
     setSuccessMessage(null);
 
     try {
-      // Supprimer le plat dans Supabase
-      const { error } = await supabase
+      // Supprimer le plat dans Supabase avec preuve (count: 'exact' + select)
+      const { data, error, count } = await supabase
         .from("dishes")
-        .delete()
-        .eq("id", dishToDelete.id)
-        .eq("restaurant_id", restaurant.id);
+        .delete({ count: "exact" })
+        .eq("id", dishId)
+        .eq("restaurant_id", restaurant.id)
+        .select("id");
 
+      // Log complet pour diagnostic
+      console.log("[ADMIN DELETE DISH]", { dishId, error, count, data });
+
+      // Gestion des erreurs
       if (error) {
         console.error("[ADMIN] delete error", error);
-        const errorMessage = error.message || "Erreur lors de la suppression du plat.";
+        const errorMessage = `Suppression impossible: ${error.message || "Erreur lors de la suppression du plat."}`;
         onError(errorMessage);
         return;
       }
 
-      console.log("[ADMIN] Dish deleted successfully");
+      // Vérification que la suppression a réellement eu lieu
+      // count peut être null/undefined si count: 'exact' n'est pas supporté, donc on vérifie aussi data
+      const hasData = data && data.length > 0;
+      const hasCount = count !== null && count !== undefined;
+      const isValidCount = hasCount && count === 1;
 
-      // Fermer la modale immédiatement
-      setDishToDelete(null);
-
-      // Mettre à jour la liste des plats sans recharger la page (feedback immédiat)
-      setDishes((prev) => prev.filter((d) => d.id !== dishToDelete.id));
-
-      // Afficher message de succès
-      setSuccessMessage("Plat supprimé avec succès");
-
-      // Annuler l'édition si le plat supprimé était en cours d'édition
-      if (editingDish?.id === dishToDelete.id) {
-        cancelEditDish();
+      if (!hasData && (!hasCount || count === 0)) {
+        console.warn("[ADMIN] Delete returned 0 rows", { dishId, count, data, hasData, hasCount });
+        const errorMessage = "0 ligne supprimée : (RLS / mauvais id / mauvaise table / pas connecté)";
+        onError(errorMessage);
+        return;
       }
 
-      // Refetch pour garantir la cohérence (source of truth)
-      await fetchDishes();
+      // SUCCÈS : count === 1 OU data.length > 0 (si count n'est pas disponible)
+      if (isValidCount || hasData) {
+        console.log("[ADMIN] Dish deleted successfully", { dishId, count, deletedId: data?.[0]?.id });
 
-      // Masquer le message de succès après 3 secondes
-      setTimeout(() => {
-        setSuccessMessage(null);
-      }, 3000);
+        // Fix UI immédiat : retirer le plat du state local (optimistic update)
+        setDishes((prev) => prev.filter((d) => d.id !== dishId));
 
-      // Refresh de la page pour garantir la persistance
-      router.refresh();
+        // Fermer la modale immédiatement
+        setDishToDelete(null);
+
+        // Annuler l'édition si le plat supprimé était en cours d'édition
+        if (editingDish?.id === dishId) {
+          cancelEditDish();
+        }
+
+        // Afficher message de succès
+        setSuccessMessage("Plat supprimé avec succès");
+
+        // Masquer le message de succès après 3 secondes
+        setTimeout(() => {
+          setSuccessMessage(null);
+        }, 3000);
+
+        // Refetch "source de vérité" pour remplacer le state (pas merge)
+        await fetchDishes();
+
+        // Refresh de la page pour garantir la persistance
+        router.refresh();
+      } else if (hasCount && count > 1) {
+        // Cas inattendu : count > 1 (ne devrait pas arriver)
+        console.warn("[ADMIN] Unexpected delete count", { dishId, count });
+        onError(`Suppression inattendue : ${count} lignes supprimées au lieu de 1.`);
+      } else {
+        // Cas inattendu : ni count ni data ne confirment la suppression
+        console.warn("[ADMIN] Delete status unclear", { dishId, count, data });
+        onError("Impossible de confirmer la suppression. Vérifiez les logs.");
+      }
     } catch (err) {
       console.error("[ADMIN] delete dish unexpected error", err);
       const errorMessage = err instanceof Error ? err.message : "Erreur inattendue lors de la suppression du plat.";
