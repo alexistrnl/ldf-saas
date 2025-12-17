@@ -53,6 +53,7 @@ export default function RestaurantMenuTab({
   // État pour la modal de confirmation de suppression
   const [dishToDelete, setDishToDelete] = useState<Dish | null>(null);
   const [deletingDishId, setDeletingDishId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -441,8 +442,25 @@ export default function RestaurantMenuTab({
 
   // Fermer la modal de confirmation
   const closeDeleteConfirm = () => {
-    if (!deletingDishId) {
+    if (!deletingDishId && !isDeleting) {
       setDishToDelete(null);
+    }
+  };
+
+  // Handler pour confirmer la suppression
+  const handleConfirmDelete = async () => {
+    console.log("[ADMIN] handleConfirmDelete called", dishToDelete);
+    
+    if (!dishToDelete) {
+      console.warn("[ADMIN] handleConfirmDelete: no dishToDelete");
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      await handleDeleteDish(dishToDelete.id);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -1220,18 +1238,18 @@ export default function RestaurantMenuTab({
               <button
                 type="button"
                 onClick={closeDeleteConfirm}
-                disabled={!!deletingDishId}
+                disabled={isDeleting || !!deletingDishId}
                 className="px-4 py-2 text-sm bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Annuler
               </button>
               <button
                 type="button"
-                onClick={() => handleDeleteDish(dishToDelete.id)}
-                disabled={!!deletingDishId}
+                onClick={() => { console.log("[ADMIN] confirm delete click"); alert("click OK"); }}
+                disabled={isDeleting || !!deletingDishId}
                 className="px-4 py-2 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
-                {deletingDishId ? (
+                {isDeleting || deletingDishId ? (
                   <>
                     <span className="animate-spin">⏳</span>
                     <span>Suppression...</span>
