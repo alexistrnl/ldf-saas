@@ -105,6 +105,12 @@ export default function RestaurantMenuTab({
     }
   };
 
+  // SOURCE DES PLATS AFFICHÉS DANS L'ADMIN
+  // Table: "dishes" (table Supabase directe, pas une view ni RPC)
+  // Colonnes utilisées: * (toutes), principales: id, restaurant_id, name, image_url, description, is_signature, is_limited_edition, position, category_id
+  // Clé primaire: "id" (string/UUID)
+  // Filtre: restaurant_id = restaurant.id
+  // Tri: position ASC, puis name ASC
   const fetchDishes = async () => {
     try {
       setLoadingDishes(true);
@@ -119,6 +125,11 @@ export default function RestaurantMenuTab({
         console.error("[Admin] dishes error", error);
         onError("Erreur lors du chargement des plats.");
         return;
+      }
+
+      // Log du premier élément pour vérifier la source (dev only)
+      if (data && data.length > 0) {
+        console.log("[ADMIN] dishes source", { table: "dishes", sample: data[0] });
       }
 
       const typed = (data || []) as Dish[];
@@ -463,6 +474,7 @@ export default function RestaurantMenuTab({
   };
 
   // Handler unique pour confirmer et exécuter la suppression
+  // SUPPRESSION VÉRIFIABLE : utilise la même table que fetchDishes ("dishes") avec clé primaire "id"
   const handleConfirmDelete = async () => {
     console.log("[ADMIN] Confirm delete clicked", { dishId: dishToDelete?.id });
 
@@ -478,7 +490,9 @@ export default function RestaurantMenuTab({
     setSuccessMessage(null);
 
     try {
-      // Supprimer le plat dans Supabase avec preuve (count: 'exact' + select)
+      // Suppression vérifiable : même table que fetchDishes, avec preuve (count: 'exact' + select)
+      // Table: "dishes" (identique à fetchDishes)
+      // Clé primaire: "id"
       const { data, error, count } = await supabase
         .from("dishes")
         .delete({ count: "exact" })
@@ -486,10 +500,17 @@ export default function RestaurantMenuTab({
         .eq("restaurant_id", restaurant.id)
         .select("id");
 
-      // Log complet pour diagnostic
-      console.log("[ADMIN DELETE DISH]", { dishId, error, count, data });
+      // Log complet pour diagnostic (impossible de mentir)
+      console.log("[ADMIN] delete result", { 
+        table: "dishes", 
+        pk: "id", 
+        value: dishId, 
+        error, 
+        count, 
+        data 
+      });
 
-      // Gestion des erreurs
+      // Condition STRICTE 1: Si error => toast erreur + return
       if (error) {
         console.error("[ADMIN] delete error", error);
         const errorMessage = `Suppression impossible: ${error.message || "Erreur lors de la suppression du plat."}`;
@@ -498,25 +519,25 @@ export default function RestaurantMenuTab({
         return;
       }
 
-      // Vérification que la suppression a réellement eu lieu
+      // Condition STRICTE 2: Si count === 0 (ou data vide) => toast erreur + return
       // count peut être null/undefined si count: 'exact' n'est pas supporté, donc on vérifie aussi data
       const hasData = data && data.length > 0;
       const hasCount = count !== null && count !== undefined;
-      const isValidCount = hasCount && count === 1;
+      const isCountZero = hasCount && count === 0;
 
-      if (!hasData && (!hasCount || count === 0)) {
+      if (isCountZero || (!hasData && !hasCount)) {
         console.warn("[ADMIN] Delete returned 0 rows", { dishId, count, data, hasData, hasCount });
-        const errorMessage = "0 ligne supprimée : (RLS / mauvais id / mauvaise table / pas connecté)";
+        const errorMessage = "0 ligne supprimée (mauvais id/table ou droits)";
         onError(errorMessage);
         // La modale reste ouverte mais utilisable (Annuler marche)
         return;
       }
 
-      // SUCCÈS : count === 1 OU data.length > 0 (si count n'est pas disponible)
-      if (isValidCount || hasData) {
+      // Condition STRICTE 3: Seulement si count > 0 => toast succès + fermer modale + retirer du state + refetch
+      if (hasCount && count > 0) {
         console.log("[ADMIN] Dish deleted successfully", { dishId, count, deletedId: data?.[0]?.id });
 
-        // Fix UI immédiat : retirer le plat du state local (optimistic update)
+        // Retirer du state local (optimistic update)
         setDishes((prev) => prev.filter((d) => d.id !== dishId));
 
         // Fermer la modale après succès
@@ -535,16 +556,39 @@ export default function RestaurantMenuTab({
           setSuccessMessage(null);
         }, 3000);
 
-        // Refetch "source de vérité" pour remplacer le state (pas merge)
+        // Resync: relancer EXACTEMENT la même fonction fetch qu'en A (fetchDishes)
         await fetchDishes();
 
         // Refresh de la page pour garantir la persistance
         router.refresh();
-      } else if (hasCount && count > 1) {
-        // Cas inattendu : count > 1 (ne devrait pas arriver)
-        console.warn("[ADMIN] Unexpected delete count", { dishId, count });
-        onError(`Suppression inattendue : ${count} lignes supprimées au lieu de 1.`);
-        // La modale reste ouverte mais utilisable (Annuler marche)
+      } else if (hasData && !hasCount) {
+        // Fallback: si data existe mais count n'est pas disponible (ancienne version Supabase)
+        console.log("[ADMIN] Dish deleted successfully (count unavailable, using data)", { dishId, deletedId: data[0]?.id });
+
+        // Retirer du state local (optimistic update)
+        setDishes((prev) => prev.filter((d) => d.id !== dishId));
+
+        // Fermer la modale après succès
+        setDishToDelete(null);
+
+        // Annuler l'édition si le plat supprimé était en cours d'édition
+        if (editingDish?.id === dishId) {
+          cancelEditDish();
+        }
+
+        // Afficher message de succès
+        setSuccessMessage("Plat supprimé avec succès");
+
+        // Masquer le message de succès après 3 secondes
+        setTimeout(() => {
+          setSuccessMessage(null);
+        }, 3000);
+
+        // Resync: relancer EXACTEMENT la même fonction fetch qu'en A (fetchDishes)
+        await fetchDishes();
+
+        // Refresh de la page pour garantir la persistance
+        router.refresh();
       } else {
         // Cas inattendu : ni count ni data ne confirment la suppression
         console.warn("[ADMIN] Delete status unclear", { dishId, count, data });
