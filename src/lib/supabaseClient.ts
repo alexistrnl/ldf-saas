@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { createBrowserClient } from '@supabase/ssr'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -31,13 +31,10 @@ export function getSiteUrl(): string {
   return 'https://www.bitebox.fr'
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    // Configuration globale pour forcer l'utilisation du bon template
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true,
-    // L'URL de redirection sera définie explicitement dans signUp
-  },
-})
+/**
+ * Client Supabase pour le navigateur
+ * Utilise createBrowserClient de @supabase/ssr pour synchroniser
+ * la session avec les cookies gérés par le middleware
+ */
+export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey)
 

@@ -28,6 +28,8 @@ export async function updateSession(request: NextRequest) {
   )
 
   // Rafraîchir la session si elle existe
+  // getSession() rafraîchit automatiquement le token si nécessaire
+  const { data: { session } } = await supabase.auth.getSession()
   const { data: { user } } = await supabase.auth.getUser()
 
   // Si l'utilisateur existe, vérifier s'il est admin
