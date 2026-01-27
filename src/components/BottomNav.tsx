@@ -46,8 +46,8 @@ export default function BottomNav() {
 
   return (
     <>
-      <nav className="fixed inset-x-0 bottom-3 z-40 flex justify-center md:hidden">
-        <div className="mx-auto flex w-full max-w-sm items-center rounded-xl bg-black/40 backdrop-blur-xl px-1 py-1.5 shadow-lg border border-white/10">
+      <nav className="fixed inset-x-0 bottom-4 z-40 flex justify-center md:hidden">
+        <div className="mx-auto flex w-full max-w-sm items-center rounded-[24px] bg-black/40 backdrop-blur-xl px-1 py-1.5 shadow-lg border border-white/10">
           {/* Home */}
           <button
             onClick={() => router.push('/home')}

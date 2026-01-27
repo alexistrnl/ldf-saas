@@ -11,6 +11,7 @@ import { getAvatarThemeFromVariant } from "@/lib/avatarTheme";
 import { useProfile } from "@/context/ProfileContext";
 import Spinner from "@/components/Spinner";
 import EditProfileModal from "@/components/EditProfileModal";
+import ExperienceGrid from "@/components/ExperienceGrid";
 
 type RestaurantLite = {
   id: string;
@@ -25,15 +26,19 @@ type ProfileStats = {
   avgRating: number;
 };
 
-type LastExperience = {
+type Experience = {
   id: string;
+  restaurant_id: string | null;
+  restaurant_slug: string | null;
   restaurant_name: string;
   restaurant_logo_url: string | null;
   rating: number;
   comment: string | null;
   visited_at: string | null;
   created_at: string;
-} | null;
+  dish_image_url: string | null;
+};
+
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -45,7 +50,7 @@ export default function ProfilePage() {
   // Données du mur
   const [stats, setStats] = useState<ProfileStats>({ restaurantsCount: 0, totalExperiences: 0, avgRating: 0 });
   const [favoriteRestaurants, setFavoriteRestaurants] = useState<RestaurantLite[]>([]);
-  const [lastExperience, setLastExperience] = useState<LastExperience>(null);
+  const [experiences, setExperiences] = useState<Experience[]>([]);
   
   // Modal édition
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -100,58 +105,106 @@ export default function ProfilePage() {
 
         setStats({ restaurantsCount, totalExperiences, avgRating });
 
-        // Charger les restaurants favoris
-        if (profile?.favorite_restaurant_ids && profile.favorite_restaurant_ids.length > 0) {
-          const favoriteIds: string[] = Array.isArray(profile.favorite_restaurant_ids)
-            ? (profile.favorite_restaurant_ids as string[])
+        // Charger les restaurants favoris en préservant les positions
+        if (profile?.favorite_restaurant_ids) {
+          const favoriteIds: (string | null)[] = Array.isArray(profile.favorite_restaurant_ids)
+            ? (profile.favorite_restaurant_ids as (string | null)[])
             : [];
           const favoriteIdsSliced = favoriteIds.slice(0, 3);
 
-          if (favoriteIdsSliced.length > 0) {
+          // Filtrer les IDs valides (non null) pour la requête
+          const validIds = favoriteIdsSliced.filter((id): id is string => 
+            id !== null && id !== undefined && typeof id === 'string' && id.length > 0
+          );
+
+          if (validIds.length > 0) {
             const { data: restaurantsData } = await supabase
               .from("restaurants")
               .select("id, name, slug, logo_url")
-              .in("id", favoriteIdsSliced);
+              .in("id", validIds);
 
             if (restaurantsData) {
               const typedRestaurants = restaurantsData as RestaurantLite[];
-              const orderedFavorites = favoriteIdsSliced
-                .map((id: string) => typedRestaurants.find((r) => r.id === id))
-                .filter((r): r is RestaurantLite => Boolean(r));
+              // Créer un Map pour un accès rapide
+              const restaurantMap = new Map(typedRestaurants.map(r => [r.id, r]));
+              // Préserver les positions : mapper selon l'ordre original
+              const orderedFavorites: RestaurantLite[] = [];
+              favoriteIdsSliced.forEach((id) => {
+                if (id && typeof id === 'string' && restaurantMap.has(id)) {
+                  orderedFavorites.push(restaurantMap.get(id)!);
+                }
+              });
               setFavoriteRestaurants(orderedFavorites);
+            } else {
+              setFavoriteRestaurants([]);
             }
+          } else {
+            setFavoriteRestaurants([]);
           }
+        } else {
+          setFavoriteRestaurants([]);
         }
 
-        // Charger la dernière expérience
-        const { data: lastLog } = await supabase
+        // Charger toutes les expériences avec leurs images de plats
+        const { data: allLogs } = await supabase
           .from("fastfood_logs")
           .select("id, restaurant_id, restaurant_name, rating, comment, visited_at, created_at")
           .eq("user_id", userId)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
+          .order("created_at", { ascending: false });
 
-        if (lastLog) {
-          let restaurantLogoUrl: string | null = null;
-          if (lastLog.restaurant_id) {
-            const { data: restaurant } = await supabase
-              .from("restaurants")
-              .select("logo_url")
-              .eq("id", lastLog.restaurant_id)
-              .maybeSingle();
-            restaurantLogoUrl = restaurant?.logo_url || null;
-          }
+        if (allLogs && allLogs.length > 0) {
+          // Récupérer les logos et slugs des restaurants, et les images des plats depuis dish_ratings
+          const experiencesWithDetails: Experience[] = await Promise.all(
+            allLogs.map(async (log) => {
+              let restaurantLogoUrl: string | null = null;
+              let restaurantSlug: string | null = null;
+              let dishImageUrl: string | null = null;
 
-          setLastExperience({
-            id: lastLog.id,
-            restaurant_name: lastLog.restaurant_name || "Restaurant inconnu",
-            restaurant_logo_url: restaurantLogoUrl,
-            rating: lastLog.rating || 0,
-            comment: lastLog.comment,
-            visited_at: lastLog.visited_at,
-            created_at: lastLog.created_at,
-          });
+              if (log.restaurant_id) {
+                const { data: restaurant } = await supabase
+                  .from("restaurants")
+                  .select("logo_url, slug")
+                  .eq("id", log.restaurant_id)
+                  .maybeSingle();
+                restaurantLogoUrl = restaurant?.logo_url || null;
+                restaurantSlug = restaurant?.slug || null;
+              }
+
+              // Récupérer une image de plat depuis dish_ratings pour ce restaurant
+              if (log.restaurant_id) {
+                const { data: dishRatings } = await supabase
+                  .from("dish_ratings")
+                  .select("dish_id")
+                  .eq("user_id", userId)
+                  .eq("restaurant_id", log.restaurant_id)
+                  .limit(1);
+                
+                if (dishRatings && dishRatings.length > 0 && dishRatings[0].dish_id) {
+                  const { data: dish } = await supabase
+                    .from("dishes")
+                    .select("image_url")
+                    .eq("id", dishRatings[0].dish_id)
+                    .maybeSingle();
+                  dishImageUrl = dish?.image_url || null;
+                }
+              }
+
+              return {
+                id: log.id,
+                restaurant_id: log.restaurant_id,
+                restaurant_slug: restaurantSlug,
+                restaurant_name: log.restaurant_name || "Restaurant inconnu",
+                restaurant_logo_url: restaurantLogoUrl,
+                rating: log.rating || 0,
+                comment: log.comment,
+                visited_at: log.visited_at,
+                created_at: log.created_at,
+                dish_image_url: dishImageUrl,
+              };
+            })
+          );
+
+          setExperiences(experiencesWithDetails);
         }
 
       } catch (err) {
@@ -268,19 +321,20 @@ export default function ProfilePage() {
 
   return (
     <main className="min-h-screen w-full overflow-x-hidden bg-[#020617]">
-      <div className="mx-auto flex w-full max-w-xl flex-col gap-6 px-4 pb-28 pt-6">
+      <div className="mx-auto flex w-full max-w-xl flex-col px-4 pb-28 pt-6">
         {error && (
-          <div className="rounded-2xl bg-red-500/10 border border-red-500/40 px-3 py-2 text-sm text-red-300">
+          <div className="rounded-2xl bg-red-500/10 border border-red-500/40 px-3 py-2 text-sm text-red-300 mb-4">
             {error}
           </div>
         )}
 
-        {/* Header profil */}
-        <section className="flex items-start justify-between gap-3 rounded-xl p-4" style={{ borderColor: theme.accentSoft, backgroundColor: theme.accentSoft }}>
-          <div className="flex items-start gap-4 flex-1 min-w-0">
+        {/* Header profil style TikTok */}
+        <section className="px-4 pt-0 pb-6">
+          {/* Avatar centré en haut */}
+          <div className="flex justify-center mb-4">
             <div
-              className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-full border"
-              style={{ boxShadow: theme.glow, borderColor: theme.accentSoft }}
+              className="relative h-28 w-28 overflow-hidden rounded-full border-2 shadow-lg"
+              style={{ boxShadow: theme.glow, borderColor: theme.accent }}
             >
               <Image
                 src={theme.avatarSrc}
@@ -290,221 +344,185 @@ export default function ProfilePage() {
                 style={{ minWidth: '100%', minHeight: '100%' }}
               />
             </div>
-            <div className="flex flex-col min-w-0 flex-1 gap-1">
-              <span className="text-lg font-semibold break-words" style={{ color: theme.accent }}>
-                {displayName}
+          </div>
+
+          {/* Nom d'utilisateur centré en dessous de l'avatar */}
+          <div className="flex flex-col items-center mb-6">
+            {displayName && displayName !== usernameDisplay ? (
+              <>
+                <h1 className="text-base font-bold text-white mb-1.5">
+                  {displayName}
+                </h1>
+                {usernameDisplay && (
+                  <span className="text-sm text-slate-400 font-medium">
+                    @{usernameDisplay}
+                  </span>
+                )}
+              </>
+            ) : (
+              <h1 className="text-base font-bold text-white">
+                {usernameDisplay ? `@${usernameDisplay}` : user?.email ?? "Utilisateur BiteBox"}
+              </h1>
+            )}
+            {profile?.bio && profile.bio.trim().length > 0 && (
+              <p className="text-sm text-slate-300 mt-3 leading-relaxed text-center max-w-sm px-4">
+                {profile.bio}
+              </p>
+            )}
+          </div>
+
+          {/* Stats alignées en dessous avec séparateurs */}
+          <div className="flex justify-center gap-6 mb-6 px-4">
+            <div className="flex flex-col items-center flex-1">
+              <span className="text-xl font-bold text-white mb-0.5">
+                {stats.totalExperiences}
               </span>
-              {usernameDisplay && (
-                <span className="text-xs text-slate-400 break-words">
-                  @{usernameDisplay}
-                </span>
-              )}
-              {!usernameDisplay && user?.email && (
-                <span className="text-xs text-slate-400 break-words">
-                  {user.email}
-                </span>
-              )}
-              {profile?.bio && profile.bio.trim().length > 0 && (
-                <p className="text-sm text-slate-300 leading-relaxed line-clamp-3 break-words mt-1">
-                  {profile.bio}
-                </p>
-              )}
+              <span className="text-xs text-slate-400 font-medium">
+                Expériences
+              </span>
+            </div>
+            <div className="h-12 w-px bg-white/10"></div>
+            <div className="flex flex-col items-center flex-1">
+              <span className="text-xl font-bold text-white mb-0.5">
+                {stats.restaurantsCount}
+              </span>
+              <span className="text-xs text-slate-400 font-medium">
+                Restos
+              </span>
+            </div>
+            <div className="h-12 w-px bg-white/10"></div>
+            <div className="flex flex-col items-center flex-1">
+              <span className="text-xl font-bold text-white mb-0.5">
+                {stats.avgRating.toFixed(1)}
+              </span>
+              <span className="text-xs text-slate-400 font-medium">
+                Note moy.
+              </span>
             </div>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
+
+          {/* Boutons d'action */}
+          <div className="space-y-3 px-4">
             <button
               onClick={handleStartEdit}
-              className="flex h-10 w-10 items-center justify-center rounded-full transition-all flex-shrink-0 border"
-              style={{ borderColor: theme.accentSoft, backgroundColor: theme.accentSoft }}
-              aria-label="Modifier le profil"
+              className="w-full rounded-xl border-2 px-4 py-3 text-sm font-semibold transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg"
+              style={{ 
+                borderColor: theme.accentSoft, 
+                backgroundColor: theme.accentSoft, 
+                color: theme.accent,
+                boxShadow: `0 4px 12px ${theme.accentSoft}40`
+              }}
             >
-              <svg
-                className="w-5 h-5"
-                style={{ color: theme.accent }}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                />
-              </svg>
+              Modifier le profil
             </button>
             <button
               onClick={() => router.push("/settings")}
-              className="flex h-10 w-10 items-center justify-center rounded-full transition-all flex-shrink-0 border"
-              style={{ borderColor: theme.accentSoft, backgroundColor: theme.accentSoft }}
-              aria-label="Paramètres"
+              className="w-full rounded-xl border-2 px-4 py-3 text-sm font-semibold transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg"
+              style={{ 
+                borderColor: theme.accentSoft, 
+                backgroundColor: theme.accentSoft, 
+                color: theme.accent,
+                boxShadow: `0 4px 12px ${theme.accentSoft}40`
+              }}
             >
-              <svg
-                className="w-5 h-5"
-                style={{ color: theme.accent }}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                />
-              </svg>
+              Paramètres
             </button>
           </div>
         </section>
 
-        {/* Stats rapides (mini) */}
-        <section className="grid grid-cols-3 gap-3 rounded-xl bg-[#0F0F1A] border shadow-md shadow-black/20 px-4 py-4" style={{ borderColor: theme.accentSoft, boxShadow: theme.ring }}>
-          <div className="flex flex-col items-center">
-            <span className="text-lg font-semibold text-white">
-              {stats.restaurantsCount}
-            </span>
-            <span className="text-[11px] text-slate-400 text-center">
-              Restos testés
-            </span>
-          </div>
-          <div className="flex flex-col items-center">
-            <span className="text-lg font-semibold text-white">
-              {stats.totalExperiences}
-            </span>
-            <span className="text-[11px] text-slate-400 text-center">
-              Expériences
-            </span>
-          </div>
-          <div className="flex flex-col items-center">
-            <span className="text-lg font-semibold text-white">
-              {stats.avgRating.toFixed(1)}
-            </span>
-            <span className="text-[11px] text-slate-400 text-center">
-              Note moyenne
-            </span>
+        {/* Mon podium BiteBox */}
+        <section className="px-4 py-4 border-t border-white/10">
+          <h2 className="text-sm font-semibold text-white mb-4">Mon podium BiteBox</h2>
+          <div className="flex items-center justify-between gap-3 w-full">
+            {/* Helper function pour obtenir le restaurant à une position donnée */}
+            {(() => {
+              const getRestaurantAtPosition = (position: number): RestaurantLite | null => {
+                if (!profile?.favorite_restaurant_ids) return null;
+                const ids = Array.isArray(profile.favorite_restaurant_ids) ? profile.favorite_restaurant_ids : [];
+                const idAtPosition = ids[position];
+                if (!idAtPosition || typeof idAtPosition !== 'string') return null;
+                return favoriteRestaurants.find((r) => r.id === idAtPosition) || null;
+              };
+
+              const restaurant1 = getRestaurantAtPosition(0);
+              const restaurant2 = getRestaurantAtPosition(1);
+              const restaurant3 = getRestaurantAtPosition(2);
+
+              return (
+                <>
+                  {/* 2ème place */}
+                  <button
+                    onClick={handleStartEdit}
+                    className="flex flex-col items-center gap-1.5 flex-1 cursor-pointer hover:opacity-80 transition-opacity"
+                  >
+                    {restaurant2?.logo_url ? (
+                      <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border-2 border-slate-400/40">
+                        <Image
+                          src={restaurant2.logo_url}
+                          alt={restaurant2.name}
+                          fill
+                          className="object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-slate-700/50 flex items-center justify-center border-2 border-slate-400/40">
+                        <span className="text-xs text-slate-400">+</span>
+                      </div>
+                    )}
+                    <span className="text-xs text-slate-400 font-medium">#2</span>
+                  </button>
+                  
+                  {/* 1ère place - Plus grande */}
+                  <button
+                    onClick={handleStartEdit}
+                    className="flex flex-col items-center gap-1.5 flex-1 cursor-pointer hover:opacity-80 transition-opacity"
+                  >
+                    {restaurant1?.logo_url ? (
+                      <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden border-2 border-yellow-500/60">
+                        <Image
+                          src={restaurant1.logo_url}
+                          alt={restaurant1.name}
+                          fill
+                          className="object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-slate-700/50 flex items-center justify-center border-2 border-yellow-500/60">
+                        <span className="text-sm text-slate-400">+</span>
+                      </div>
+                    )}
+                    <span className="text-xs text-yellow-500/80 font-medium">#1</span>
+                  </button>
+                  
+                  {/* 3ème place */}
+                  <button
+                    onClick={handleStartEdit}
+                    className="flex flex-col items-center gap-1.5 flex-1 cursor-pointer hover:opacity-80 transition-opacity"
+                  >
+                    {restaurant3?.logo_url ? (
+                      <div className="relative w-[72px] h-[72px] sm:w-20 sm:h-20 rounded-full overflow-hidden border-2 border-amber-600/50">
+                        <Image
+                          src={restaurant3.logo_url}
+                          alt={restaurant3.name}
+                          fill
+                          className="object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-[72px] h-[72px] sm:w-20 sm:h-20 rounded-full bg-slate-700/50 flex items-center justify-center border-2 border-amber-600/50">
+                        <span className="text-[10px] text-slate-400">+</span>
+                      </div>
+                    )}
+                    <span className="text-xs text-amber-600/70 font-medium">#3</span>
+                  </button>
+                </>
+              );
+            })()}
           </div>
         </section>
 
-        {/* Lien vers Expérience pour les stats complètes */}
-        <Link
-          href="/experience"
-          className="flex items-center justify-between rounded-xl bg-[#0F0F1A] border border-white/5 p-3 hover:bg-[#151520] transition-colors"
-        >
-          <span className="text-sm text-slate-400">Voir toutes mes expériences</span>
-          <svg
-            className="w-4 h-4 text-slate-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9 5l7 7-7 7"
-            />
-          </svg>
-        </Link>
-
-        {/* 3 enseignes favorites */}
-        <section className="space-y-3 rounded-xl p-3 border" style={{ borderColor: theme.accentSoft }}>
-          <h2 className="text-lg font-bold text-white">
-            3 enseignes favorites
-          </h2>
-          {favoriteRestaurants.length > 0 ? (
-            <div className="grid grid-cols-3 gap-3">
-              {favoriteRestaurants.map((restaurant) => (
-                <Link
-                  key={restaurant.id}
-                  href={restaurant.slug ? `/restaurants/${restaurant.slug}` : `#`}
-                  className="flex flex-col items-center gap-2 rounded-xl bg-[#0F0F1A] border border-white/5 p-3 hover:bg-[#151520] transition-colors"
-                >
-                  {restaurant.logo_url ? (
-                    <div className="relative h-12 w-12 rounded overflow-hidden">
-                      <Image
-                        src={restaurant.logo_url}
-                        alt={restaurant.name}
-                        fill
-                        className="object-cover"
-                      />
-                    </div>
-                  ) : (
-                    <div className="h-12 w-12 rounded bg-slate-700/50 flex items-center justify-center">
-                      <span className="text-xs text-slate-400">?</span>
-                    </div>
-                  )}
-                  <span className="text-xs text-white text-center truncate w-full">
-                    {restaurant.name}
-                  </span>
-                </Link>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-slate-400">
-              Aucune enseigne favorite définie.
-            </p>
-          )}
-        </section>
-
-        {/* Dernière expérience */}
-        {lastExperience && (
-          <section className="space-y-3">
-            <h2 className="text-lg font-bold text-white">
-              Dernière expérience
-            </h2>
-            <div className="rounded-xl bg-[#0F0F1A] border p-4" style={{ borderColor: theme.accentSoft, boxShadow: theme.ring }}>
-              <div className="flex items-start gap-3">
-                {lastExperience.restaurant_logo_url && (
-                  <div className="relative h-12 w-12 flex-shrink-0 rounded overflow-hidden">
-                    <Image
-                      src={lastExperience.restaurant_logo_url}
-                      alt={lastExperience.restaurant_name}
-                      fill
-                      className="object-cover"
-                    />
-                  </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2 mb-1">
-                    <h3 className="text-base font-semibold text-white truncate">
-                      {lastExperience.restaurant_name}
-                    </h3>
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      {[...Array(5)].map((_, i) => (
-                        <svg
-                          key={i}
-                          className={`w-4 h-4 ${
-                            i < lastExperience.rating
-                              ? "text-yellow-400 fill-yellow-400"
-                              : "text-slate-600"
-                          }`}
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                        </svg>
-                      ))}
-                    </div>
-                  </div>
-                  <p className="text-xs text-slate-400 mb-2">
-                    {formatDate(lastExperience.visited_at || lastExperience.created_at)}
-                  </p>
-                  {lastExperience.comment && (
-                    <p className="text-sm text-slate-300">
-                      {truncateComment(lastExperience.comment)}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </section>
-        )}
+        {/* Grille d'expériences style Instagram */}
+        <ExperienceGrid experiences={experiences} title="Mes dernières expériences" />
       </div>
 
       {/* Modal d'édition du profil */}
@@ -515,8 +533,39 @@ export default function ProfilePage() {
         onSave={() => {
           // Le profil est déjà mis à jour via le contexte par EditProfileModal
           // Le useEffect dépend de profile, donc il se déclenchera automatiquement
-          // On recharge les stats et la dernière expérience car profile a changé
+          // On recharge les stats, les favoris et les expériences car profile a changé
           console.log("[Profile] onSave callback called, profile updated via context");
+          // Recharger les données pour mettre à jour les favoris
+          if (user) {
+            const loadFavorites = async () => {
+              if (profile?.favorite_restaurant_ids && profile.favorite_restaurant_ids.length > 0) {
+                const favoriteIds: string[] = Array.isArray(profile.favorite_restaurant_ids)
+                  ? (profile.favorite_restaurant_ids as string[])
+                  : [];
+                const favoriteIdsSliced = favoriteIds.slice(0, 3);
+
+                if (favoriteIdsSliced.length > 0) {
+                  const { data: restaurantsData } = await supabase
+                    .from("restaurants")
+                    .select("id, name, slug, logo_url")
+                    .in("id", favoriteIdsSliced);
+
+                  if (restaurantsData) {
+                    const typedRestaurants = restaurantsData as RestaurantLite[];
+                    const orderedFavorites = favoriteIdsSliced
+                      .map((id: string) => typedRestaurants.find((r) => r.id === id))
+                      .filter((r): r is RestaurantLite => Boolean(r));
+                    setFavoriteRestaurants(orderedFavorites);
+                  }
+                } else {
+                  setFavoriteRestaurants([]);
+                }
+              } else {
+                setFavoriteRestaurants([]);
+              }
+            };
+            loadFavorites();
+          }
         }}
       />
     </main>

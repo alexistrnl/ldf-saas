@@ -4,6 +4,7 @@ import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
 import { getAvatarThemeFromVariant } from "@/lib/avatarTheme";
 import { UserProfile } from "@/lib/profile";
+import ExperienceGrid from "@/components/ExperienceGrid";
 
 // Désactiver le cache pour cette page (données toujours fraîches)
 export const dynamic = "force-dynamic";
@@ -22,6 +23,19 @@ type RestaurantLite = {
   logo_url: string | null;
 };
 
+type Experience = {
+  id: string;
+  restaurant_id: string | null;
+  restaurant_slug: string | null;
+  restaurant_name: string;
+  restaurant_logo_url: string | null;
+  rating: number;
+  comment: string | null;
+  visited_at: string | null;
+  created_at: string;
+  dish_image_url: string | null;
+};
+
 type PublicProfileData = {
   profile: UserProfile;
   stats: {
@@ -30,6 +44,7 @@ type PublicProfileData = {
     avgRating: number;
   };
   favoriteRestaurants: Array<RestaurantLite>;
+  experiences: Array<Experience>;
   lastExperience: {
     id: string;
     restaurant_name: string;
@@ -149,18 +164,73 @@ async function getPublicProfile(username: string): Promise<PublicProfileData | n
     // Si restaurantsData est vide, favoriteRestaurants reste [] (pas d'erreur)
   }
 
-  // 4. Récupérer la dernière expérience
-  const { data: lastLog, error: lastLogError } = await supabase
+  // 4. Charger toutes les expériences avec leurs images de plats
+  const { data: allLogs } = await supabase
     .from("fastfood_logs")
     .select("id, restaurant_id, restaurant_name, rating, comment, visited_at, created_at")
     .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .order("created_at", { ascending: false });
 
+  let experiences: PublicProfileData["experiences"] = [];
+
+  if (allLogs && allLogs.length > 0) {
+    // Récupérer les logos et slugs des restaurants, et les images des plats depuis dish_ratings
+    experiences = await Promise.all(
+      allLogs.map(async (log) => {
+        let restaurantLogoUrl: string | null = null;
+        let restaurantSlug: string | null = null;
+        let dishImageUrl: string | null = null;
+
+        if (log.restaurant_id) {
+          const { data: restaurant } = await supabase
+            .from("restaurants")
+            .select("logo_url, slug")
+            .eq("id", log.restaurant_id)
+            .maybeSingle();
+          restaurantLogoUrl = restaurant?.logo_url || null;
+          restaurantSlug = restaurant?.slug || null;
+        }
+
+        // Récupérer une image de plat depuis dish_ratings pour ce restaurant
+        if (log.restaurant_id) {
+          const { data: dishRatings } = await supabase
+            .from("dish_ratings")
+            .select("dish_id")
+            .eq("user_id", userId)
+            .eq("restaurant_id", log.restaurant_id)
+            .limit(1);
+          
+          if (dishRatings && dishRatings.length > 0 && dishRatings[0].dish_id) {
+            const { data: dish } = await supabase
+              .from("dishes")
+              .select("image_url")
+              .eq("id", dishRatings[0].dish_id)
+              .maybeSingle();
+            dishImageUrl = dish?.image_url || null;
+          }
+        }
+
+        return {
+          id: log.id,
+          restaurant_id: log.restaurant_id,
+          restaurant_slug: restaurantSlug,
+          restaurant_name: log.restaurant_name || "Restaurant inconnu",
+          restaurant_logo_url: restaurantLogoUrl,
+          rating: log.rating || 0,
+          comment: log.comment,
+          visited_at: log.visited_at,
+          created_at: log.created_at,
+          dish_image_url: dishImageUrl,
+        };
+      })
+    );
+  }
+
+  // 5. Récupérer la dernière expérience
+  const lastLog = allLogs && allLogs.length > 0 ? allLogs[0] : null;
   let lastExperience: PublicProfileData["lastExperience"] = null;
 
-  if (lastLog && !lastLogError) {
+  if (lastLog) {
     // Récupérer le logo du restaurant si restaurant_id existe
     let restaurantLogoUrl: string | null = null;
     if (lastLog.restaurant_id) {
@@ -191,6 +261,7 @@ async function getPublicProfile(username: string): Promise<PublicProfileData | n
       avgRating,
     },
     favoriteRestaurants,
+    experiences,
     lastExperience,
   };
 }
@@ -222,7 +293,7 @@ export default async function PublicProfilePage({
     notFound();
   }
 
-  const { profile, stats, favoriteRestaurants, lastExperience } = data;
+  const { profile, stats, favoriteRestaurants, experiences, lastExperience } = data;
   
   // Utiliser avatar_variant comme source de vérité unique
   // Log pour debug
@@ -232,166 +303,180 @@ export default async function PublicProfilePage({
 
   return (
     <main className="min-h-screen w-full overflow-x-hidden bg-[#020617]">
-      <div className="mx-auto flex w-full max-w-xl flex-col gap-6 px-4 pb-28 pt-6">
-        {/* Header profil */}
-        <section className="flex items-start gap-4 rounded-xl p-4 border" style={{ borderColor: theme.accentSoft, backgroundColor: theme.accentSoft }}>
-          <div
-            className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-full border"
-            style={{ boxShadow: theme.glow, borderColor: theme.accentSoft }}
-          >
-            <Image
-              src={theme.avatarSrc}
-              alt={profile.username || "Avatar"}
-              fill
-              className="object-cover object-center scale-150"
-              style={{ minWidth: '100%', minHeight: '100%' }}
-            />
+      <div className="mx-auto flex w-full max-w-xl flex-col px-4 pb-28 pt-6">
+        {/* Header profil style TikTok */}
+        <section className="px-4 pt-0 pb-6">
+          {/* Avatar centré en haut */}
+          <div className="flex justify-center mb-4">
+            <div
+              className="relative h-28 w-28 overflow-hidden rounded-full border-2 shadow-lg"
+              style={{ boxShadow: theme.glow, borderColor: theme.accent }}
+            >
+              <Image
+                src={theme.avatarSrc}
+                alt={profile.username || "Avatar"}
+                fill
+                className="object-cover object-center scale-150"
+                style={{ minWidth: '100%', minHeight: '100%' }}
+              />
+            </div>
           </div>
-          <div className="flex flex-col min-w-0 flex-1 gap-1">
+
+          {/* Nom d'utilisateur centré en dessous de l'avatar */}
+          <div className="flex flex-col items-center mb-6">
             {profile.display_name && profile.display_name.trim().length > 0 ? (
               <>
-                <h1 className="text-lg font-semibold break-words" style={{ color: theme.accent }}>
+                <h1 className="text-base font-bold text-white mb-1.5">
                   {profile.display_name}
                 </h1>
-                <span className="text-xs text-slate-400 break-words">
+                <span className="text-sm text-slate-400 font-medium">
                   @{profile.username}
                 </span>
               </>
             ) : (
-              <h1 className="text-lg font-semibold break-words" style={{ color: theme.accent }}>
+              <h1 className="text-base font-bold text-white">
                 @{profile.username}
               </h1>
             )}
             {profile.bio && profile.bio.trim().length > 0 && (
-              <p className="text-sm text-slate-300 leading-relaxed line-clamp-3 break-words mt-1">
+              <p className="text-sm text-slate-300 mt-3 leading-relaxed text-center max-w-sm px-4">
                 {profile.bio}
               </p>
             )}
           </div>
-        </section>
 
-        {/* Stats rapides */}
-        <section className="grid grid-cols-3 gap-3 rounded-xl bg-[#0F0F1A] border shadow-md shadow-black/20 px-4 py-4" style={{ borderColor: theme.accentSoft, boxShadow: theme.ring }}>
-          <div className="flex flex-col items-center">
-            <span className="text-lg font-semibold text-white">
-              {stats.restaurantsCount}
-            </span>
-            <span className="text-[11px] text-slate-400 text-center">
-              Restos testés
-            </span>
-          </div>
-          <div className="flex flex-col items-center">
-            <span className="text-lg font-semibold text-white">
-              {stats.totalExperiences}
-            </span>
-            <span className="text-[11px] text-slate-400 text-center">
-              Expériences
-            </span>
-          </div>
-          <div className="flex flex-col items-center">
-            <span className="text-lg font-semibold text-white">
-              {stats.avgRating.toFixed(1)}
-            </span>
-            <span className="text-[11px] text-slate-400 text-center">
-              Note moyenne
-            </span>
-          </div>
-        </section>
-
-        {/* 3 enseignes favorites */}
-        <section className="space-y-3 rounded-xl p-3 border" style={{ borderColor: theme.accentSoft }}>
-          <h2 className="text-lg font-bold text-white">
-            3 enseignes favorites
-          </h2>
-          {favoriteRestaurants.length > 0 ? (
-            <div className="grid grid-cols-3 gap-3">
-              {favoriteRestaurants.map((restaurant) => (
-                <Link
-                  key={restaurant.id}
-                  href={restaurant.slug ? `/restaurants/${restaurant.slug}` : `#`}
-                  className="flex flex-col items-center gap-2 rounded-xl bg-[#0F0F1A] border p-3 hover:bg-[#151520] transition-colors"
-                  style={{ borderColor: theme.accentSoft }}
-                >
-                  {restaurant.logo_url ? (
-                    <div className="relative h-12 w-12 rounded overflow-hidden">
-                      <Image
-                        src={restaurant.logo_url}
-                        alt={restaurant.name}
-                        fill
-                        className="object-cover"
-                      />
-                    </div>
-                  ) : (
-                    <div className="h-12 w-12 rounded bg-slate-700/50 flex items-center justify-center">
-                      <span className="text-xs text-slate-400">?</span>
-                    </div>
-                  )}
-                  <span className="text-xs text-white text-center truncate w-full">
-                    {restaurant.name}
-                  </span>
-                </Link>
-              ))}
+          {/* Stats alignées en dessous avec séparateurs */}
+          <div className="flex justify-center gap-6 mb-6 px-4">
+            <div className="flex flex-col items-center flex-1">
+              <span className="text-xl font-bold text-white mb-0.5">
+                {stats.totalExperiences}
+              </span>
+              <span className="text-xs text-slate-400 font-medium">
+                Expériences
+              </span>
             </div>
-          ) : (
-            <p className="text-sm text-slate-400">
-              Aucune enseigne favorite définie.
-            </p>
-          )}
+            <div className="h-12 w-px bg-white/10"></div>
+            <div className="flex flex-col items-center flex-1">
+              <span className="text-xl font-bold text-white mb-0.5">
+                {stats.restaurantsCount}
+              </span>
+              <span className="text-xs text-slate-400 font-medium">
+                Restos
+              </span>
+            </div>
+            <div className="h-12 w-px bg-white/10"></div>
+            <div className="flex flex-col items-center flex-1">
+              <span className="text-xl font-bold text-white mb-0.5">
+                {stats.avgRating.toFixed(1)}
+              </span>
+              <span className="text-xs text-slate-400 font-medium">
+                Note moy.
+              </span>
+            </div>
+          </div>
         </section>
 
-        {/* Dernière expérience */}
-        {lastExperience && (
-          <section className="space-y-3">
-            <h2 className="text-lg font-bold text-white">
-              Dernière expérience
-            </h2>
-            <div className="rounded-xl bg-[#0F0F1A] border p-4" style={{ borderColor: theme.accentSoft, boxShadow: theme.ring }}>
-              <div className="flex items-start gap-3">
-                {lastExperience.restaurant_logo_url && (
-                  <div className="relative h-12 w-12 flex-shrink-0 rounded overflow-hidden">
+        {/* Son podium BiteBox */}
+        <section className="px-4 py-4 border-t border-white/10">
+          <h2 className="text-sm font-semibold text-white mb-4">Son podium BiteBox</h2>
+          <div className="flex items-center justify-between gap-3 w-full">
+            {/* 2ème place */}
+            {favoriteRestaurants[1] ? (
+              <Link
+                href={favoriteRestaurants[1].slug ? `/restaurants/${favoriteRestaurants[1].slug}` : '#'}
+                className="flex flex-col items-center gap-1.5 flex-1"
+              >
+                {favoriteRestaurants[1].logo_url ? (
+                  <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border-2 border-slate-400/40">
                     <Image
-                      src={lastExperience.restaurant_logo_url}
-                      alt={lastExperience.restaurant_name}
+                      src={favoriteRestaurants[1].logo_url}
+                      alt={favoriteRestaurants[1].name}
                       fill
                       className="object-cover"
                     />
                   </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2 mb-1">
-                    <h3 className="text-base font-semibold text-white truncate">
-                      {lastExperience.restaurant_name}
-                    </h3>
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      {[...Array(5)].map((_, i) => (
-                        <svg
-                          key={i}
-                          className={`w-4 h-4 ${
-                            i < lastExperience.rating
-                              ? "text-yellow-400 fill-yellow-400"
-                              : "text-slate-600"
-                          }`}
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                        </svg>
-                      ))}
-                    </div>
+                ) : (
+                  <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-slate-700/50 flex items-center justify-center border-2 border-slate-400/40">
+                    <span className="text-xs text-slate-400">?</span>
                   </div>
-                  <p className="text-xs text-slate-400 mb-2">
-                    {formatDate(lastExperience.visited_at || lastExperience.created_at)}
-                  </p>
-                  {lastExperience.comment && (
-                    <p className="text-sm text-slate-300">
-                      {truncateComment(lastExperience.comment)}
-                    </p>
-                  )}
+                )}
+                <span className="text-xs text-slate-400 font-medium">#2</span>
+              </Link>
+            ) : (
+              <div className="flex flex-col items-center gap-1.5 flex-1">
+                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-slate-700/50 flex items-center justify-center border-2 border-slate-400/40">
+                  <span className="text-xs text-slate-400">+</span>
                 </div>
+                <span className="text-xs text-slate-400 font-medium">#2</span>
               </div>
-            </div>
-          </section>
-        )}
+            )}
+            
+            {/* 1ère place - Plus grande */}
+            {favoriteRestaurants[0] ? (
+              <Link
+                href={favoriteRestaurants[0].slug ? `/restaurants/${favoriteRestaurants[0].slug}` : '#'}
+                className="flex flex-col items-center gap-1.5 flex-1"
+              >
+                {favoriteRestaurants[0].logo_url ? (
+                  <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden border-2 border-yellow-500/60">
+                    <Image
+                      src={favoriteRestaurants[0].logo_url}
+                      alt={favoriteRestaurants[0].name}
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-slate-700/50 flex items-center justify-center border-2 border-yellow-500/60">
+                    <span className="text-sm text-slate-400">?</span>
+                  </div>
+                )}
+                <span className="text-xs text-yellow-500/80 font-medium">#1</span>
+              </Link>
+            ) : (
+              <div className="flex flex-col items-center gap-1.5 flex-1">
+                <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-slate-700/50 flex items-center justify-center border-2 border-yellow-500/60">
+                  <span className="text-sm text-slate-400">+</span>
+                </div>
+                <span className="text-xs text-yellow-500/80 font-medium">#1</span>
+              </div>
+            )}
+            
+            {/* 3ème place */}
+            {favoriteRestaurants[2] ? (
+              <Link
+                href={favoriteRestaurants[2].slug ? `/restaurants/${favoriteRestaurants[2].slug}` : '#'}
+                className="flex flex-col items-center gap-1.5 flex-1"
+              >
+                {favoriteRestaurants[2].logo_url ? (
+                  <div className="relative w-[72px] h-[72px] sm:w-20 sm:h-20 rounded-full overflow-hidden border-2 border-amber-600/50">
+                    <Image
+                      src={favoriteRestaurants[2].logo_url}
+                      alt={favoriteRestaurants[2].name}
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div className="w-[72px] h-[72px] sm:w-20 sm:h-20 rounded-full bg-slate-700/50 flex items-center justify-center border-2 border-amber-600/50">
+                    <span className="text-[10px] text-slate-400">?</span>
+                  </div>
+                )}
+                <span className="text-xs text-amber-600/70 font-medium">#3</span>
+              </Link>
+            ) : (
+              <div className="flex flex-col items-center gap-1.5 flex-1">
+                <div className="w-[72px] h-[72px] sm:w-20 sm:h-20 rounded-full bg-slate-700/50 flex items-center justify-center border-2 border-amber-600/50">
+                  <span className="text-[10px] text-slate-400">+</span>
+                </div>
+                <span className="text-xs text-amber-600/70 font-medium">#3</span>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Grille d'expériences style Instagram */}
+        <ExperienceGrid experiences={experiences} title="Ses dernières expériences" />
       </div>
     </main>
   );

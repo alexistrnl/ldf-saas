@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
-import { UserProfile, updateProfile, sanitizeUsername, validateUsernameFormat } from "@/lib/profile";
+import { UserProfile, updateProfile, updateSocialSettings, sanitizeUsername, validateUsernameFormat } from "@/lib/profile";
 import { useProfile } from "@/context/ProfileContext";
 import { AvatarVariant } from "@/lib/avatarTheme";
 import Spinner from "@/components/Spinner";
@@ -53,7 +53,7 @@ export default function EditProfileModal({
   const [username, setUsername] = useState("");
   const [bio, setBio] = useState("");
   const [isPublic, setIsPublic] = useState(false);
-  const [favoriteRestaurantIds, setFavoriteRestaurantIds] = useState<string[]>([]);
+  const [favoriteRestaurantIds, setFavoriteRestaurantIds] = useState<(string | null)[]>([]);
 
   // Données pour les favoris
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
@@ -74,7 +74,27 @@ export default function EditProfileModal({
       setUsername(profile.username || "");
       setBio(profile.bio || "");
       setIsPublic(profile.is_public ?? false);
-      setFavoriteRestaurantIds(profile.favorite_restaurant_ids || []);
+      // Convertir le tableau d'IDs en tableau de 3 positions (avec null pour les places vides)
+      const existingIds = profile.favorite_restaurant_ids || [];
+      const favoritesWithPositions: (string | null)[] = [null, null, null];
+      
+      // Si c'est un tableau avec des null (nouveau format), l'utiliser directement
+      if (Array.isArray(existingIds) && existingIds.length > 0 && (existingIds[0] === null || typeof existingIds[0] === 'string')) {
+        existingIds.forEach((id, idx) => {
+          if (idx < 3) {
+            favoritesWithPositions[idx] = (id && typeof id === 'string') ? id : null;
+          }
+        });
+      } else {
+        // Ancien format : tableau simple d'IDs, les mapper dans l'ordre
+        existingIds.forEach((id, idx) => {
+          if (idx < 3 && id && typeof id === 'string') {
+            favoritesWithPositions[idx] = id;
+          }
+        });
+      }
+      
+      setFavoriteRestaurantIds(favoritesWithPositions);
       setError(null);
     }
   }, [profile, isOpen]);
@@ -129,26 +149,31 @@ export default function EditProfileModal({
   };
 
   const handleFavoriteRestaurantChange = (index: number, restaurantId: string | null) => {
-    const newFavorites = [...favoriteRestaurantIds];
+    // Créer un tableau de 3 éléments pour représenter les 3 places
+    const newFavorites: (string | null)[] = [null, null, null];
+    
+    // Copier les favoris existants dans leurs positions respectives
+    favoriteRestaurantIds.forEach((id, idx) => {
+      if (idx < 3) {
+        newFavorites[idx] = id;
+      }
+    });
 
     if (restaurantId) {
       // Retirer le restaurant s'il est déjà sélectionné ailleurs
       const existingIndex = newFavorites.findIndex((id) => id === restaurantId);
       if (existingIndex !== -1 && existingIndex !== index) {
-        newFavorites.splice(existingIndex, 1);
+        newFavorites[existingIndex] = null;
       }
 
-      if (index < newFavorites.length) {
-        newFavorites[index] = restaurantId;
-      } else {
-        if (newFavorites.length < 3) {
-          newFavorites.push(restaurantId);
-        }
-      }
+      // Mettre à jour la place spécifique (même si les places supérieures sont vides)
+      newFavorites[index] = restaurantId;
     } else {
-      newFavorites.splice(index, 1);
+      // Désélectionner cette place
+      newFavorites[index] = null;
     }
 
+    // Garder le tableau avec les positions (y compris les null)
     setFavoriteRestaurantIds(newFavorites);
     setError(null);
   };
@@ -206,11 +231,26 @@ export default function EditProfileModal({
         return;
       }
 
-      // Succès : utiliser directement le profil retourné par updateProfile (source de vérité)
-      if (updatedProfile) {
-        console.log("[EditProfileModal] Profile saved successfully, updating context with:", updatedProfile);
-        console.log("[EditProfileModal] avatar_variant:", updatedProfile.avatar_variant, "display_name:", updatedProfile.display_name, "bio:", updatedProfile.bio);
-        setContextProfile(updatedProfile);
+      // Sauvegarder les favoris séparément
+      // Préserver les positions avec null pour les places vides
+      const idsToSave = favoriteRestaurantIds.slice(0, 3);
+      
+      const { profile: profileWithFavorites, error: favoritesError } = await updateSocialSettings({
+        favorite_restaurant_ids: idsToSave,
+      });
+
+      if (favoritesError) {
+        console.error("[EditProfileModal] Favorites save error", favoritesError);
+        // Ne pas bloquer si l'erreur vient des favoris, juste logger
+      }
+
+      // Utiliser le profil avec favoris si disponible, sinon celui sans favoris
+      const finalProfile = profileWithFavorites || updatedProfile;
+      
+      if (finalProfile) {
+        console.log("[EditProfileModal] Profile saved successfully, updating context with:", finalProfile);
+        console.log("[EditProfileModal] avatar_variant:", finalProfile.avatar_variant, "display_name:", finalProfile.display_name, "bio:", finalProfile.bio, "favorites:", finalProfile.favorite_restaurant_ids);
+        setContextProfile(finalProfile);
       }
 
       // Rafraîchir la page pour s'assurer que tout est à jour
@@ -389,13 +429,25 @@ export default function EditProfileModal({
                   3 enseignes favorites
                 </label>
                 {[0, 1, 2].map((index) => {
-                  const selectedId = favoriteRestaurantIds[index] || null;
+                  const selectedId = (favoriteRestaurantIds[index] && typeof favoriteRestaurantIds[index] === 'string') 
+                    ? favoriteRestaurantIds[index] as string 
+                    : null;
                   const selectedRestaurant = selectedId
                     ? restaurants.find((r) => r.id === selectedId)
                     : null;
+                  
+                  const placeLabels = ["#1", "#2", "#3"];
+                  const placeColors = [
+                    "text-yellow-500/80",
+                    "text-slate-400",
+                    "text-amber-600/70"
+                  ];
 
                   return (
                     <div key={index} className="flex items-center gap-2">
+                      <span className={`text-xs font-medium w-8 flex-shrink-0 ${placeColors[index]}`}>
+                        {placeLabels[index]}
+                      </span>
                       <select
                         value={selectedId || ""}
                         onChange={(e) =>
@@ -409,7 +461,7 @@ export default function EditProfileModal({
                         </option>
                         {restaurants.map((restaurant) => {
                           const isSelectedElsewhere =
-                            favoriteRestaurantIds.includes(restaurant.id) &&
+                            favoriteRestaurantIds.some((id) => id === restaurant.id) &&
                             favoriteRestaurantIds[index] !== restaurant.id;
                           if (isSelectedElsewhere) return null;
 

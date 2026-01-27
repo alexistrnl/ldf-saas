@@ -455,7 +455,7 @@ export function validateUsernameFormat(username: string): { valid: boolean; erro
 export async function updateSocialSettings(data: {
   username?: string | null;
   is_public?: boolean;
-  favorite_restaurant_ids?: string[];
+  favorite_restaurant_ids?: (string | null)[];
 }): Promise<{ profile: UserProfile | null; error: any }> {
   console.log("[Profile] updateSocialSettings called with:", data);
 
@@ -473,7 +473,7 @@ export async function updateSocialSettings(data: {
   const updateData: {
     username?: string | null;
     is_public?: boolean;
-    favorite_restaurant_ids?: string[];
+    favorite_restaurant_ids?: (string | null)[];
   } = {};
 
   if (data.username !== undefined) {
@@ -484,9 +484,10 @@ export async function updateSocialSettings(data: {
   }
   if (data.favorite_restaurant_ids !== undefined) {
     // S'assurer que c'est un tableau valide (max 3 éléments)
+    // Préserver les positions avec null pour les places vides
     const ids = Array.isArray(data.favorite_restaurant_ids) 
       ? data.favorite_restaurant_ids.slice(0, 3) 
-      : [];
+      : [null, null, null];
     updateData.favorite_restaurant_ids = ids;
   }
 
