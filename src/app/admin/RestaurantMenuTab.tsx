@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { supabase } from "@/lib/supabaseClient";
 import { Restaurant, Dish, DishCategory } from "./types";
 import DishImage from "@/components/DishImage";
 
@@ -16,7 +16,6 @@ export default function RestaurantMenuTab({
   onError,
 }: RestaurantMenuTabProps) {
   const router = useRouter();
-  const supabase = createClientComponentClient();
   const [categories, setCategories] = useState<DishCategory[]>([]);
   const [dishes, setDishes] = useState<Dish[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
@@ -50,6 +49,7 @@ export default function RestaurantMenuTab({
   const [editDishImageUrl, setEditDishImageUrl] = useState("");
   const [editDishImagePreview, setEditDishImagePreview] = useState<string | null>(null);
   const [editDishImageError, setEditDishImageError] = useState<string | null>(null);
+  const [brokenImageUrls, setBrokenImageUrls] = useState<Set<string>>(new Set());
   const [editDishIsSignature, setEditDishIsSignature] = useState(false);
   const [editDishIsLimitedEdition, setEditDishIsLimitedEdition] = useState(false);
   const [editDishCategoryId, setEditDishCategoryId] = useState<string | null>(null);
@@ -1065,9 +1065,9 @@ export default function RestaurantMenuTab({
                 {dishImagePreview && (
                   <div className="mt-2">
                     <DishImage
-                      imageUrl={dishImagePreview}
+                      src={dishImagePreview}
                       alt="Aperçu"
-                      containerClassName="max-w-xs"
+                      className="max-w-xs"
                     />
                   </div>
                 )}
@@ -1175,9 +1175,9 @@ export default function RestaurantMenuTab({
                 {editDishImagePreview && (
                   <div className="mt-2">
                     <DishImage
-                      imageUrl={editDishImagePreview}
+                      src={editDishImagePreview}
                       alt="Aperçu"
-                      containerClassName="max-w-xs"
+                      className="max-w-xs"
                     />
                   </div>
                 )}
@@ -1267,18 +1267,37 @@ export default function RestaurantMenuTab({
                           key={dish.id}
                           className="flex items-center gap-3 p-3 bg-slate-950/70 rounded-lg border border-slate-800 hover:border-slate-700 transition"
                         >
-                          <DishImage
-                            imageUrl={dish.image_url}
-                            alt={dish.name}
-                            size="small"
-                            containerClassName="flex-shrink-0"
-                          />
+                          <div className="relative flex-shrink-0">
+                            <DishImage
+                              src={dish.image_url}
+                              alt={dish.name}
+                              size="small"
+                              className="flex-shrink-0"
+                              onImageError={(url) => {
+                                if (url) {
+                                  setBrokenImageUrls((prev) => new Set(prev).add(url));
+                                }
+                              }}
+                            />
+                            {((!dish.image_url || dish.image_url.trim() === "") || brokenImageUrls.has(dish.image_url || "")) && (
+                              <div className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center border-2 border-slate-950 z-10 shadow-lg">
+                                <span className="text-white text-xs font-bold">!</span>
+                              </div>
+                            )}
+                          </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-start justify-between gap-2">
                               <div className="flex-1 min-w-0">
-                                <h5 className="text-sm font-medium text-white truncate">
-                                  {dish.name}
-                                </h5>
+                                <div className="flex items-center gap-2">
+                                  <h5 className="text-sm font-medium text-white truncate">
+                                    {dish.name}
+                                  </h5>
+                                  {((!dish.image_url || dish.image_url.trim() === "") || brokenImageUrls.has(dish.image_url || "")) && (
+                                    <span className="text-xs text-red-400 font-semibold" title="Image manquante ou cassée - Ce plat ne sera pas affiché dans la carte">
+                                      ⚠️
+                                    </span>
+                                  )}
+                                </div>
                                 {dish.description && (
                                   <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">
                                     {dish.description}

@@ -7,7 +7,7 @@ import AdminPasswordGate from './AdminPasswordGate'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-export default async function AdminRestaurantsPage() {
+export default async function AdminPage() {
   // Le middleware gère déjà la protection de /admin/* et redirige vers /login si non authentifié
   // On vérifie quand même ici pour obtenir l'utilisateur si nécessaire
   const supabase = await createClient()
@@ -18,8 +18,9 @@ export default async function AdminRestaurantsPage() {
   const adminAccess = cookieStore.get('admin_access')
 
   // Si le cookie existe et vaut "ok", afficher le contenu admin
+  // Passer l'utilisateur en props pour éviter les problèmes de synchronisation
   if (adminAccess?.value === 'ok') {
-    return <AdminRestaurantsContent />
+    return <AdminRestaurantsContent initialUser={user} />
   }
 
   // Sinon, afficher le formulaire de mot de passe

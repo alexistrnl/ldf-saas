@@ -31,6 +31,8 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<'best-rating' | 'worst-rating' | 'alphabetical' | 'most-ratings' | 'least-ratings'>('best-rating');
+  const [showSortMenu, setShowSortMenu] = useState(false);
 
   useEffect(() => {
     const fetchRestaurants = async () => {
@@ -161,19 +163,57 @@ export default function HomePage() {
     fetchRestaurants();
   }, []);
 
-  // Filtrer les restaurants en fonction de la recherche
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setFilteredRestaurants(restaurants);
-      return;
+  // Fonction de tri
+  const sortRestaurants = (restaurantsToSort: RestaurantWithStats[]) => {
+    const sorted = [...restaurantsToSort];
+    
+    switch (sortBy) {
+      case 'best-rating':
+        return sorted.sort((a, b) => {
+          if (a.ratingStats.count === 0 && b.ratingStats.count === 0) return 0;
+          if (a.ratingStats.count === 0) return 1;
+          if (b.ratingStats.count === 0) return -1;
+          return b.ratingStats.avg - a.ratingStats.avg;
+        });
+      
+      case 'worst-rating':
+        return sorted.sort((a, b) => {
+          if (a.ratingStats.count === 0 && b.ratingStats.count === 0) return 0;
+          if (a.ratingStats.count === 0) return 1;
+          if (b.ratingStats.count === 0) return -1;
+          return a.ratingStats.avg - b.ratingStats.avg;
+        });
+      
+      case 'alphabetical':
+        return sorted.sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+      
+      case 'most-ratings':
+        return sorted.sort((a, b) => b.ratingStats.count - a.ratingStats.count);
+      
+      case 'least-ratings':
+        return sorted.sort((a, b) => a.ratingStats.count - b.ratingStats.count);
+      
+      default:
+        return sorted;
     }
+  };
 
-    const query = searchQuery.toLowerCase().trim();
-    const filtered = restaurants.filter((restaurant) =>
-      restaurant.name.toLowerCase().includes(query)
-    );
-    setFilteredRestaurants(filtered);
-  }, [searchQuery, restaurants]);
+  // Filtrer et trier les restaurants en fonction de la recherche et du tri
+  useEffect(() => {
+    let filtered = restaurants;
+    
+    // Filtrer par recherche
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = restaurants.filter((restaurant) =>
+        restaurant.name.toLowerCase().includes(query)
+      );
+    }
+    
+    // Trier les résultats
+    const sorted = sortRestaurants(filtered);
+    setFilteredRestaurants(sorted);
+  }, [searchQuery, restaurants, sortBy]);
 
   const getRestaurantUrl = (r: RestaurantWithStats) =>
     r.slug ? `/restaurants/${r.slug}` : `/restaurants/${r.id}`;
@@ -219,86 +259,90 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Enseignes du moment */}
-        {!loading && !searchQuery && trendingRestaurants.length > 0 && (
-          <section className="space-y-3">
-            <h2 className="text-lg font-semibold">Enseignes du moment</h2>
-            <p className="text-xs text-slate-400 mb-3">
-              Les enseignes les plus notées ces 3 derniers jours
-            </p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-              {trendingRestaurants.map((restaurant) => {
-                const isNew = isRestaurantNew(restaurant);
-                return (
-                <Link
-                  key={restaurant.id}
-                  href={getRestaurantUrl(restaurant)}
-                  className="group block bg-slate-900/80 rounded-2xl shadow-md hover:shadow-xl border border-slate-800/70 hover:border-bitebox/60 transition overflow-hidden flex flex-col relative"
-                >
-                  {isNew && (
-                    <div className="absolute top-2 right-2 z-10 rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-semibold text-white shadow-lg">
-                      NEW
-                    </div>
-                  )}
-                  <div className="w-full aspect-[4/3] overflow-hidden rounded-t-2xl bg-slate-950">
-                    {restaurant.logo_url ? (
-                      <img
-                        src={restaurant.logo_url}
-                        alt={restaurant.name}
-                        className="w-full h-full object-cover scale-110"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <span className="text-xs text-slate-500">
-                          Pas de logo
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="px-3 py-1.5 space-y-1">
-                    <p className="text-sm font-semibold truncate group-hover:text-bitebox-light">
-                      {restaurant.name}
-                    </p>
-                    <div className="mt-2 flex items-center justify-between text-xs text-slate-300">
-                      {restaurant.ratingStats.count === 0 ? (
-                        <span className="text-[11px] text-slate-500">Note : à venir</span>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <div className="flex">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                              <span
-                                key={star}
-                                className={
-                                  restaurant.ratingStats.avg >= star
-                                    ? "text-yellow-400"
-                                    : "text-slate-700"
-                                }
-                              >
-                                ★
-                              </span>
-                            ))}
-                          </div>
-                          <span className="text-[11px] text-slate-400">
-                            {restaurant.ratingStats.avg.toFixed(1)} / 5
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </Link>
-              );
-              })}
-            </div>
-          </section>
-        )}
-
         {/* Liste des enseignes */}
         <section className="space-y-3">
-          <h2 className="text-lg font-semibold">
-            {searchQuery
-              ? `Résultats de recherche${filteredRestaurants.length > 0 ? ` (${filteredRestaurants.length})` : ""}`
-              : "Tous les spots"}
-          </h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-medium text-slate-200">
+              {searchQuery
+                ? `Résultats de recherche${filteredRestaurants.length > 0 ? ` (${filteredRestaurants.length})` : ""}`
+                : "Tous les spots"}
+            </h2>
+            
+            {/* Icône de tri */}
+            <div className="relative">
+              <button
+                onClick={() => setShowSortMenu(!showSortMenu)}
+                className="p-2 rounded-lg hover:bg-slate-800 transition-colors"
+                aria-label="Options de tri"
+              >
+                <svg
+                  className="w-5 h-5 text-slate-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"
+                  />
+                </svg>
+              </button>
+              
+              {/* Menu déroulant de tri */}
+              {showSortMenu && (
+                <>
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setShowSortMenu(false)}
+                  />
+                  <div className="absolute right-0 top-full mt-2 w-48 bg-slate-900 border border-slate-700 rounded-lg shadow-lg z-20 overflow-hidden">
+                    <button
+                      onClick={() => { setSortBy('best-rating'); setShowSortMenu(false); }}
+                      className={`w-full text-left px-4 py-2 text-sm hover:bg-slate-800 transition-colors ${
+                        sortBy === 'best-rating' ? 'text-bitebox bg-slate-800' : 'text-white'
+                      }`}
+                    >
+                      Meilleure note
+                    </button>
+                    <button
+                      onClick={() => { setSortBy('worst-rating'); setShowSortMenu(false); }}
+                      className={`w-full text-left px-4 py-2 text-sm hover:bg-slate-800 transition-colors ${
+                        sortBy === 'worst-rating' ? 'text-bitebox bg-slate-800' : 'text-white'
+                      }`}
+                    >
+                      Moins bonne note
+                    </button>
+                    <button
+                      onClick={() => { setSortBy('alphabetical'); setShowSortMenu(false); }}
+                      className={`w-full text-left px-4 py-2 text-sm hover:bg-slate-800 transition-colors ${
+                        sortBy === 'alphabetical' ? 'text-bitebox bg-slate-800' : 'text-white'
+                      }`}
+                    >
+                      Ordre alphabétique
+                    </button>
+                    <button
+                      onClick={() => { setSortBy('most-ratings'); setShowSortMenu(false); }}
+                      className={`w-full text-left px-4 py-2 text-sm hover:bg-slate-800 transition-colors ${
+                        sortBy === 'most-ratings' ? 'text-bitebox bg-slate-800' : 'text-white'
+                      }`}
+                    >
+                      Plus de notes
+                    </button>
+                    <button
+                      onClick={() => { setSortBy('least-ratings'); setShowSortMenu(false); }}
+                      className={`w-full text-left px-4 py-2 text-sm hover:bg-slate-800 transition-colors ${
+                        sortBy === 'least-ratings' ? 'text-bitebox bg-slate-800' : 'text-white'
+                      }`}
+                    >
+                      Moins de notes
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
 
           {loading ? (
             <div className="flex items-center justify-center py-8">
@@ -313,60 +357,73 @@ export default function HomePage() {
                 : "Aucune enseigne pour l'instant. Ajoute-en via la page admin."}
             </p>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            <div className="flex flex-col gap-3">
               {filteredRestaurants.map((restaurant) => {
                 const isNew = isRestaurantNew(restaurant);
                 return (
                 <Link
                   key={restaurant.id}
                   href={getRestaurantUrl(restaurant)}
-                  className="group block bg-slate-900/80 rounded-2xl shadow-md hover:shadow-xl border border-slate-800/70 hover:border-bitebox/60 transition overflow-hidden flex flex-col relative"
+                  className="group block bg-white/5 backdrop-blur-sm rounded-lg shadow-sm hover:shadow-md border border-white/10 hover:border-bitebox/40 transition-all overflow-hidden flex flex-col relative w-full"
                 >
                   {isNew && (
-                    <div className="absolute top-2 right-2 z-10 rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-semibold text-white shadow-lg">
+                    <div className="absolute top-2 right-2 z-10 rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-medium text-white shadow-md">
                       NEW
                     </div>
                   )}
-                  <div className="w-full aspect-[4/3] overflow-hidden rounded-t-2xl bg-slate-950">
+                  <div className="w-full overflow-hidden rounded-t-lg bg-white" style={{ aspectRatio: 'auto' }}>
                     {restaurant.logo_url ? (
                       <img
                         src={restaurant.logo_url}
                         alt={restaurant.name}
-                        className="w-full h-full object-cover scale-110"
+                        className="w-full h-auto block"
+                        style={restaurant.name.toLowerCase().includes('nach!') ? { maxHeight: '180px', objectFit: 'contain' } : {}}
+                        onLoad={(e) => {
+                          const img = e.currentTarget;
+                          const container = img.parentElement;
+                          if (container) {
+                            // Pour nach!, limiter la hauteur à 180px pour mieux voir le logo
+                            if (restaurant.name.toLowerCase().includes('nach!')) {
+                              container.style.height = '180px';
+                            } else {
+                              container.style.height = `${img.offsetHeight}px`;
+                            }
+                          }
+                        }}
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center">
+                      <div className="w-full h-32 flex items-center justify-center">
                         <span className="text-xs text-slate-500">
                           Pas de logo
                         </span>
                       </div>
                     )}
                   </div>
-                  <div className="px-3 py-1.5 space-y-1">
-                    <p className="text-sm font-semibold truncate group-hover:text-bitebox-light">
+                  <div className="px-3 py-2.5 space-y-1">
+                    <p className="text-sm font-medium truncate group-hover:text-bitebox transition-colors">
                       {restaurant.name}
                     </p>
                     <div className="mt-2 flex items-center justify-between text-xs text-slate-300">
                       {restaurant.ratingStats.count === 0 ? (
-                        <span className="text-[11px] text-slate-500">Note : à venir</span>
+                        <span className="text-[11px] text-slate-500">Note : à venir (0)</span>
                       ) : (
                         <div className="flex items-center gap-2">
                           <div className="flex">
                             {[1, 2, 3, 4, 5].map((star) => (
                               <span
                                 key={star}
-                                className={
+                                className={`text-base ${
                                   restaurant.ratingStats.avg >= star
-                                    ? "text-yellow-400"
+                                    ? "text-orange-400"
                                     : "text-slate-700"
-                                }
+                                }`}
                               >
                                 ★
                               </span>
                             ))}
                           </div>
-                          <span className="text-[11px] text-slate-400">
-                            {restaurant.ratingStats.avg.toFixed(1)} / 5
+                          <span className="text-xs text-orange-400 font-medium">
+                            {restaurant.ratingStats.avg.toFixed(1)} / 5 ({restaurant.ratingStats.count})
                           </span>
                         </div>
                       )}

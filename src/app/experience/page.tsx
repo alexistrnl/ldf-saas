@@ -7,7 +7,6 @@ import Image from "next/image";
 import { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
 import { getCurrentUserProfile, UserProfile } from "@/lib/profile";
-import { getAvatarTheme, hexToRgba } from "@/lib/getAvatarTheme";
 import Spinner from "@/components/Spinner";
 
 type ProfileRestaurantSummary = {
@@ -46,6 +45,7 @@ export default function ExperiencePage() {
   >([]);
   const [experiences, setExperiences] = useState<ProfileExperience[]>([]);
   const [expandedExperiences, setExpandedExperiences] = useState<Set<string>>(new Set());
+  const [totalRestaurants, setTotalRestaurants] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -186,6 +186,15 @@ export default function ExperiencePage() {
         });
 
         setRestaurantsSummary(summaryData);
+
+        // Charger le nombre total d'enseignes disponibles
+        const { count: totalCount, error: countError } = await supabase
+          .from("restaurants")
+          .select("*", { count: "exact", head: true });
+
+        if (!countError && totalCount !== null) {
+          setTotalRestaurants(totalCount);
+        }
 
         // 5) Charger les plats notés (fastfood_log_dishes)
         const logIds = logs.map((log) => log.id);
@@ -333,61 +342,78 @@ export default function ExperiencePage() {
     });
   };
 
-  // Calculer le thème basé sur l'avatar
-  const theme = getAvatarTheme(profile?.avatar_url);
-  const themeColorWithOpacity = hexToRgba(theme.color, 0.4);
 
   return (
     <main className="min-h-screen w-full overflow-x-hidden bg-[#020617]">
       <div className="mx-auto flex w-full max-w-xl flex-col gap-6 px-4 pb-28 pt-6">
-        <h1 className="text-2xl font-bold text-white">Mes expériences</h1>
+        <div className="mb-4 text-center">
+          <h1 className="text-2xl font-bold text-white mb-1">Mes stats BiteBox</h1>
+          <p className="text-xs text-slate-400">Ton parcours en un coup d'œil</p>
+        </div>
 
         {error && (
-          <div className="rounded-2xl bg-red-500/10 border border-red-500/40 px-3 py-2 text-sm text-red-300">
+          <div className="rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 text-sm text-red-300">
             {error}
           </div>
         )}
 
         {/* Stats rapides */}
-        <section className="grid grid-cols-3 gap-3 rounded-xl bg-[#0F0F1A] border border-white/5 shadow-md shadow-black/20 px-4 py-4">
-          <div className="flex flex-col items-center">
-            <span className="text-lg font-semibold text-white">
+        <section className="grid grid-cols-3 gap-3">
+          <div className="rounded-xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm border border-white/10 shadow-lg p-4 flex flex-col items-center justify-center hover:border-white/20 transition-all">
+            <div className="text-2xl font-bold text-white mb-1">
               {restaurantsCount}
-            </span>
-            <span className="text-[11px] text-slate-400 text-center">
+            </div>
+            <div className="text-[11px] text-slate-300 text-center font-medium">
               Restos testés
-            </span>
+            </div>
           </div>
-          <div className="flex flex-col items-center">
-            <span className="text-lg font-semibold text-white">
+          <div className="rounded-xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm border border-white/10 shadow-lg p-4 flex flex-col items-center justify-center hover:border-white/20 transition-all">
+            <div className="text-2xl font-bold text-white mb-1">
               {totalExperiences}
-            </span>
-            <span className="text-[11px] text-slate-400 text-center">
+            </div>
+            <div className="text-[11px] text-slate-300 text-center font-medium">
               Expériences
-            </span>
+            </div>
           </div>
-          <div className="flex flex-col items-center">
-            <span className="text-lg font-semibold text-white">
+          <div className="rounded-xl bg-gradient-to-br from-bitebox/20 to-bitebox/10 backdrop-blur-sm border border-bitebox/30 shadow-lg p-4 flex flex-col items-center justify-center hover:border-bitebox/40 transition-all">
+            <div className="text-2xl font-bold text-bitebox mb-1 flex items-center gap-1">
               {avgRating}
-            </span>
-            <span className="text-[11px] text-slate-400 text-center">
+              <span className="text-sm">⭐</span>
+            </div>
+            <div className="text-[11px] text-slate-300 text-center font-medium">
               Note moyenne
-            </span>
+            </div>
           </div>
         </section>
 
-        {/* Restaurants que j'ai testés */}
-        <section className="mt-6 space-y-4">
+        {/* Séparateur */}
+        <div className="border-t border-white/5 my-2"></div>
+
+        {/* Ma mosaïque BiteBox */}
+        <section className="space-y-3">
           <div>
-            <h2 
-              className="text-xl font-bold mb-1"
-              style={{ color: theme.color }}
-            >
-              Restaurants que j'ai testés
-            </h2>
-            <p className="text-sm text-white/50 mb-3">
-              Ton top des spots où tu as déjà mis une note.
-            </p>
+            <div className="flex items-center justify-between gap-4 mb-2">
+              <h2 
+                className="text-base font-medium text-slate-200"
+              >
+                Ma mosaïque BiteBox
+              </h2>
+              {totalRestaurants > 0 && (
+                <span className="text-xs font-medium text-white">
+                  {Math.round((restaurantsSummary.length / totalRestaurants) * 100)}%
+                </span>
+              )}
+            </div>
+            {totalRestaurants > 0 && (
+              <div className="w-full h-3 bg-white/10 rounded-full overflow-hidden mb-3">
+                <div 
+                  className="h-full bg-bitebox rounded-full transition-all duration-500"
+                  style={{ 
+                    width: `${Math.min((restaurantsSummary.length / totalRestaurants) * 100, 100)}%` 
+                  }}
+                />
+              </div>
+            )}
           </div>
 
           {restaurantsSummary.length === 0 ? (
@@ -395,67 +421,56 @@ export default function ExperiencePage() {
               Tu n'as pas encore testé de restaurant.
             </p>
           ) : (
-            <div className="-mx-4 overflow-x-auto pb-2">
-              <div className="flex gap-4 px-4">
-                {restaurantsSummary.map((r) => (
-                  <Link
-                    key={r.restaurantId}
-                    href={r.slug ? `/restaurants/${r.slug}` : "#"}
-                    className={`w-48 flex-shrink-0 overflow-hidden rounded-xl bg-[#0F0F1A] border shadow-md shadow-black/20 transition hover:shadow-lg hover:shadow-black/30 ${
-                      !r.slug ? "pointer-events-none opacity-60" : ""
-                    }`}
-                    style={{ 
-                      borderColor: themeColorWithOpacity,
-                      borderWidth: '1px'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = theme.color;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = themeColorWithOpacity;
-                    }}
-                  >
-                    <div className="w-full aspect-[4/3] overflow-hidden rounded-t-xl bg-slate-950">
-                      {r.logoUrl ? (
-                        <img
-                          src={r.logoUrl}
-                          alt={r.restaurantName}
-                          className="w-full h-full object-cover scale-110"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <span className="text-xs text-slate-500">
-                            Pas de logo
-                          </span>
-                        </div>
-                      )}
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
+              {restaurantsSummary.map((r) => (
+                <Link
+                  key={r.restaurantId}
+                  href={r.slug ? `/restaurants/${r.slug}` : "#"}
+                  className={`overflow-hidden rounded-lg transition-opacity hover:opacity-80 ${
+                    !r.slug ? "pointer-events-none opacity-40" : ""
+                  }`}
+                >
+                  {r.logoUrl ? (
+                    <div className="w-full flex items-center justify-center">
+                      <img
+                        src={r.logoUrl}
+                        alt={r.restaurantName}
+                        className="w-full h-auto object-contain"
+                        onLoad={(e) => {
+                          const img = e.currentTarget;
+                          const container = img.parentElement?.parentElement;
+                          if (container) {
+                            // Adapter la hauteur du conteneur à l'image
+                            container.style.height = 'auto';
+                          }
+                        }}
+                      />
                     </div>
-                    <div className="space-y-1 p-4 md:p-5">
-                      <p className="truncate text-lg font-semibold text-white">
-                        {r.restaurantName}
-                      </p>
-                      <p className="text-xs text-slate-400">
-                        {r.avgRating.toFixed(1)} / 5 · {r.visitsCount}{" "}
-                        visite{r.visitsCount > 1 ? "s" : ""}
-                      </p>
+                  ) : (
+                    <div className="w-full p-3 flex items-center justify-center min-h-[60px] bg-white/5 backdrop-blur-sm rounded-lg border border-white/10">
+                      <span className="text-xs text-slate-500 font-medium">
+                        {r.restaurantName.charAt(0)}
+                      </span>
                     </div>
-                  </Link>
-                ))}
-              </div>
+                  )}
+                </Link>
+              ))}
             </div>
           )}
         </section>
 
-        {/* Mes expériences */}
-        <section className="mt-6 space-y-4">
-          <div>
+        {/* Séparateur */}
+        <div className="border-t border-white/5 mt-1 mb-3"></div>
+
+        {/* Mon activité récente */}
+        <section className="space-y-3">
+          <div className="text-center">
             <h2 
-              className="text-xl font-bold mb-1"
-              style={{ color: theme.color }}
+              className="text-base font-bold mb-1 text-slate-200"
             >
-              Historique
+              Mon activité récente
             </h2>
-            <p className="text-sm text-white/50 mb-3">
+            <p className="text-xs text-slate-400 mb-8">
               Retrouve toutes tes notes, par date.
             </p>
           </div>
@@ -473,17 +488,7 @@ export default function ExperiencePage() {
                 return (
                   <div
                     key={exp.id}
-                    className="rounded-xl bg-[#0F0F1A] border shadow-md shadow-black/20 transition hover:shadow-lg hover:shadow-black/30"
-                    style={{ 
-                      borderColor: themeColorWithOpacity,
-                      borderWidth: '1px'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = theme.color;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = themeColorWithOpacity;
-                    }}
+                    className="rounded-lg bg-white/5 backdrop-blur-sm border border-white/10 shadow-sm hover:shadow-md transition-all overflow-hidden"
                   >
                     {/* En-tête cliquable */}
                     <button
@@ -500,125 +505,137 @@ export default function ExperiencePage() {
                           });
                         }
                       }}
-                      className={`w-full p-4 md:p-5 ${hasDetails ? 'cursor-pointer' : 'cursor-default'}`}
+                      className={`w-full flex items-center gap-3 p-3 ${hasDetails ? 'cursor-pointer hover:bg-white/5' : 'cursor-default'}`}
                       disabled={!hasDetails}
                     >
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                          <div className="h-10 w-10 overflow-hidden rounded-full bg-slate-800 flex items-center justify-center flex-shrink-0">
-                            {exp.restaurantLogoUrl ? (
-                              <img
-                                src={exp.restaurantLogoUrl}
-                                alt={exp.restaurantName}
-                                className="h-10 w-10 object-cover"
-                              />
-                            ) : (
-                              <span className="text-xs text-slate-300">
-                                {exp.restaurantName.charAt(0)}
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex flex-col min-w-0 flex-1 text-left">
-                            {exp.restaurantSlug ? (
-                              <Link
-                                href={`/restaurants/${exp.restaurantSlug}`}
-                                onClick={(e) => e.stopPropagation()}
-                                className="text-lg font-semibold text-white hover:text-bitebox-light truncate"
-                              >
-                                {exp.restaurantName}
-                              </Link>
-                            ) : (
-                              <span className="text-lg font-semibold text-white truncate">
-                                {exp.restaurantName}
-                              </span>
-                            )}
-                            <span className="text-sm text-white/50">
-                              {formatDate(exp.visitedAt)}
+                      {/* Logo */}
+                      <div className="h-16 w-16 overflow-hidden rounded-lg flex-shrink-0">
+                        {exp.restaurantLogoUrl ? (
+                          <img
+                            src={exp.restaurantLogoUrl}
+                            alt={exp.restaurantName}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="h-full w-full bg-white flex items-center justify-center">
+                            <span className="text-base font-semibold text-slate-600">
+                              {exp.restaurantName.charAt(0)}
                             </span>
                           </div>
-                        </div>
-                        <div className="flex items-center gap-3 flex-shrink-0">
-                          <div className="text-right">
-                            <div className="flex justify-end mb-1">
-                              {[1, 2, 3, 4, 5].map((star) => (
-                                <span
-                                  key={star}
-                                  className={
-                                    exp.rating >= star
-                                      ? "text-yellow-400"
-                                      : "text-slate-700"
-                                  }
-                                >
-                                  ★
-                                </span>
-                              ))}
-                            </div>
-                            <span className="text-sm text-white font-medium">
-                              {exp.rating} / 5
-                            </span>
-                          </div>
-                          {hasDetails && (
-                            <svg
-                              className={`w-5 h-5 text-white/50 transition-transform ${
-                                isExpanded ? 'rotate-180' : ''
-                              }`}
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M19 9l-7 7-7-7"
-                              />
-                            </svg>
-                          )}
-                        </div>
+                        )}
                       </div>
+                      
+                      {/* Nom de l'enseigne et Date */}
+                      <div className="flex-1 min-w-0 flex flex-col text-left">
+                        {exp.restaurantSlug ? (
+                          <Link
+                            href={`/restaurants/${exp.restaurantSlug}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-sm font-medium text-white hover:text-bitebox transition-colors truncate"
+                          >
+                            {exp.restaurantName}
+                          </Link>
+                        ) : (
+                          <span className="text-sm font-medium text-white truncate">
+                            {exp.restaurantName}
+                          </span>
+                        )}
+                        <span className="text-xs text-slate-400 mt-0.5">
+                          {formatDate(exp.visitedAt)}
+                        </span>
+                      </div>
+                      
+                      {/* Note */}
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <div className="flex gap-0.5">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <span
+                              key={star}
+                              className={`text-sm ${
+                                exp.rating >= star
+                                  ? "text-orange-400"
+                                  : "text-slate-700"
+                              }`}
+                            >
+                              ★
+                            </span>
+                          ))}
+                        </div>
+                        <span className="text-xs text-orange-400 font-medium">
+                          {exp.rating}/5
+                        </span>
+                      </div>
+                      
+                      {/* Flèche d'expansion */}
+                      {hasDetails && (
+                        <svg
+                          className={`w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ${
+                            isExpanded ? 'rotate-180' : ''
+                          }`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 9l-7 7-7-7"
+                          />
+                        </svg>
+                      )}
                     </button>
 
                     {/* Contenu déroulant */}
                     {isExpanded && hasDetails && (
-                      <div className="px-4 md:px-5 pb-4 md:pb-5 pt-0 border-t border-white/5 mt-2">
+                      <div className="px-3 pb-3 pt-0 border-t border-white/10 mt-2">
                         {/* Commentaire */}
                         {exp.comment && (
-                          <p className="text-sm text-slate-300 mb-4">
+                          <p className="text-sm text-slate-300 mb-3 leading-relaxed">
                             {exp.comment}
                           </p>
                         )}
 
                         {/* Plats goûtés */}
                         {exp.dishes.length > 0 && (
-                          <div className="space-y-3">
-                            <p className="text-sm font-semibold text-white">
-                              Plats goûtés :
+                          <div className="space-y-3 mt-3">
+                            <p className="text-xs font-semibold text-slate-300 uppercase tracking-wide">
+                              Plats goûtés ({exp.dishes.length})
                             </p>
                             <div className="grid grid-cols-2 gap-3">
                               {exp.dishes.map((dish, idx) => (
                                 <div
                                   key={dish.dishId ?? `${exp.id}-dish-${idx}`}
-                                  className="rounded-lg bg-[#161622] border border-white/5 shadow-sm p-3 flex flex-col gap-1"
+                                  className="rounded-xl bg-white/5 border border-white/10 p-3 flex flex-col gap-2 hover:border-white/20 transition-all"
                                 >
-                                  <p className="text-sm font-semibold text-white truncate">
+                                  {dish.imageUrl && (
+                                    <div className="w-full h-32 rounded-lg overflow-hidden bg-slate-800/50 mb-1">
+                                      <img
+                                        src={dish.imageUrl}
+                                        alt={dish.dishName}
+                                        className="w-full h-full object-cover"
+                                      />
+                                    </div>
+                                  )}
+                                  <p className="text-sm font-semibold text-white line-clamp-2 min-h-[2.5rem]">
                                     {dish.dishName}
                                   </p>
-                                  <div className="flex items-center gap-1">
-                                    <div className="flex">
+                                  <div className="flex items-center gap-2 mt-auto">
+                                    <div className="flex gap-0.5">
                                       {[1, 2, 3, 4, 5].map((star) => (
                                         <span
                                           key={star}
-                                          className={
+                                          className={`text-sm ${
                                             dish.rating >= star
-                                              ? "text-yellow-400 text-xs"
-                                              : "text-slate-700 text-xs"
-                                          }
+                                              ? "text-orange-400"
+                                              : "text-slate-700"
+                                          }`}
                                         >
                                           ★
                                         </span>
                                       ))}
                                     </div>
-                                    <span className="text-xs text-white font-medium">
+                                    <span className="text-xs text-orange-400 font-semibold">
                                       {dish.rating}/5
                                     </span>
                                   </div>

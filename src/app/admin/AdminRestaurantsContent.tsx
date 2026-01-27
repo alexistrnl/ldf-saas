@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { supabase } from "@/lib/supabaseClient";
 import { formatRLSError } from "@/lib/errorMessages";
 import { Restaurant, ViewMode } from "./types";
 import RestaurantListPanel from "./RestaurantListPanel";
@@ -17,9 +17,12 @@ function slugify(name: string) {
     .replace(/^-+|-+$/g, "");
 }
 
-export default function AdminRestaurantsContent() {
+type AdminRestaurantsContentProps = {
+  initialUser?: { id: string; email?: string | null } | null;
+};
+
+export default function AdminRestaurantsContent({ initialUser }: AdminRestaurantsContentProps = {}) {
   const router = useRouter();
-  const supabase = createClientComponentClient();
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -27,7 +30,7 @@ export default function AdminRestaurantsContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("overview");
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [supabaseUser, setSupabaseUser] = useState<{ id?: string; email?: string | null } | null>(null);
+  const [supabaseUser, setSupabaseUser] = useState<{ id?: string; email?: string | null } | null>(initialUser || null);
 
   // État pour la création
   const [name, setName] = useState("");
@@ -48,17 +51,89 @@ export default function AdminRestaurantsContent() {
   const [editLogoPreview, setEditLogoPreview] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchRestaurants();
-    
-    // Vérifier l'utilisateur Supabase au chargement
-    const checkUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      console.log("[AdminRestaurantsContent] Supabase user on load:", user);
-      setSupabaseUser(user);
+    // Utiliser l'utilisateur initial passé depuis le serveur
+    if (initialUser) {
+      setSupabaseUser(initialUser);
+      fetchRestaurants();
+      return;
+    }
+
+    // Sinon, vérifier l'utilisateur Supabase au chargement
+    const initializeData = async () => {
+      // Attendre un peu pour laisser le temps aux cookies de se synchroniser
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Essayer d'abord getSession() qui lit depuis les cookies
+      let session = null;
+      let user = null;
+      
+      try {
+        const sessionResult = await supabase.auth.getSession();
+        session = sessionResult.data?.session;
+        console.log("[AdminRestaurantsContent] Session on load:", session?.user?.email, "error:", sessionResult.error);
+      } catch (err) {
+        console.error("[AdminRestaurantsContent] Error getting session:", err);
+      }
+      
+      // Si pas de session, essayer getUser() qui peut forcer un refresh
+      if (!session?.user) {
+        try {
+          const userResult = await supabase.auth.getUser();
+          user = userResult.data?.user;
+          console.log("[AdminRestaurantsContent] User on load (fallback):", user?.email, "error:", userResult.error);
+        } catch (err) {
+          console.error("[AdminRestaurantsContent] Error getting user:", err);
+        }
+      } else {
+        user = session.user;
+      }
+      
+      if (user) {
+        setSupabaseUser(user);
+        await fetchRestaurants();
+      } else {
+        console.warn("[AdminRestaurantsContent] No user found, skipping restaurants fetch");
+        setLoading(false);
+        // Afficher un message d'erreur pour aider au debug
+        setError("Vous n'êtes pas connecté. Veuillez vous connecter pour accéder à l'admin.");
+      }
     };
     
-    checkUser();
-  }, []);
+    initializeData();
+
+    // Écouter les changements d'authentification pour mettre à jour l'utilisateur
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("[AdminRestaurantsContent] Auth state changed:", event, session?.user?.email);
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "USER_UPDATED") {
+        // Utiliser la session directement si disponible
+        if (session?.user) {
+          setSupabaseUser(session.user);
+          // Recharger les restaurants si l'utilisateur vient de se connecter
+          if (event === "SIGNED_IN") {
+            await fetchRestaurants();
+          }
+        } else {
+          // Fallback: vérifier à nouveau l'utilisateur
+          const { data: { user } } = await supabase.auth.getUser();
+          console.log("[AdminRestaurantsContent] User after auth change (fallback):", user?.email);
+          setSupabaseUser(user);
+          if (event === "SIGNED_IN" && user) {
+            await fetchRestaurants();
+          }
+        }
+      } else if (event === "SIGNED_OUT") {
+        setSupabaseUser(null);
+        setRestaurants([]);
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [initialUser]);
 
   // Sélectionner automatiquement la première enseigne au chargement
   useEffect(() => {
@@ -85,6 +160,18 @@ export default function AdminRestaurantsContent() {
       setError(null);
       setLoading(true);
 
+      // Vérifier la session avant de faire la requête
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.warn("[Admin] No session found when fetching restaurants");
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          setError("Vous devez être connecté pour charger les enseignes.");
+          setLoading(false);
+          return;
+        }
+      }
+
       const { data, error } = await supabase
         .from("restaurants")
         .select("*")
@@ -92,10 +179,11 @@ export default function AdminRestaurantsContent() {
 
       if (error) {
         console.error("[Admin] restaurants error", error);
-        setError("Erreur lors du chargement des enseignes.");
+        setError(`Erreur lors du chargement des enseignes: ${error.message}`);
         return;
       }
 
+      console.log("[Admin] Restaurants loaded:", data?.length || 0);
       setRestaurants((data || []) as Restaurant[]);
     } catch (err) {
       console.error("[Admin] restaurants unexpected", err);
@@ -696,7 +784,7 @@ export default function AdminRestaurantsContent() {
             </button>
           ) : (
             <button
-              onClick={() => router.push("/login?next=/admin/restaurants")}
+              onClick={() => router.push("/login?next=/admin")}
               className="px-3 py-1.5 text-xs font-medium text-white bg-bitebox border border-bitebox rounded-md hover:bg-bitebox-dark transition-colors"
             >
               Se connecter

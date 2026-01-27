@@ -63,6 +63,7 @@ export default function RestaurantPage() {
   const [isAddExperienceOpen, setIsAddExperienceOpen] = useState(false);
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
   const [latestDishes, setLatestDishes] = useState<DishWithStats[]>([]);
+  const [brokenImageUrls, setBrokenImageUrls] = useState<Set<string>>(new Set());
 
   const handleAddNoteClick = () => {
     if (isMobile) {
@@ -260,21 +261,45 @@ export default function RestaurantPage() {
     }
   }, [params?.slug]);
 
+  // Fonction pour gérer les erreurs d'image
+  const handleImageError = (imageUrl: string | null) => {
+    if (imageUrl) {
+      setBrokenImageUrls((prev) => new Set(prev).add(imageUrl));
+    }
+  };
+
+  // Fonction helper pour vérifier si un plat a une image valide
+  const hasValidImage = (dish: DishWithStats) => {
+    // Vérifier que image_url existe, n'est pas null, et n'est pas une chaîne vide ou seulement des espaces
+    if (!dish.image_url || typeof dish.image_url !== 'string' || dish.image_url.trim() === "") {
+      return false;
+    }
+    // Vérifier que l'image n'est pas dans la liste des images cassées
+    return !brokenImageUrls.has(dish.image_url);
+  };
+
   // Fonction helper pour rendre une carte de plat (réutilisée dans plusieurs sections)
+  // NOTE: Cette fonction ne devrait être appelée que pour les plats avec hasValidImage(dish) === true
   const renderDishCard = (dish: DishWithStats) => {
+    // Double vérification de sécurité - ne pas afficher si pas d'image valide
+    if (!hasValidImage(dish)) {
+      return null;
+    }
+    
     return (
       <div
         key={dish.id}
-        className="bg-slate-900/80 rounded-2xl overflow-hidden border border-slate-800/70 shadow-md flex flex-col"
+        className="bg-white/5 backdrop-blur-sm rounded-lg overflow-hidden border border-white/10 shadow-sm hover:shadow-md transition-all flex flex-col"
       >
         <DishImage
-          imageUrl={dish.image_url}
+          src={dish.image_url}
           alt={dish.name}
-          containerClassName="rounded-t-2xl rounded-b-none"
+          className="rounded-t-lg rounded-b-none"
+          onImageError={handleImageError}
         />
 
-        <div className="px-3 py-3 space-y-1">
-          <p className="text-sm font-semibold truncate">{dish.name}</p>
+        <div className="px-3 py-2.5 space-y-1">
+          <p className="text-sm font-medium truncate">{dish.name}</p>
           {(dish.is_signature || dish.is_limited_edition) && (
             <div className="flex gap-2 flex-wrap">
               {dish.is_signature && (
@@ -407,16 +432,6 @@ export default function RestaurantPage() {
     );
   }
 
-  // Calculer le Top 3 des plats les mieux notés
-  const topRatedDishes = dishes
-    .filter((d) => d.ratingStats.count > 0)
-    .sort((a, b) => {
-      if (b.ratingStats.avg === a.ratingStats.avg) {
-        return b.ratingStats.count - a.ratingStats.count; // départage sur nb d'avis
-      }
-      return b.ratingStats.avg - a.ratingStats.avg;
-    })
-    .slice(0, 3);
 
   // Fonction de scroll fluide vers une section
   const scrollToSection = (categoryId: string) => {
@@ -428,9 +443,9 @@ export default function RestaurantPage() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50">
-      <div className="mx-auto w-full max-w-3xl overflow-hidden rounded-b-3xl bg-black/40">
-        {/* Bannière */}
-        <div className="relative h-40 sm:h-52">
+      {/* Bannière avec logo */}
+      <div className="relative w-full">
+        <div className="relative h-48 sm:h-64 overflow-hidden">
           {restaurant.logo_url ? (
             <Image
               src={restaurant.logo_url}
@@ -440,161 +455,102 @@ export default function RestaurantPage() {
               priority
             />
           ) : (
-            <div className="w-full h-full bg-slate-800 flex items-center justify-center">
-              <span className="text-sm text-slate-500">Pas de logo</span>
+            <div className="w-full h-full bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center">
+              <span className="text-lg text-slate-500 font-medium">Pas de logo</span>
             </div>
           )}
           {/* Dégradé en bas pour la lisibilité */}
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#020617] via-transparent to-transparent" />
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/80 to-transparent" />
+        </div>
+        
+        {/* Nom du restaurant et informations */}
+        <div className="relative -mt-16 sm:-mt-20 px-4 pb-6">
+          <div className="max-w-5xl mx-auto">
+            {/* Nom du restaurant */}
+            <h1 className="text-2xl sm:text-3xl font-semibold text-white mb-3">
+              {restaurant.name}
+            </h1>
+            
+            {/* Bloc note et bouton */}
+            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-3 bg-white/5 backdrop-blur-md rounded-lg p-4 border border-white/10 shadow-lg">
+              {/* Bloc note */}
+              <div className="flex-1 w-full sm:w-auto">
+                {restaurantRatingStats.count === 0 ? (
+                  <div className="text-center sm:text-left">
+                    <p className="text-sm text-slate-400 mb-2">
+                      Cette enseigne n'a pas encore de note publique.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col sm:flex-row items-center sm:items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <div className="flex">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <span
+                            key={star}
+                            className={`text-2xl ${
+                              restaurantRatingStats.avg >= star
+                                ? "text-orange-400"
+                                : "text-slate-700"
+                            }`}
+                          >
+                            ★
+                          </span>
+                        ))}
+                      </div>
+                      <span className="text-lg font-semibold text-white">
+                        {restaurantRatingStats.avg.toFixed(1)}
+                      </span>
+                    </div>
+                    <div className="text-sm text-slate-300">
+                      <span className="font-medium">{restaurantRatingStats.count}</span>{" "}
+                      {restaurantRatingStats.count === 1 ? "avis" : "avis"}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Bouton Ajouter une note */}
+              <button
+                onClick={handleAddNoteClick}
+                className="w-full sm:w-auto inline-flex items-center justify-center rounded-lg bg-bitebox px-5 py-2.5 text-sm font-medium text-white shadow-md hover:bg-bitebox-dark transition-colors"
+              >
+                Ajouter une note
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
       <div className="max-w-5xl mx-auto px-4 py-4">
-        {/* Bloc note + bouton */}
-        <section className="mt-4 flex flex-col items-center gap-4 mb-3">
-          {/* Bloc note */}
-          {restaurantRatingStats.count === 0 ? (
-            <span className="text-sm text-slate-500">
-              Cette enseigne n'a pas encore de note publique.
-            </span>
-          ) : (
-            <div className="flex items-center gap-2">
-              <div className="flex">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <span
-                    key={star}
-                    className={
-                      restaurantRatingStats.avg >= star
-                        ? "text-yellow-400"
-                        : "text-slate-700"
-                    }
-                  >
-                    ★
-                  </span>
-                ))}
-              </div>
-              <span className="text-sm text-slate-300">
-                {restaurantRatingStats.avg.toFixed(1)} / 5 • {restaurantRatingStats.count} avis
-              </span>
-            </div>
-          )}
 
-          {/* Bouton Ajouter une note */}
-          <button
-            onClick={handleAddNoteClick}
-            className="inline-flex items-center rounded-full bg-bitebox px-6 py-3 text-sm font-semibold text-white shadow hover:bg-bitebox-dark transition"
-          >
-            Ajouter une note
-          </button>
-        </section>
 
-        {/* Derniers ajouts */}
-        {restaurant.show_latest_additions !== false && (
-          <section className="mt-6">
-            <h3 className="mb-3 text-base font-semibold text-white">Derniers ajouts</h3>
-            {latestDishes.length === 0 ? (
-              <p className="text-sm text-slate-400">Aucun plat ajouté récemment à la carte.</p>
-            ) : (
-              <div className="flex gap-4 overflow-x-auto overflow-y-hidden pb-2 snap-x snap-mandatory [-webkit-overflow-scrolling:touch] sm:grid sm:grid-cols-3 sm:gap-4 sm:overflow-x-visible sm:pb-0 sm:snap-none">
-                {latestDishes.slice(0, 3).map((dish) => (
-                  <div key={dish.id} className="w-[260px] flex-shrink-0 snap-start sm:w-auto sm:flex-shrink sm:snap-none">
-                    {renderDishCard(dish)}
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        )}
-
-        {/* Top 3 plats les mieux notés */}
-        {topRatedDishes.length > 0 && (
-          <section className="mt-4">
-            <h2 className="text-lg font-semibold text-slate-50 mb-3">
-              Les plats les mieux notés
-            </h2>
-            <p className="text-xs text-slate-400 mb-4">
-              Le top 3 des plats notés par la communauté pour cette enseigne.
-            </p>
-            
-            {/* Carrousel horizontal scrollable */}
-            <div className="flex gap-4 overflow-x-auto overflow-y-hidden pb-2 snap-x snap-mandatory [-webkit-overflow-scrolling:touch] sm:grid sm:grid-cols-3 sm:gap-4 sm:overflow-x-visible sm:pb-0 sm:snap-none">
-              {topRatedDishes.map((dish, index) => (
-                <div
-                  key={dish.id}
-                  className="w-[260px] flex-shrink-0 snap-start sm:w-auto sm:flex-shrink sm:snap-none"
-                >
-                  <div className="bg-slate-900/80 rounded-2xl overflow-hidden border border-slate-800/70 shadow-md flex flex-col">
-                    {/* Image */}
-                    <DishImage
-                      imageUrl={dish.image_url}
-                      alt={dish.name}
-                      containerClassName="rounded-t-2xl rounded-b-none"
-                    />
-
-                    {/* Contenu */}
-                    <div className="px-4 py-4 space-y-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-semibold text-slate-100 truncate">
-                          {dish.name}
-                        </p>
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-bitebox/10 text-yellow-400 border border-bitebox/40 whitespace-nowrap">
-                          Top {index + 1}
-                        </span>
-                      </div>
-
-                      {/* Note en étoiles */}
-                      <div className="flex items-center justify-between text-[11px] text-slate-300">
-                        <div className="flex">
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <span
-                              key={star}
-                              className={
-                                dish.ratingStats.avg >= star
-                                  ? "text-yellow-400"
-                                  : "text-slate-700"
-                              }
-                            >
-                              ★
-                            </span>
-                          ))}
-                        </div>
-                        <span className="text-[11px] text-slate-400 ml-1">
-                          {dish.ratingStats.avg.toFixed(1)} / 5 ·{" "}
-                          {dish.ratingStats.count} avis
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
 
         {/* Carte des plats */}
         <section className="mt-3">
-          <h2 className="text-lg font-semibold mb-3">La carte</h2>
+          <h2 className="text-lg font-medium mb-3 text-slate-200">La carte</h2>
 
-          {dishes.length === 0 ? (
+          {dishes.filter((dish) => hasValidImage(dish)).length === 0 ? (
             <p className="text-sm text-slate-400">
               Aucun plat n'a encore été ajouté pour cette enseigne.
             </p>
           ) : categories.length === 0 ? (
             // Affichage sans sections (comportement par défaut)
             <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-              {dishes.map((dish) => (
+              {dishes.filter((dish) => hasValidImage(dish)).map((dish) => (
                 <div
                   key={dish.id}
-                  className="bg-slate-900/80 rounded-2xl overflow-hidden border border-slate-800/70 shadow-md flex flex-col"
+                  className="bg-white/5 backdrop-blur-sm rounded-lg overflow-hidden border border-white/10 shadow-sm hover:shadow-md transition-all flex flex-col"
                 >
                     <DishImage
-                      imageUrl={dish.image_url}
+                      src={dish.image_url}
                       alt={dish.name}
-                      containerClassName="rounded-t-2xl rounded-b-none"
+                      className="rounded-t-lg rounded-b-none"
+                      onImageError={handleImageError}
                     />
 
                   <div className="px-3 py-3 space-y-1">
-                    <p className="text-sm font-semibold truncate">{dish.name}</p>
+                    <p className="text-sm font-medium truncate">{dish.name}</p>
                     {(dish.is_signature || dish.is_limited_edition) && (
                       <div className="flex gap-2 flex-wrap">
                         {dish.is_signature && (
@@ -647,30 +603,34 @@ export default function RestaurantPage() {
             // Affichage groupé par sections
             <div className="space-y-6">
               {categories
-                .filter((category) => dishes.some((d) => d.category_id === category.id))
+                .filter((category) => {
+                  const categoryDishes = dishes.filter((d) => d.category_id === category.id && hasValidImage(d));
+                  return categoryDishes.length > 0;
+                })
                 .map((category) => {
-                const categoryDishes = dishes.filter((d) => d.category_id === category.id);
+                const categoryDishes = dishes.filter((d) => d.category_id === category.id && hasValidImage(d));
                 const isBurgerKing = restaurant?.name?.toLowerCase().includes("burger king") || restaurant?.slug?.toLowerCase().includes("burger-king");
 
                 return (
                   <div key={category.id} id={`section-${category.id}`} className={`${isBurgerKing ? 'space-y-1 pt-1' : 'space-y-3 pt-4'}`}>
-                    <h3 className="text-base font-semibold text-slate-100 border-b border-slate-800 pb-2">
+                    <h3 className="text-base font-medium text-slate-200 border-b border-white/10 pb-2">
                       {category.name}
                     </h3>
                     <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                       {categoryDishes.map((dish) => (
                         <div
                           key={dish.id}
-                          className="bg-slate-900/80 rounded-2xl overflow-hidden border border-slate-800/70 shadow-md flex flex-col"
+                          className="bg-white/5 backdrop-blur-sm rounded-lg overflow-hidden border border-white/10 shadow-sm hover:shadow-md transition-all flex flex-col"
                         >
-                          <DishImage
-                            imageUrl={dish.image_url}
-                            alt={dish.name}
-                            containerClassName="rounded-t-2xl rounded-b-none"
-                          />
+                    <DishImage
+                      src={dish.image_url}
+                      alt={dish.name}
+                      className="rounded-t-lg rounded-b-none"
+                      onImageError={handleImageError}
+                    />
 
-                          <div className="px-3 py-3 space-y-1">
-                            <p className="text-sm font-semibold truncate">{dish.name}</p>
+                          <div className="px-3 py-2.5 space-y-1">
+                            <p className="text-sm font-medium truncate">{dish.name}</p>
                             {(dish.is_signature || dish.is_limited_edition) && (
                               <div className="flex gap-2 flex-wrap">
                                 {dish.is_signature && (
@@ -725,29 +685,33 @@ export default function RestaurantPage() {
               
               {/* Plats sans section */}
               {(() => {
-                const dishesWithoutCategory = dishes.filter((d) => !d.category_id);
+                const dishesWithoutCategory = dishes.filter((d) => !d.category_id && hasValidImage(d));
                 if (dishesWithoutCategory.length === 0) return null;
                 const isBurgerKing = restaurant?.name?.toLowerCase().includes("burger king") || restaurant?.slug?.toLowerCase().includes("burger-king");
 
                 return (
                   <div className={isBurgerKing ? "space-y-1" : "space-y-3"}>
-                    <h3 className="text-base font-semibold text-slate-100 border-b border-slate-800 pb-2">
+                    <h3 className="text-base font-medium text-slate-200 border-b border-white/10 pb-2">
                       Autres
                     </h3>
                     <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                      {dishesWithoutCategory.map((dish) => (
+                      {dishesWithoutCategory.map((dish) => {
+                        // Ne pas afficher si pas d'image valide
+                        if (!hasValidImage(dish)) return null;
+                        return (
                         <div
                           key={dish.id}
-                          className="bg-slate-900/80 rounded-2xl overflow-hidden border border-slate-800/70 shadow-md flex flex-col"
+                          className="bg-white/5 backdrop-blur-sm rounded-lg overflow-hidden border border-white/10 shadow-sm hover:shadow-md transition-all flex flex-col"
                         >
-                          <DishImage
-                            imageUrl={dish.image_url}
-                            alt={dish.name}
-                            containerClassName="rounded-t-2xl rounded-b-none"
-                          />
+                    <DishImage
+                      src={dish.image_url}
+                      alt={dish.name}
+                      className="rounded-t-lg rounded-b-none"
+                      onImageError={handleImageError}
+                    />
 
-                          <div className="px-3 py-3 space-y-1">
-                            <p className="text-sm font-semibold truncate">{dish.name}</p>
+                          <div className="px-3 py-2.5 space-y-1">
+                            <p className="text-sm font-medium truncate">{dish.name}</p>
                             {(dish.is_signature || dish.is_limited_edition) && (
                               <div className="flex gap-2 flex-wrap">
                                 {dish.is_signature && (
@@ -794,7 +758,8 @@ export default function RestaurantPage() {
                             </div>
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 );

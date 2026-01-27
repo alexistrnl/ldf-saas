@@ -46,8 +46,8 @@ export default function BottomNav() {
 
   return (
     <>
-      <nav className="fixed inset-x-0 bottom-4 z-40 flex justify-center md:hidden">
-        <div className="mx-auto flex w-full max-w-sm items-center rounded-full bg-[#020617] px-1 py-2 shadow-[0_8px_30px_rgba(0,0,0,0.8)] border border-white/10">
+      <nav className="fixed inset-x-0 bottom-3 z-40 flex justify-center md:hidden">
+        <div className="mx-auto flex w-full max-w-sm items-center rounded-xl bg-black/40 backdrop-blur-xl px-1 py-1.5 shadow-lg border border-white/10">
           {/* Home */}
           <button
             onClick={() => router.push('/home')}
@@ -90,10 +90,10 @@ export default function BottomNav() {
           <div className="flex items-center justify-center px-2">
             <button
               onClick={handleAddClick}
-              className="flex h-14 w-14 items-center justify-center rounded-full bg-bitebox text-white shadow-xl shadow-bitebox/50 transition-transform hover:scale-110 hover:bg-bitebox-dark -mt-2"
+              className="flex h-12 w-12 items-center justify-center rounded-xl bg-bitebox text-white shadow-md hover:bg-bitebox-dark transition-colors -mt-1.5"
               aria-label="Ajouter une note"
             >
-              <span className="text-3xl leading-none font-bold">+</span>
+              <span className="text-2xl leading-none font-semibold">+</span>
             </button>
           </div>
 

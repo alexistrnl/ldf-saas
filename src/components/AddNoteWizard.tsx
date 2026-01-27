@@ -476,9 +476,9 @@ export default function AddNoteWizard({
                       >
                         {/* Image */}
                         <DishImage
-                          imageUrl={dish.image_url}
+                          src={dish.image_url}
                           alt={dish.name}
-                          containerClassName="rounded-t-2xl rounded-b-none"
+                          className="rounded-t-2xl rounded-b-none"
                         />
 
                         {/* Nom */}
@@ -534,10 +534,10 @@ export default function AddNoteWizard({
                   >
                     {/* Image miniature */}
                     <DishImage
-                      imageUrl={dish.image_url}
+                      src={dish.image_url}
                       alt={dish.name}
                       size="mini"
-                      containerClassName="flex-shrink-0"
+                      className="flex-shrink-0"
                     />
 
                     {/* Nom et étoiles */}
