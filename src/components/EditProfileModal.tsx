@@ -368,7 +368,7 @@ export default function EditProfileModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#020617] flex flex-col">
+    <div className="fixed inset-0 z-50 bg-[#020617] flex flex-col overflow-hidden touch-none">
       <div className="w-full h-full bg-[#020617] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-white/5 flex-shrink-0">
@@ -395,8 +395,8 @@ export default function EditProfileModal({
         </div>
 
         {/* Contenu scrollable */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
-          <div className="px-6 py-5 space-y-8">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain">
+          <div className="px-6 py-5 space-y-8 max-w-full">
             {/* Message d'erreur */}
             {error && (
               <div className="rounded-xl bg-red-500/10 border border-red-500/30 px-4 py-3">
