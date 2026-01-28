@@ -415,7 +415,7 @@ export default function EditProfileModal({
                 <label className="text-xs font-medium text-slate-200 block mb-2">
                   Avatar
                 </label>
-                <div className="grid grid-cols-6 gap-2.5">
+                <div className="grid grid-cols-6 gap-3">
                   {/* 5 avatars preset */}
                   {AVAILABLE_AVATARS.map((avatar) => {
                     const isSelected = avatarType === 'preset' && avatarPreset === avatar.variant;
@@ -424,7 +424,7 @@ export default function EditProfileModal({
                         key={avatar.key}
                         type="button"
                         onClick={() => handleAvatarPresetSelect(avatar.variant)}
-                        className={`relative w-14 h-14 rounded-full overflow-hidden transition-all ${
+                        className={`relative w-12 h-12 rounded-full overflow-hidden transition-all ${
                           isSelected
                             ? "ring-2 ring-white ring-offset-2 ring-offset-[#020617]"
                             : ""
@@ -461,7 +461,7 @@ export default function EditProfileModal({
                   <button
                     type="button"
                     onClick={handlePhotoSelect}
-                    className={`relative w-14 h-14 rounded-full overflow-hidden transition-all ${
+                    className={`relative w-12 h-12 rounded-full overflow-hidden transition-all ${
                       avatarType === 'photo'
                         ? "ring-2 ring-white ring-offset-2 ring-offset-[#020617]"
                         : ""
@@ -555,7 +555,7 @@ export default function EditProfileModal({
                 <label className="text-xs font-medium text-slate-200 block mb-2">
                   Couleur d'accent
                 </label>
-                <div className="grid grid-cols-6 gap-2.5">
+                <div className="grid grid-cols-6 gap-3">
                   {/* 5 couleurs des avatars */}
                   {[
                     { color: '#6A24A4', label: 'Violet', variant: 'purple' },
@@ -571,7 +571,7 @@ export default function EditProfileModal({
                         setAccentColor(color);
                         setShowCustomColorPicker(false);
                       }}
-                      className={`w-14 h-14 rounded-full transition-all ${
+                      className={`w-12 h-12 rounded-full transition-all ${
                         accentColor === color && !showCustomColorPicker
                           ? "ring-2 ring-white ring-offset-2 ring-offset-[#020617]"
                           : ""
@@ -585,7 +585,7 @@ export default function EditProfileModal({
                   <button
                     type="button"
                     onClick={() => setShowCustomColorPicker(!showCustomColorPicker)}
-                    className={`w-14 h-14 rounded-full transition-all flex items-center justify-center ${
+                    className={`w-12 h-12 rounded-full transition-all flex items-center justify-center ${
                       showCustomColorPicker
                         ? "ring-2 ring-white ring-offset-2 ring-offset-[#020617] bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500"
                         : "bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500"
@@ -614,7 +614,7 @@ export default function EditProfileModal({
                     <div className="flex items-center gap-4">
                       <div className="relative">
                         <div 
-                          className="w-14 h-14 rounded-full border-2 border-white/20 cursor-pointer shadow-lg overflow-hidden"
+                          className="w-12 h-12 rounded-full border-2 border-white/20 cursor-pointer shadow-lg overflow-hidden"
                           style={{ 
                             backgroundColor: accentColor,
                             boxShadow: `0 0 20px ${accentColor}40`
@@ -766,16 +766,6 @@ export default function EditProfileModal({
                           );
                         })}
                       </select>
-                      {selectedRestaurant?.logo_url && (
-                        <div className="relative h-8 w-8 rounded overflow-hidden flex-shrink-0">
-                          <Image
-                            src={selectedRestaurant.logo_url}
-                            alt={selectedRestaurant.name}
-                            fill
-                            className="object-cover"
-                          />
-                        </div>
-                      )}
                     </div>
                   );
                 })}
