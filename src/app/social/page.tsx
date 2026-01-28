@@ -5,17 +5,12 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
 import { getAvatarThemeFromVariant } from "@/lib/avatarTheme";
+import { getAvatarUrl, getProfileAccentColor, hexToRgba } from "@/lib/avatarUtils";
+import { UserProfile } from "@/lib/profile";
 import Spinner from "@/components/Spinner";
 
-type PublicProfile = {
-  id: string;
-  username: string | null;
-  avatar_url: string | null;
-  avatar_variant?: string | null;
-  display_name?: string | null;
-  bio?: string | null;
+type PublicProfile = UserProfile & {
   favorite_restaurant_ids: string[] | null;
-  updated_at?: string | null;
 };
 
 export default function SocialPage() {
@@ -54,7 +49,7 @@ export default function SocialPage() {
         // Toujours faire une requête fraîche (pas de cache)
         const { data, error: searchError } = await supabase
           .from("profiles")
-          .select("id, username, display_name, bio, avatar_variant, avatar_url, is_public, favorite_restaurant_ids, updated_at")
+          .select("id, username, display_name, bio, avatar_variant, avatar_url, avatar_type, avatar_preset, accent_color, is_public, favorite_restaurant_ids, updated_at")
           .eq("is_public", true)
           .ilike("username", `%${cleanQuery}%`)
           .not("username", "is", null)
@@ -69,7 +64,9 @@ export default function SocialPage() {
           // Log pour valider que les données sont à jour
           console.log("[Social search] fetched", (data || []).map((r: any) => ({
             u: r.username,
-            v: r.avatar_variant,
+            avatar_type: r.avatar_type,
+            avatar_preset: r.avatar_preset,
+            accent_color: r.accent_color,
             d: r.display_name,
             b: r.bio,
             t: r.updated_at
@@ -82,8 +79,12 @@ export default function SocialPage() {
               username: profile.username,
               avatar_url: profile.avatar_url,
               avatar_variant: profile.avatar_variant,
+              avatar_type: profile.avatar_type || 'preset',
+              avatar_preset: profile.avatar_preset || null,
+              accent_color: profile.accent_color || null,
               display_name: profile.display_name,
               bio: profile.bio,
+              is_public: profile.is_public ?? false,
               favorite_restaurant_ids: profile.favorite_restaurant_ids,
               updated_at: profile.updated_at,
             } as PublicProfile;
@@ -142,9 +143,13 @@ export default function SocialPage() {
     }
   };
 
-  const favoriteCount = (favoriteIds: string[] | null) => {
+  const favoriteCount = (favoriteIds: string[] | (string | null)[] | null) => {
     if (!favoriteIds) return 0;
-    return favoriteIds.length;
+    // Filtrer les null pour compter uniquement les restaurants réels
+    if (Array.isArray(favoriteIds)) {
+      return favoriteIds.filter((id): id is string => id !== null && typeof id === 'string').length;
+    }
+    return 0;
   };
 
   return (
@@ -232,7 +237,11 @@ export default function SocialPage() {
         ) : (
           <div className="flex flex-col gap-3">
             {profiles.map((profile) => {
-              const theme = getAvatarThemeFromVariant((profile as any).avatar_variant);
+              // Utiliser les nouvelles fonctions pour obtenir l'avatar et la couleur
+              const avatarUrl = getAvatarUrl(profile);
+              const accentColor = getProfileAccentColor(profile);
+              const accentSoft = hexToRgba(accentColor, 0.2);
+              const accentGlow = hexToRgba(accentColor, 0.33);
               const favoritesCount = favoriteCount(profile.favorite_restaurant_ids);
 
               return (
@@ -240,25 +249,25 @@ export default function SocialPage() {
                   key={profile.id}
                   onClick={() => handleProfileClick(profile)}
                   className="flex items-center gap-4 rounded-2xl bg-slate-800/50 border-l-4 border-r border-t border-b p-4 hover:bg-slate-800/70 transition-colors text-left"
-                  style={{ borderLeftColor: theme.accent, borderRightColor: theme.accentSoft, borderTopColor: theme.accentSoft, borderBottomColor: theme.accentSoft }}
+                  style={{ borderLeftColor: accentColor, borderRightColor: accentSoft, borderTopColor: accentSoft, borderBottomColor: accentSoft }}
                 >
                   {/* Avatar */}
                   <div
                     className="relative h-14 w-14 flex-shrink-0 overflow-hidden rounded-full border"
-                    style={{ boxShadow: theme.glow, borderColor: theme.accentSoft }}
+                    style={{ boxShadow: `0 0 20px ${accentGlow}`, borderColor: accentSoft }}
                   >
                     <Image
-                      src={theme.avatarSrc}
+                      src={avatarUrl}
                       alt={profile.username || "Avatar"}
                       fill
-                      className="object-cover object-center scale-150"
+                      className="object-cover object-center"
                       style={{ minWidth: '100%', minHeight: '100%' }}
                     />
                   </div>
 
                   {/* Infos */}
                   <div className="flex flex-col flex-1 min-w-0">
-                    <span className="text-base font-semibold truncate" style={{ color: theme.accent }}>
+                    <span className="text-base font-semibold truncate" style={{ color: accentColor }}>
                       @{profile.username}
                     </span>
                     <div className="flex items-center gap-4 mt-1">

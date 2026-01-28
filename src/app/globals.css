@@ -24,3 +24,31 @@
   display: none; /* Chrome, Safari et Opera */
 }
 
+/* Styles pour le color picker personnalisé - supprimer les traits internes */
+.custom-color-picker {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  padding: 0;
+  border: none;
+  overflow: hidden;
+}
+
+.custom-color-picker::-webkit-color-swatch-wrapper {
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+.custom-color-picker::-webkit-color-swatch {
+  border: none;
+  border-radius: 50%;
+  padding: 0;
+}
+
+.custom-color-picker::-moz-color-swatch {
+  border: none;
+  border-radius: 50%;
+  padding: 0;
+}

@@ -8,6 +8,7 @@ import { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
 import { UserProfile } from "@/lib/profile";
 import { getAvatarThemeFromVariant } from "@/lib/avatarTheme";
+import { getAvatarUrl, getProfileAccentColor, hexToRgba } from "@/lib/avatarUtils";
 import { useProfile } from "@/context/ProfileContext";
 import Spinner from "@/components/Spinner";
 import EditProfileModal from "@/components/EditProfileModal";
@@ -305,13 +306,13 @@ export default function ProfilePage() {
     );
   }
 
-  // Utiliser avatar_variant comme source de vérité unique
-  const theme = getAvatarThemeFromVariant(profile?.avatar_variant as any);
+  // Obtenir la couleur d'accent (nouveau système)
+  const accentColor = getProfileAccentColor(profile);
+  const accentRgba = hexToRgba(accentColor, 0.2);
+  const accentGlow = hexToRgba(accentColor, 0.33);
   
-  // Log temporaire pour confirmer la valeur depuis la DB
-  if (process.env.NODE_ENV === "development") {
-    console.log("[Profile] avatar_variant from DB =", profile?.avatar_variant, "→ theme:", theme);
-  }
+  // Obtenir l'URL de l'avatar (preset ou photo)
+  const avatarUrl = getAvatarUrl(profile);
   const displayName = profile?.display_name && profile.display_name.trim().length > 0
     ? profile.display_name
     : profile?.username && profile.username.trim().length > 0
@@ -329,18 +330,66 @@ export default function ProfilePage() {
         )}
 
         {/* Header profil style TikTok */}
-        <section className="px-4 pt-0 pb-6">
+        <section className="px-4 pt-0 pb-6 relative">
+          {/* Bouton Modifier le profil - en haut à gauche */}
+          <button
+            onClick={handleStartEdit}
+            className="absolute -top-4 left-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors backdrop-blur-sm z-10"
+            aria-label="Modifier le profil"
+          >
+            <svg
+              className="w-5 h-5 text-white"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+              />
+            </svg>
+          </button>
+          
+          {/* Bouton Paramètres - en haut à droite */}
+          <button
+            onClick={() => router.push("/settings")}
+            className="absolute -top-4 right-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors backdrop-blur-sm z-10"
+            aria-label="Paramètres"
+          >
+            <svg
+              className="w-5 h-5 text-white"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+              />
+            </svg>
+          </button>
+
           {/* Avatar centré en haut */}
           <div className="flex justify-center mb-4">
             <div
               className="relative h-28 w-28 overflow-hidden rounded-full border-2 shadow-lg"
-              style={{ boxShadow: theme.glow, borderColor: theme.accent }}
+              style={{ boxShadow: `0 0 20px ${accentGlow}`, borderColor: accentColor }}
             >
               <Image
-                src={theme.avatarSrc}
+                src={avatarUrl}
                 alt="Avatar"
                 fill
-                className="object-cover object-center scale-150"
+                className="object-cover object-center"
                 style={{ minWidth: '100%', minHeight: '100%' }}
               />
             </div>
@@ -400,39 +449,11 @@ export default function ProfilePage() {
               </span>
             </div>
           </div>
-
-          {/* Boutons d'action */}
-          <div className="space-y-3 px-4">
-            <button
-              onClick={handleStartEdit}
-              className="w-full rounded-xl border-2 px-4 py-3 text-sm font-semibold transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg"
-              style={{ 
-                borderColor: theme.accentSoft, 
-                backgroundColor: theme.accentSoft, 
-                color: theme.accent,
-                boxShadow: `0 4px 12px ${theme.accentSoft}40`
-              }}
-            >
-              Modifier le profil
-            </button>
-            <button
-              onClick={() => router.push("/settings")}
-              className="w-full rounded-xl border-2 px-4 py-3 text-sm font-semibold transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg"
-              style={{ 
-                borderColor: theme.accentSoft, 
-                backgroundColor: theme.accentSoft, 
-                color: theme.accent,
-                boxShadow: `0 4px 12px ${theme.accentSoft}40`
-              }}
-            >
-              Paramètres
-            </button>
-          </div>
         </section>
 
         {/* Mon podium BiteBox */}
-        <section className="px-4 py-4 border-t border-white/10">
-          <h2 className="text-sm font-semibold text-white mb-4">Mon podium BiteBox</h2>
+        <section className="px-4 py-4">
+          <h2 className="text-base font-bold text-white mb-6 border-b-2 pb-2" style={{ borderBottomColor: accentColor }}>Mon podium BiteBox</h2>
           <div className="flex items-center justify-between gap-3 w-full">
             {/* Helper function pour obtenir le restaurant à une position donnée */}
             {(() => {
@@ -522,7 +543,7 @@ export default function ProfilePage() {
         </section>
 
         {/* Grille d'expériences style Instagram */}
-        <ExperienceGrid experiences={experiences} title="Mes dernières expériences" />
+        <ExperienceGrid experiences={experiences} title="Mes dernières expériences" accentColor={accentColor} />
       </div>
 
       {/* Modal d'édition du profil */}

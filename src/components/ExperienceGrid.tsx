@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
 import Spinner from "./Spinner";
@@ -28,6 +28,7 @@ type DishRating = {
 type ExperienceGridProps = {
   experiences: Experience[];
   title: string;
+  accentColor?: string;
 };
 
 function formatDate(dateString: string | null): string {
@@ -39,15 +40,26 @@ function formatDate(dateString: string | null): string {
   });
 }
 
-export default function ExperienceGrid({ experiences, title }: ExperienceGridProps) {
+export default function ExperienceGrid({ experiences, title, accentColor = '#7c3aed' }: ExperienceGridProps) {
   const [selectedExperience, setSelectedExperience] = useState<Experience | null>(null);
   const [experienceDishes, setExperienceDishes] = useState<DishRating[]>([]);
   const [loadingDishes, setLoadingDishes] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+  const [isOpening, setIsOpening] = useState(false);
 
   const handleExperienceClick = async (exp: Experience) => {
     setSelectedExperience(exp);
+    setIsModalOpen(true);
+    setIsClosing(false);
+    setIsOpening(false);
     setLoadingDishes(true);
     setExperienceDishes([]);
+    
+    // Déclencher l'animation d'ouverture après un court délai pour permettre au DOM de se mettre à jour
+    setTimeout(() => {
+      setIsOpening(true);
+    }, 10);
 
     try {
       // Charger les plats notés pour cette expérience
@@ -93,9 +105,28 @@ export default function ExperienceGrid({ experiences, title }: ExperienceGridPro
   };
 
   const handleCloseExperienceModal = () => {
-    setSelectedExperience(null);
-    setExperienceDishes([]);
+    setIsOpening(false);
+    setIsClosing(true);
+    // Attendre la fin de l'animation avant de fermer
+    setTimeout(() => {
+      setIsModalOpen(false);
+      setSelectedExperience(null);
+      setExperienceDishes([]);
+      setIsClosing(false);
+    }, 200); // Durée de l'animation de fermeture
   };
+
+  // Empêcher le scroll du body quand le modal est ouvert
+  useEffect(() => {
+    if (isModalOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isModalOpen]);
 
   if (experiences.length === 0) {
     return (
@@ -108,7 +139,7 @@ export default function ExperienceGrid({ experiences, title }: ExperienceGridPro
   return (
     <>
       <section className="mt-4 px-4">
-        <h2 className="text-sm font-semibold text-white mb-3">{title}</h2>
+        <h2 className="text-base font-bold text-white mb-3 border-b-2 pb-2" style={{ borderBottomColor: accentColor }}>{title}</h2>
         <div className="grid grid-cols-3 gap-1">
           {experiences.map((exp) => (
             <button
@@ -190,10 +221,29 @@ export default function ExperienceGrid({ experiences, title }: ExperienceGridPro
       </section>
 
       {/* Modal détails expérience */}
-      {selectedExperience && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={handleCloseExperienceModal}>
+      {selectedExperience && isModalOpen && (
+        <div 
+          className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-opacity duration-200 ${
+            isClosing || !isOpening ? 'opacity-0' : 'opacity-100'
+          }`}
+          onClick={handleCloseExperienceModal}
+        >
+          {/* Backdrop avec blur */}
           <div 
-            className="bg-[#020617] rounded-2xl border border-white/10 max-w-md w-full max-h-[90vh] overflow-y-auto shadow-2xl"
+            className={`absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity duration-200 ${
+              isClosing || !isOpening ? 'opacity-0' : 'opacity-100'
+            }`}
+          />
+          
+          {/* Contenu du modal */}
+          <div 
+            className={`relative bg-[#020617] rounded-2xl border border-white/10 max-w-md w-full max-h-[90vh] overflow-y-auto shadow-2xl transform transition-all duration-200 ${
+              isClosing 
+                ? 'scale-95 opacity-0 translate-y-4' 
+                : !isOpening
+                ? 'scale-95 opacity-0 translate-y-4'
+                : 'scale-100 opacity-100 translate-y-0'
+            }`}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}

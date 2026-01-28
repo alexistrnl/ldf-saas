@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
 import { getAvatarThemeFromVariant } from "@/lib/avatarTheme";
+import { getAvatarUrl, getProfileAccentColor, hexToRgba } from "@/lib/avatarUtils";
 import { UserProfile } from "@/lib/profile";
 import ExperienceGrid from "@/components/ExperienceGrid";
 
@@ -43,7 +44,7 @@ type PublicProfileData = {
     totalExperiences: number;
     avgRating: number;
   };
-  favoriteRestaurants: Array<RestaurantLite>;
+  favoriteRestaurants: Array<RestaurantLite | null>; // Peut contenir null pour préserver les positions
   experiences: Array<Experience>;
   lastExperience: {
     id: string;
@@ -60,7 +61,7 @@ async function getPublicProfile(username: string): Promise<PublicProfileData | n
   // 1. Récupérer le profil par username
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("id, username, display_name, is_public, favorite_restaurant_ids, avatar_url, avatar_variant, bio, updated_at")
+      .select("id, username, display_name, is_public, favorite_restaurant_ids, avatar_url, avatar_variant, avatar_type, avatar_preset, accent_color, bio, updated_at")
       .eq("username", username.toLowerCase())
       .eq("is_public", true)
       .maybeSingle();
@@ -81,6 +82,9 @@ async function getPublicProfile(username: string): Promise<PublicProfileData | n
     username: profile.username,
     avatar_url: profile.avatar_url,
     avatar_variant: profile.avatar_variant || null,
+    avatar_type: profile.avatar_type || 'preset',
+    avatar_preset: profile.avatar_preset || null,
+    accent_color: profile.accent_color || null,
     display_name: (profile.display_name && profile.display_name.trim().length > 0) ? profile.display_name.trim() : null,
     bio: (profile.bio && profile.bio.trim().length > 0) ? profile.bio.trim() : null,
     is_public: profile.is_public ?? false,
@@ -122,47 +126,70 @@ async function getPublicProfile(username: string): Promise<PublicProfileData | n
     ? Number((ratings.reduce((sum, r) => sum + r, 0) / ratings.length).toFixed(1))
     : 0;
 
-  // 3. Récupérer les 3 restaurants favoris
-  // Fonction utilitaire pour normaliser favorite_restaurant_ids
-  function normalizeFavoriteIds(raw: unknown): string[] {
+  // 3. Récupérer les 3 restaurants favoris en préservant les positions
+  // Normaliser favorite_restaurant_ids en préservant les positions (peut contenir null)
+  function normalizeFavoriteIdsWithPositions(raw: unknown): (string | null)[] {
     if (Array.isArray(raw)) {
-      return raw.filter((x): x is string => typeof x === "string");
+      // Préserver les positions : prendre les 3 premiers éléments (peuvent être null)
+      const ids: (string | null)[] = [];
+      for (let i = 0; i < 3; i++) {
+        const id = raw[i];
+        ids.push(id && typeof id === "string" ? id : null);
+      }
+      return ids;
     }
     if (typeof raw === "string") {
+      // Ancien format : string, le convertir en tableau
       const cleaned = raw.replace(/^{|}$/g, "");
-      return cleaned
+      const ids = cleaned
         .split(",")
         .map((id) => id.trim())
-        .filter((id) => id.length > 0);
+        .filter((id) => id.length > 0)
+        .slice(0, 3);
+      // Remplir jusqu'à 3 éléments avec null si nécessaire
+      const result: (string | null)[] = [];
+      for (let i = 0; i < 3; i++) {
+        result.push(i < ids.length ? ids[i] : null);
+      }
+      return result;
     }
-    return [];
+    return [null, null, null];
   }
 
-  const favoriteIds = normalizeFavoriteIds(profile.favorite_restaurant_ids);
+  const favoriteIds = normalizeFavoriteIdsWithPositions(profile.favorite_restaurant_ids);
   
-  // Limiter à 3 favoris max
-  const favoriteIdsSliced = favoriteIds.slice(0, 3);
-  let favoriteRestaurants: PublicProfileData["favoriteRestaurants"] = [];
+  // Filtrer les IDs valides (non null) pour la requête
+  const validIds = favoriteIds.filter((id): id is string => 
+    id !== null && typeof id === 'string' && id.length > 0
+  );
+  
+  // Créer un tableau de 3 éléments pour préserver les positions
+  let favoriteRestaurants: (RestaurantLite | null)[] = [null, null, null];
 
-  if (favoriteIdsSliced.length > 0) {
+  if (validIds.length > 0) {
     const { data: restaurantsData, error: restaurantsError } = await supabase
       .from("restaurants")
       .select("id, name, slug, logo_url")
-      .in("id", favoriteIdsSliced);
+      .in("id", validIds);
 
     if (restaurantsError) {
       console.error("[PublicProfile] Error loading favorite restaurants:", restaurantsError);
       // Ne pas casser la page si la requête échoue
-      favoriteRestaurants = [];
     } else if (restaurantsData && restaurantsData.length > 0) {
       const typedRestaurantsData = restaurantsData as RestaurantLite[];
-      // Préserver l'ordre des favoris : mapper favoriteIdsSliced vers restaurantsData
-      favoriteRestaurants = favoriteIdsSliced
-        .map((id: string) => typedRestaurantsData.find((r) => r.id === id))
-        .filter((r): r is RestaurantLite => Boolean(r));
+      // Créer un Map pour un accès rapide
+      const restaurantMap = new Map(typedRestaurantsData.map(r => [r.id, r]));
+      // Préserver les positions exactes : mapper selon l'ordre original
+      favoriteIds.forEach((id, index) => {
+        if (id && typeof id === 'string' && restaurantMap.has(id) && index < 3) {
+          favoriteRestaurants[index] = restaurantMap.get(id)!;
+        }
+      });
     }
-    // Si restaurantsData est vide, favoriteRestaurants reste [] (pas d'erreur)
   }
+  
+  // Convertir en RestaurantLite[] pour le type (sans les null pour l'affichage)
+  // Mais on va utiliser favoriteRestaurants directement dans le JSX avec les positions
 
   // 4. Charger toutes les expériences avec leurs images de plats
   const { data: allLogs } = await supabase
@@ -295,11 +322,10 @@ export default async function PublicProfilePage({
 
   const { profile, stats, favoriteRestaurants, experiences, lastExperience } = data;
   
-  // Utiliser avatar_variant comme source de vérité unique
-  // Log pour debug
-  console.log("[PublicProfile] Rendering - avatar_variant:", profile.avatar_variant);
-  
-  const theme = getAvatarThemeFromVariant(profile.avatar_variant);
+  // Obtenir la couleur d'accent et l'URL de l'avatar (nouveau système)
+  const accentColor = getProfileAccentColor(profile);
+  const accentGlow = hexToRgba(accentColor, 0.33);
+  const avatarUrl = getAvatarUrl(profile);
 
   return (
     <main className="min-h-screen w-full overflow-x-hidden bg-[#020617]">
@@ -310,13 +336,13 @@ export default async function PublicProfilePage({
           <div className="flex justify-center mb-4">
             <div
               className="relative h-28 w-28 overflow-hidden rounded-full border-2 shadow-lg"
-              style={{ boxShadow: theme.glow, borderColor: theme.accent }}
+              style={{ boxShadow: `0 0 20px ${accentGlow}`, borderColor: accentColor }}
             >
               <Image
-                src={theme.avatarSrc}
+                src={avatarUrl}
                 alt={profile.username || "Avatar"}
                 fill
-                className="object-cover object-center scale-150"
+                className="object-cover object-center"
                 style={{ minWidth: '100%', minHeight: '100%' }}
               />
             </div>
@@ -476,7 +502,7 @@ export default async function PublicProfilePage({
         </section>
 
         {/* Grille d'expériences style Instagram */}
-        <ExperienceGrid experiences={experiences} title="Ses dernières expériences" />
+        <ExperienceGrid experiences={experiences} title="Ses dernières expériences" accentColor={accentColor} />
       </div>
     </main>
   );

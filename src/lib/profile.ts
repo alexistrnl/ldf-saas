@@ -17,7 +17,10 @@ export type UserProfile = {
   id: string;
   username: string | null;
   avatar_url: string | null;
-  avatar_variant?: string | null; // "red" | "violet" | "blue" | "green" | "pink"
+  avatar_variant?: string | null; // "red" | "violet" | "blue" | "green" | "pink" (deprecated, utiliser avatar_preset)
+  avatar_type?: 'preset' | 'photo' | null; // Type d'avatar
+  avatar_preset?: string | null; // 'purple' | 'blue' | 'green' | 'red' | 'orange'
+  accent_color?: string | null; // Couleur d'accent hex (ex: '#7c3aed')
   display_name?: string | null;
   bio?: string | null;
   is_public?: boolean | null;
@@ -65,7 +68,7 @@ export async function getMyProfileWithData(): Promise<{
   // 1. Récupérer le profil
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("id, username, display_name, bio, avatar_variant, avatar_url, favorite_restaurant_ids, is_public, updated_at")
+    .select("id, username, display_name, bio, avatar_variant, avatar_url, avatar_type, avatar_preset, accent_color, favorite_restaurant_ids, is_public, updated_at")
     .eq("id", user.id)
     .single();
 
@@ -79,6 +82,9 @@ export async function getMyProfileWithData(): Promise<{
     username: profile.username,
     avatar_url: profile.avatar_url,
     avatar_variant: profile.avatar_variant,
+    avatar_type: profile.avatar_type || 'preset',
+    avatar_preset: profile.avatar_preset || null,
+    accent_color: profile.accent_color || null,
     display_name: (profile.display_name && profile.display_name.trim().length > 0) ? profile.display_name.trim() : null,
     bio: (profile.bio && profile.bio.trim().length > 0) ? profile.bio.trim() : null,
     is_public: profile.is_public ?? false,
@@ -214,7 +220,7 @@ export async function getCurrentUserProfile(): Promise<{
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("id, username, display_name, avatar_url, avatar_variant, bio, is_public, favorite_restaurant_ids, created_at, updated_at")
+    .select("id, username, display_name, avatar_url, avatar_variant, avatar_type, avatar_preset, accent_color, bio, is_public, favorite_restaurant_ids, created_at, updated_at")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -546,6 +552,10 @@ export async function updateSocialSettings(data: {
 /**
  * Upload un avatar vers Supabase Storage
  */
+/**
+ * Upload un avatar photo vers Supabase Storage bucket 'avatars'
+ * Chemin: ${user.id}/${Date.now()}-${file.name}
+ */
 export async function uploadAvatar(file: File): Promise<{ url: string | null; error: any }> {
   const {
     data: { user },
@@ -568,16 +578,15 @@ export async function uploadAvatar(file: File): Promise<{ url: string | null; er
     }
 
     const userId = user.id;
-    const fileExt = file.name.split(".").pop() || "jpg";
-    const fileName = `${userId}/${Date.now()}.${fileExt}`;
-    const filePath = `avatars/${fileName}`;
+    const fileName = `${userId}/${Date.now()}-${file.name}`;
+    const filePath = fileName;
 
-    // Upload vers le bucket "avatars" (ou "fastfood-images" si "avatars" n'existe pas)
+    // Upload vers le bucket "avatars" (public)
     const { data, error: uploadError } = await supabase.storage
       .from("avatars")
       .upload(filePath, file, {
         cacheControl: "3600",
-        upsert: false,
+        upsert: true, // Permet de remplacer si existe déjà
       });
 
     if (uploadError) {
@@ -585,9 +594,9 @@ export async function uploadAvatar(file: File): Promise<{ url: string | null; er
       if (uploadError.message.includes("not found") || uploadError.message.includes("Bucket")) {
         const { data: fallbackData, error: fallbackError } = await supabase.storage
           .from("fastfood-images")
-          .upload(`avatars/${fileName}`, file, {
+          .upload(`avatars/${filePath}`, file, {
             cacheControl: "3600",
-            upsert: false,
+            upsert: true,
           });
 
         if (fallbackError) {
@@ -597,7 +606,7 @@ export async function uploadAvatar(file: File): Promise<{ url: string | null; er
 
         const { data: publicUrlData } = supabase.storage
           .from("fastfood-images")
-          .getPublicUrl(`avatars/${fileName}`);
+          .getPublicUrl(`avatars/${filePath}`);
 
         return { url: publicUrlData.publicUrl, error: null };
       }
@@ -619,13 +628,28 @@ export async function uploadAvatar(file: File): Promise<{ url: string | null; er
 }
 
 /**
- * Met à jour les champs du profil (display_name, bio, avatar_variant, is_public)
+ * Fonction utilitaire pour obtenir la couleur d'accent avec fallback
+ */
+export function getAccentColor(profile: UserProfile | null | undefined): string {
+  if (profile?.accent_color) {
+    return profile.accent_color;
+  }
+  // Fallback par défaut
+  return '#7c3aed'; // violet-500
+}
+
+/**
+ * Met à jour les champs du profil (display_name, bio, avatar_variant, avatar_type, avatar_preset, accent_color, is_public)
  * Ne met à jour que les champs définis (ne jamais écraser par null/undefined)
  */
 export async function updateProfile(data: {
   display_name?: string | null;
   bio?: string | null;
   avatar_variant?: string | null;
+  avatar_type?: 'preset' | 'photo' | null;
+  avatar_preset?: string | null;
+  avatar_url?: string | null;
+  accent_color?: string | null;
   is_public?: boolean;
 }): Promise<{ profile: UserProfile | null; error: any }> {
   console.log("[Profile] updateProfile called with:", data);
@@ -657,6 +681,18 @@ export async function updateProfile(data: {
   if (data.avatar_variant !== undefined) {
     updates.avatar_variant = data.avatar_variant;
   }
+  if (data.avatar_type !== undefined) {
+    updates.avatar_type = data.avatar_type;
+  }
+  if (data.avatar_preset !== undefined) {
+    updates.avatar_preset = data.avatar_preset;
+  }
+  if (data.avatar_url !== undefined) {
+    updates.avatar_url = data.avatar_url;
+  }
+  if (data.accent_color !== undefined) {
+    updates.accent_color = data.accent_color;
+  }
   if (data.is_public !== undefined) {
     updates.is_public = data.is_public;
   }
@@ -669,7 +705,7 @@ export async function updateProfile(data: {
     .from("profiles")
     .update(updates)
     .eq("id", user.id)
-    .select("id, username, display_name, avatar_url, avatar_variant, bio, is_public, favorite_restaurant_ids, created_at, updated_at")
+    .select("id, username, display_name, avatar_url, avatar_variant, avatar_type, avatar_preset, accent_color, bio, is_public, favorite_restaurant_ids, created_at, updated_at")
     .single();
 
   if (error) {
