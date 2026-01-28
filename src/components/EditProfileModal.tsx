@@ -139,15 +139,18 @@ export default function EditProfileModal({
     loadRestaurants();
   }, [isOpen]);
 
-  // Empêcher le scroll du body quand la modal est ouverte
+  // Empêcher le scroll du body et masquer la bottom nav quand la modal est ouverte
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
+      document.body.setAttribute("data-modal-open", "true");
     } else {
       document.body.style.overflow = "unset";
+      document.body.removeAttribute("data-modal-open");
     }
     return () => {
       document.body.style.overflow = "unset";
+      document.body.removeAttribute("data-modal-open");
     };
   }, [isOpen]);
 
