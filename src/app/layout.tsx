@@ -41,8 +41,8 @@ export default function RootLayout({
   // ConditionalAppShell bypass AppShell pour les pages d'authentification
   // Pour toutes les autres pages, AppShell est utilisé
   return (
-    <html lang="fr">
-      <body className="min-h-screen bg-slate-950 text-slate-50">
+    <html lang="fr" className="h-full">
+      <body className="h-full bg-slate-950 text-slate-50 overflow-hidden">
         <ProfileProvider>
           <ConditionalAppShell>{children}</ConditionalAppShell>
         </ProfileProvider>

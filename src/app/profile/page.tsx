@@ -430,7 +430,7 @@ export default function ProfilePage() {
                 Expériences
               </span>
             </div>
-            <div className="h-12 w-px bg-white/10"></div>
+            <div className="h-12 w-px" style={{ backgroundColor: accentColor }}></div>
             <div className="flex flex-col items-center flex-1">
               <span className="text-xl font-bold text-white mb-0.5">
                 {stats.restaurantsCount}
@@ -439,7 +439,7 @@ export default function ProfilePage() {
                 Restos
               </span>
             </div>
-            <div className="h-12 w-px bg-white/10"></div>
+            <div className="h-12 w-px" style={{ backgroundColor: accentColor }}></div>
             <div className="flex flex-col items-center flex-1">
               <span className="text-xl font-bold text-white mb-0.5">
                 {stats.avgRating.toFixed(1)}

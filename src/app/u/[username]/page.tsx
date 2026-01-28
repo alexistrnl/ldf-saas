@@ -381,7 +381,7 @@ export default async function PublicProfilePage({
                 Expériences
               </span>
             </div>
-            <div className="h-12 w-px bg-white/10"></div>
+            <div className="h-12 w-px" style={{ backgroundColor: accentColor }}></div>
             <div className="flex flex-col items-center flex-1">
               <span className="text-xl font-bold text-white mb-0.5">
                 {stats.restaurantsCount}
@@ -390,7 +390,7 @@ export default async function PublicProfilePage({
                 Restos
               </span>
             </div>
-            <div className="h-12 w-px bg-white/10"></div>
+            <div className="h-12 w-px" style={{ backgroundColor: accentColor }}></div>
             <div className="flex flex-col items-center flex-1">
               <span className="text-xl font-bold text-white mb-0.5">
                 {stats.avgRating.toFixed(1)}
@@ -403,8 +403,8 @@ export default async function PublicProfilePage({
         </section>
 
         {/* Son podium BiteBox */}
-        <section className="px-4 py-4 border-t border-white/10">
-          <h2 className="text-sm font-semibold text-white mb-4">Son podium BiteBox</h2>
+        <section className="px-4 py-4">
+          <h2 className="text-base font-bold text-white mb-6 border-b-2 pb-2" style={{ borderBottomColor: accentColor }}>Son podium BiteBox</h2>
           <div className="flex items-center justify-between gap-3 w-full">
             {/* 2ème place */}
             {favoriteRestaurants[1] ? (

@@ -2,6 +2,37 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Empêcher le scroll au-delà des limites de la page */
+html {
+  overscroll-behavior: none;
+  overscroll-behavior-y: none;
+  overscroll-behavior-x: none;
+  height: 100%;
+  position: fixed;
+  width: 100%;
+  overflow: hidden;
+}
+
+body {
+  overscroll-behavior: none;
+  overscroll-behavior-y: none;
+  overscroll-behavior-x: none;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  position: fixed;
+  touch-action: pan-y;
+}
+
+/* Permettre le scroll uniquement dans le main */
+main {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* Masquer la scrollbar sur mobile */
 @media (max-width: 768px) {
   * {

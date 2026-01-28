@@ -19,7 +19,7 @@ export default function ConditionalAppShell({
 
   // Si c'est une route auth, retourner directement les children sans AppShell
   if (isAuthRoute) {
-    return <>{children}</>
+    return <div className="h-screen flex flex-col overflow-hidden"><main className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain">{children}</main></div>
   }
 
   // Sinon, utiliser AppShell normalement
