@@ -31,7 +31,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className={`h-screen flex flex-col ${isDesktopInfoPage ? '' : 'bg-[#020617] text-white'} overflow-hidden`}>
       {showHeader && <AppHeader />}
-      <main className={`flex-1 overflow-y-auto overflow-x-hidden overscroll-contain ${showBottomNav ? 'pb-24' : 'pb-2'} ${showHeader ? 'pt-2' : 'pt-0'}`}>
+      <main className={`flex-1 overflow-y-auto overflow-x-hidden overscroll-contain ${showBottomNav ? 'pb-36' : 'pb-2'} ${showHeader ? 'pt-2' : 'pt-0'}`}>
         {children}
       </main>
       {showBottomNav && <BottomNav />}
