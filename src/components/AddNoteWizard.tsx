@@ -292,6 +292,38 @@ export default function AddNoteWizard({
     wizardState.selectedDishIds.includes(d.id)
   );
 
+  // Calculer la moyenne des notes des plats notés
+  const calculateAverageDishRating = () => {
+    const ratedDishes = selectedDishes.filter((dish) => {
+      const rating = wizardState.dishRatings[dish.id];
+      return rating && rating > 0;
+    });
+
+    if (ratedDishes.length === 0) return 0;
+
+    const sum = ratedDishes.reduce((acc, dish) => {
+      return acc + (wizardState.dishRatings[dish.id] || 0);
+    }, 0);
+
+    const average = sum / ratedDishes.length;
+    return Math.round(average * 100) / 100; // Arrondir à 2 décimales maximum
+  };
+
+  // Préremplir la note globale avec la moyenne des plats quand on arrive à l'étape 4
+  useEffect(() => {
+    if (wizardState.currentStep === 4) {
+      const averageRating = calculateAverageDishRating();
+      // Toujours préremplir avec la moyenne si des plats ont été notés
+      // Cela calcule la moyenne de tous les plats notés (ou la note unique si un seul plat)
+      if (averageRating > 0) {
+        setWizardState((prev) => ({
+          ...prev,
+          globalRating: averageRating,
+        }));
+      }
+    }
+  }, [wizardState.currentStep, wizardState.dishRatings]);
+
   return (
     <div className="min-h-screen w-full overflow-x-hidden bg-slate-950 text-slate-50">
       {/* Header avec bouton retour */}
@@ -530,32 +562,71 @@ export default function AddNoteWizard({
                 return (
                   <div
                     key={dish.id}
-                    className="flex items-center gap-4 p-4 rounded-xl bg-slate-900/70 border border-slate-800"
+                    className="flex gap-4 p-4 rounded-xl bg-slate-900/70 border border-slate-800"
                   >
-                    {/* Image miniature */}
-                    <DishImage
-                      src={dish.image_url}
-                      alt={dish.name}
-                      size="mini"
-                      className="flex-shrink-0"
-                    />
+                    {/* Image à gauche */}
+                    <div className="flex-shrink-0 w-20 h-20 sm:w-24 sm:h-24">
+                      <DishImage
+                        src={dish.image_url}
+                        alt={dish.name}
+                        size="small"
+                        className="w-full h-full"
+                      />
+                    </div>
 
-                    {/* Nom et étoiles */}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-white mb-2 truncate">
+                    {/* Contenu principal : nom et notation */}
+                    <div className="flex-1 min-w-0 flex flex-col justify-between">
+                      {/* Nom du plat */}
+                      <p className="text-sm font-semibold text-white mb-3 line-clamp-2">
                         {dish.name}
                       </p>
-                      <div className="flex items-center gap-2">
-                        <StarRating
-                          value={rating}
-                          onChange={(value) => setDishRating(dish.id, value)}
-                          size="md"
-                          allowHalf={true}
-                        />
-                        {rating > 0 && (
-                          <span className="text-xs text-slate-400">
-                            {rating.toFixed(1)}/5
-                          </span>
+                      
+                      {/* Zone de notation bien visible */}
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <StarRating
+                            value={rating}
+                            onChange={(value) => setDishRating(dish.id, value)}
+                            size="lg"
+                            allowHalf={true}
+                            className="flex-shrink-0"
+                          />
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number"
+                              min="0"
+                              max="5"
+                              step="0.5"
+                              value={rating > 0 ? rating : ""}
+                              onChange={(e) => {
+                                const value = parseFloat(e.target.value);
+                                if (!isNaN(value) && value >= 0 && value <= 5) {
+                                  setDishRating(dish.id, value);
+                                } else if (e.target.value === "") {
+                                  setDishRating(dish.id, 0);
+                                }
+                              }}
+                              onBlur={(e) => {
+                                const value = parseFloat(e.target.value);
+                                if (isNaN(value) || value < 0) {
+                                  setDishRating(dish.id, 0);
+                                } else if (value > 5) {
+                                  setDishRating(dish.id, 5);
+                                }
+                              }}
+                              placeholder="0"
+                              className="w-16 px-2 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-sm font-semibold text-white text-center outline-none focus:border-bitebox transition"
+                              style={{ WebkitAppearance: "none", MozAppearance: "textfield" }}
+                            />
+                            <span className="text-sm font-semibold text-slate-400 whitespace-nowrap">
+                              / 5
+                            </span>
+                          </div>
+                        </div>
+                        {rating === 0 && (
+                          <p className="text-xs text-slate-500">
+                            Clique, glisse ou tape une note
+                          </p>
                         )}
                       </div>
                     </div>
@@ -585,22 +656,50 @@ export default function AddNoteWizard({
               </div>
               {wizardState.selectedDishIds.length > 0 && (
                 <div>
-                  <p className="text-xs text-slate-400 mb-1">
+                  <p className="text-xs text-slate-400 mb-2">
                     Plats sélectionnés ({wizardState.selectedDishIds.length})
                   </p>
-                  <p className="text-xs text-slate-300">
-                    {selectedDishes.map((d) => d.name).join(", ")}
-                  </p>
+                  <div className="space-y-2">
+                    {selectedDishes.map((dish) => {
+                      const dishRating = wizardState.dishRatings[dish.id] || 0;
+                      return (
+                        <div
+                          key={dish.id}
+                          className="flex items-center justify-between text-xs"
+                        >
+                          <span className="text-slate-300 truncate flex-1 mr-2">
+                            {dish.name}
+                          </span>
+                          {dishRating > 0 ? (
+                            <span className="text-slate-200 font-semibold whitespace-nowrap">
+                              {dishRating.toFixed(2)} / 5
+                            </span>
+                          ) : (
+                            <span className="text-slate-500 whitespace-nowrap">
+                              Non noté
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>
 
             {/* Note globale */}
             <div className="space-y-3">
-              <label className="text-sm text-slate-300 font-medium">
-                Note globale *
-              </label>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center justify-between">
+                <label className="text-sm text-slate-300 font-medium">
+                  Note globale *
+                </label>
+                {selectedDishes.some((d) => (wizardState.dishRatings[d.id] || 0) > 0) && (
+                  <span className="text-xs text-slate-500">
+                    (Moyenne: {calculateAverageDishRating().toFixed(2)} / 5)
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-4 flex-wrap">
                 <StarRating
                   value={wizardState.globalRating}
                   onChange={(value) =>
@@ -612,11 +711,49 @@ export default function AddNoteWizard({
                   size="lg"
                   allowHalf={true}
                 />
-                {wizardState.globalRating > 0 && (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    max="5"
+                    step="0.5"
+                    value={wizardState.globalRating > 0 ? wizardState.globalRating : ""}
+                    onChange={(e) => {
+                      const value = parseFloat(e.target.value);
+                      if (!isNaN(value) && value >= 0 && value <= 5) {
+                        setWizardState((prev) => ({
+                          ...prev,
+                          globalRating: value,
+                        }));
+                      } else if (e.target.value === "") {
+                        setWizardState((prev) => ({
+                          ...prev,
+                          globalRating: 0,
+                        }));
+                      }
+                    }}
+                    onBlur={(e) => {
+                      const value = parseFloat(e.target.value);
+                      if (isNaN(value) || value < 0) {
+                        setWizardState((prev) => ({
+                          ...prev,
+                          globalRating: 0,
+                        }));
+                      } else if (value > 5) {
+                        setWizardState((prev) => ({
+                          ...prev,
+                          globalRating: 5,
+                        }));
+                      }
+                    }}
+                    placeholder="0"
+                    className="w-16 px-2 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-sm font-semibold text-white text-center outline-none focus:border-bitebox transition"
+                    style={{ WebkitAppearance: "none", MozAppearance: "textfield" }}
+                  />
                   <span className="text-base text-slate-400 font-medium">
-                    {wizardState.globalRating.toFixed(1)} / 5
+                    / 5
                   </span>
-                )}
+                </div>
               </div>
             </div>
 

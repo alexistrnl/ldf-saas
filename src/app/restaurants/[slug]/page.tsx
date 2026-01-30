@@ -175,7 +175,7 @@ export default function RestaurantPage() {
               dishRatingMap.set(row.dish_id, {
                 count,
                 sum,
-                avg: sum / count,
+                avg: Math.round((sum / count) * 100) / 100,
               });
             }
           }
@@ -228,7 +228,7 @@ export default function RestaurantPage() {
                 latestDishRatingMap.set(row.dish_id, {
                   count,
                   sum,
-                  avg: sum / count,
+                  avg: Math.round((sum / count) * 100) / 100,
                 });
               }
             }
@@ -339,7 +339,7 @@ export default function RestaurantPage() {
                   ))}
                 </div>
                 <span className="text-slate-400 ml-1">
-                  {dish.ratingStats.avg.toFixed(1)} / 5 · {dish.ratingStats.count} avis
+                  {dish.ratingStats.avg.toFixed(2)} / 5 · {dish.ratingStats.count} avis
                 </span>
               </>
             )}
@@ -499,7 +499,7 @@ export default function RestaurantPage() {
                         ))}
                       </div>
                       <span className="text-lg font-semibold text-white">
-                        {restaurantRatingStats.avg.toFixed(1)}
+                        {restaurantRatingStats.avg.toFixed(2)}
                       </span>
                     </div>
                     <div className="text-sm text-slate-300">
@@ -590,7 +590,7 @@ export default function RestaurantPage() {
                             ))}
                           </div>
                           <span className="text-slate-400 ml-1">
-                            {dish.ratingStats.avg.toFixed(1)} / 5 · {dish.ratingStats.count} avis
+                            {dish.ratingStats.avg.toFixed(2)} / 5 · {dish.ratingStats.count} avis
                           </span>
                         </>
                       )}
@@ -670,7 +670,7 @@ export default function RestaurantPage() {
                                     ))}
                                   </div>
                                   <span className="text-slate-400 ml-1">
-                                    {dish.ratingStats.avg.toFixed(1)} / 5 · {dish.ratingStats.count} avis
+                                    {dish.ratingStats.avg.toFixed(2)} / 5 · {dish.ratingStats.count} avis
                                   </span>
                                 </>
                               )}
@@ -751,7 +751,7 @@ export default function RestaurantPage() {
                                     ))}
                                   </div>
                                   <span className="text-slate-400 ml-1">
-                                    {dish.ratingStats.avg.toFixed(1)} / 5 · {dish.ratingStats.count} avis
+                                    {dish.ratingStats.avg.toFixed(2)} / 5 · {dish.ratingStats.count} avis
                                   </span>
                                 </>
                               )}

@@ -180,7 +180,7 @@ export default function ExperiencePage() {
             visitsCount: value.visits,
             avgRating:
               value.countRatings > 0
-                ? Number((value.totalRating / value.countRatings).toFixed(1))
+                ? Math.round((value.totalRating / value.countRatings) * 100) / 100
                 : 0,
           };
         });
@@ -328,9 +328,9 @@ export default function ExperiencePage() {
   const avgRating =
     experiences.length > 0
       ? (
-          experiences.reduce((sum, exp) => sum + exp.rating, 0) / experiences.length
-        ).toFixed(1)
-      : "0.0";
+          Math.round((experiences.reduce((sum, exp) => sum + exp.rating, 0) / experiences.length) * 100) / 100
+        ).toFixed(2)
+      : "0.00";
 
   // Fonction pour formater la date
   const formatDate = (dateString: string | null) => {

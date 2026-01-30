@@ -423,7 +423,7 @@ export default function HomePage() {
                             ))}
                           </div>
                           <span className="text-xs text-orange-400 font-medium">
-                            {restaurant.ratingStats.avg.toFixed(1)} / 5 ({restaurant.ratingStats.count})
+                            {restaurant.ratingStats.avg.toFixed(2)} / 5 ({restaurant.ratingStats.count})
                           </span>
                         </div>
                       )}

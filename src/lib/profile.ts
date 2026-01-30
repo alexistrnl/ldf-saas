@@ -115,7 +115,7 @@ export async function getMyProfileWithData(): Promise<{
     .map((log) => log.rating)
     .filter((rating): rating is number => typeof rating === "number");
   const avgRating = ratings.length > 0
-    ? Number((ratings.reduce((sum, r) => sum + r, 0) / ratings.length).toFixed(1))
+    ? Math.round((ratings.reduce((sum, r) => sum + r, 0) / ratings.length) * 100) / 100
     : 0;
 
   // 3. Récupérer les restaurants favoris

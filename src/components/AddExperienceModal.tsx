@@ -314,7 +314,7 @@ export default function AddExperienceModal({
                 allowHalf={true}
               />
               <span className="text-xs text-slate-400">
-                {rating.toFixed(1)} / 5
+                {rating.toFixed(2)} / 5
               </span>
             </div>
           </div>
@@ -344,7 +344,7 @@ export default function AddExperienceModal({
                         </p>
                         {value > 0 && (
                           <span className="text-[10px] text-bitebox-light">
-                            {value.toFixed(1)}/5
+                            {value.toFixed(2)}/5
                           </span>
                         )}
                       </div>

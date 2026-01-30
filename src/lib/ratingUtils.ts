@@ -1,4 +1,11 @@
 /**
+ * Arrondit un nombre à 2 décimales maximum
+ */
+export function roundToTwoDecimals(value: number): number {
+  return Math.round(value * 100) / 100
+}
+
+/**
  * Calcule la note publique d'une enseigne avec la règle "1 utilisateur = 1 voix"
  * 
  * Règle métier :
@@ -40,7 +47,7 @@ export function calculatePublicRating(logs: Array<{ user_id: string; rating: num
   const uniqueVotersCount = userAverages.length
   const publicRating =
     uniqueVotersCount > 0
-      ? userAverages.reduce((acc, avg) => acc + avg, 0) / uniqueVotersCount
+      ? roundToTwoDecimals(userAverages.reduce((acc, avg) => acc + avg, 0) / uniqueVotersCount)
       : 0
 
   return {
