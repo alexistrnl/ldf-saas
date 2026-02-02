@@ -21,7 +21,14 @@ export async function signIn(formData: FormData) {
   })
 
   if (error) {
-    return { error: error.message }
+    // Traduire le message d'erreur en français
+    let errorMessage = error.message
+    if (error.message.toLowerCase().includes('invalid login credentials') || 
+        error.message.toLowerCase().includes('invalid credentials') ||
+        error.message.toLowerCase().includes('email not confirmed')) {
+      errorMessage = 'Le mot de passe ou l\'identifiant est incorrect'
+    }
+    return { error: errorMessage }
   }
 
   if (!user) {

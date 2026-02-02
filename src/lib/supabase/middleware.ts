@@ -32,17 +32,17 @@ export async function updateSession(request: NextRequest) {
   const { data: { session } } = await supabase.auth.getSession()
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Si l'utilisateur existe, vérifier s'il est admin
+  // Si l'utilisateur existe, vérifier s'il est admin via profiles.is_admin
   let isAdmin = false
   if (user) {
     try {
       const { data, error } = await supabase
-        .from('admin_users')
-        .select('1')
-        .eq('user_id', user.id)
-        .limit(1)
+        .from('profiles')
+        .select('is_admin')
+        .eq('id', user.id)
+        .single()
       
-      if (!error && data?.length) {
+      if (!error && data?.is_admin === true) {
         isAdmin = true
       }
     } catch (error) {

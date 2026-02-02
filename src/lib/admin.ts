@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 
 /**
  * Vérifie si l'utilisateur connecté est un admin
- * en interrogeant la table admin_users
+ * en interrogeant profiles.is_admin
  * 
  * Retourne true si l'utilisateur est admin, false sinon
  */
@@ -11,17 +11,17 @@ export async function isAdmin(userId: string): Promise<boolean> {
     const supabase = await createClient()
     
     const { data, error } = await supabase
-      .from('admin_users')
-      .select('1')
-      .eq('user_id', userId)
-      .limit(1)
+      .from('profiles')
+      .select('is_admin')
+      .eq('id', userId)
+      .single()
     
     if (error) {
       console.error('[Admin] Error checking admin status:', error)
       return false
     }
     
-    return !!data?.length
+    return data?.is_admin === true
   } catch (error) {
     console.error('[Admin] Exception checking admin status:', error)
     return false
