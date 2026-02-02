@@ -1,6 +1,68 @@
 import { supabase } from "@/lib/supabaseClient";
 
 /**
+ * WHITELIST STRICTE des colonnes autorisées pour les updates de profiles
+ * Cette liste doit être maintenue à jour si de nouvelles colonnes sont ajoutées
+ */
+/**
+ * WHITELIST STRICTE des colonnes autorisées pour les updates de profiles
+ * Cette liste correspond EXACTEMENT aux colonnes existantes dans la table profiles
+ * 
+ * Colonnes autorisées :
+ * - display_name, bio, username (identité)
+ * - avatar_variant, avatar_type, avatar_preset, avatar_url (avatar)
+ * - accent_color (couleur d'accent)
+ * - is_public, favorite_restaurant_ids (social)
+ * - is_verified, is_admin (admin - géré par RLS)
+ * - updated_at (timestamp)
+ * 
+ * ⚠️ NE JAMAIS ajouter rating_scale ou tout autre champ supprimé
+ */
+const ALLOWED_PROFILE_UPDATE_FIELDS = [
+  'display_name',
+  'bio',
+  'username',
+  'avatar_variant',
+  'avatar_type',
+  'avatar_preset',
+  'avatar_url',
+  'accent_color',
+  'is_public',
+  'favorite_restaurant_ids',
+  'is_verified', // Modifiable uniquement par les admins (géré par RLS)
+  'is_admin', // Modifiable uniquement par les admins (géré par RLS)
+  'updated_at',
+] as const;
+
+type AllowedProfileUpdateField = typeof ALLOWED_PROFILE_UPDATE_FIELDS[number];
+
+/**
+ * Filtre strictement un objet pour ne garder que les champs autorisés
+ * @param data - Objet contenant potentiellement des champs non autorisés
+ * @returns Objet filtré avec uniquement les champs autorisés
+ */
+export function filterAllowedProfileFields(data: Record<string, any>): Record<string, any> {
+  const filtered: Record<string, any> = {};
+  
+  for (const field of ALLOWED_PROFILE_UPDATE_FIELDS) {
+    if (field in data && data[field] !== undefined) {
+      filtered[field] = data[field];
+    }
+  }
+  
+  // Log pour validation : vérifier qu'aucun champ non autorisé n'est présent
+  const inputKeys = Object.keys(data);
+  const filteredKeys = Object.keys(filtered);
+  const rejectedKeys = inputKeys.filter(key => !filteredKeys.includes(key));
+  
+  if (rejectedKeys.length > 0) {
+    console.warn("[Profile] Rejected fields (not in whitelist):", rejectedKeys);
+  }
+  
+  return filtered;
+}
+
+/**
  * Type pour le profil utilisateur
  * 
  * ⚠️ Migration Supabase nécessaire :
@@ -25,6 +87,8 @@ export type UserProfile = {
   bio?: string | null;
   is_public?: boolean | null;
   favorite_restaurant_ids?: string[] | null;
+  is_verified?: boolean | null; // Compte certifié (badge bleu)
+  is_admin?: boolean | null; // Indique si l'utilisateur est administrateur
   created_at?: string;
   updated_at?: string;
 };
@@ -68,7 +132,7 @@ export async function getMyProfileWithData(): Promise<{
   // 1. Récupérer le profil
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("id, username, display_name, bio, avatar_variant, avatar_url, avatar_type, avatar_preset, accent_color, favorite_restaurant_ids, is_public, updated_at")
+    .select("id, username, display_name, bio, avatar_variant, avatar_url, avatar_type, avatar_preset, accent_color, favorite_restaurant_ids, is_public, is_verified, updated_at")
     .eq("id", user.id)
     .single();
 
@@ -89,6 +153,7 @@ export async function getMyProfileWithData(): Promise<{
     bio: (profile.bio && profile.bio.trim().length > 0) ? profile.bio.trim() : null,
     is_public: profile.is_public ?? false,
     favorite_restaurant_ids: profile.favorite_restaurant_ids || null,
+    is_verified: profile.is_verified ?? false,
     updated_at: profile.updated_at,
   };
 
@@ -220,7 +285,7 @@ export async function getCurrentUserProfile(): Promise<{
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("id, username, display_name, avatar_url, avatar_variant, avatar_type, avatar_preset, accent_color, bio, is_public, favorite_restaurant_ids, created_at, updated_at")
+    .select("id, username, display_name, avatar_url, avatar_variant, avatar_type, avatar_preset, accent_color, bio, is_public, favorite_restaurant_ids, is_verified, created_at, updated_at")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -229,7 +294,7 @@ export async function getCurrentUserProfile(): Promise<{
     const { data: newProfile, error: insertError } = await supabase
       .from("profiles")
       .insert({ id: user.id })
-      .select()
+      .select("id, username, display_name, avatar_url, avatar_variant, avatar_type, avatar_preset, accent_color, bio, is_public, favorite_restaurant_ids, is_verified, created_at, updated_at")
       .single();
 
     if (insertError) {
@@ -259,9 +324,36 @@ export async function getCurrentUserProfile(): Promise<{
     };
   }
 
+  // Si le profil n'existe pas, retourner null
+  if (!profile) {
+    return {
+      user: { id: user.id, email: user.email },
+      profile: null,
+      error: null,
+    };
+  }
+
+  // S'assurer que le profil a les types corrects, notamment is_verified
+  const typedProfile: UserProfile = {
+    id: profile.id,
+    username: profile.username,
+    avatar_url: profile.avatar_url,
+    avatar_variant: profile.avatar_variant || null,
+    avatar_type: profile.avatar_type || 'preset',
+    avatar_preset: profile.avatar_preset || null,
+    accent_color: profile.accent_color || null,
+    display_name: (profile.display_name && profile.display_name.trim().length > 0) ? profile.display_name.trim() : null,
+    bio: (profile.bio && profile.bio.trim().length > 0) ? profile.bio.trim() : null,
+    is_public: profile.is_public ?? false,
+    favorite_restaurant_ids: profile.favorite_restaurant_ids || null,
+    is_verified: profile.is_verified ?? false,
+    created_at: profile.created_at || null,
+    updated_at: profile.updated_at || null,
+  };
+
   return {
     user: { id: user.id, email: user.email },
-    profile: (profile as UserProfile) || null,
+    profile: typedProfile,
     error: null,
   };
 }
@@ -319,7 +411,7 @@ export async function updateUsername(
     const { data: newProfile, error: createError } = await supabase
       .from("profiles")
       .insert({ id: user.id, username: newUsername })
-      .select("*")
+      .select("id, username, display_name, avatar_url, avatar_variant, avatar_type, avatar_preset, accent_color, bio, is_public, favorite_restaurant_ids, is_verified, created_at, updated_at")
       .single();
 
     if (createError) {
@@ -336,13 +428,20 @@ export async function updateUsername(
     return { profile: newProfile as UserProfile, error: null };
   }
 
-  // Mettre à jour le profil existant
+  // Mettre à jour le profil existant avec whitelist stricte
+  const updatePayload = filterAllowedProfileFields({
+    username: newUsername,
+    updated_at: new Date().toISOString(),
+  });
+  
   console.log("[Profile] Updating existing profile...");
+  console.log("[profiles update keys]", Object.keys(updatePayload));
+  console.log("[Profile] Payload (filtered):", JSON.stringify(updatePayload, null, 2));
   const { data: updatedProfile, error } = await supabase
     .from("profiles")
-    .update({ username: newUsername })
+    .update(updatePayload)
     .eq("id", user.id)
-    .select("*")
+    .select("id, username, display_name, avatar_url, avatar_variant, avatar_type, avatar_preset, accent_color, bio, is_public, favorite_restaurant_ids, is_verified, created_at, updated_at")
     .single();
 
   if (error) {
@@ -387,7 +486,7 @@ export async function updateAvatar(
     const { data: newProfile, error: createError } = await supabase
       .from("profiles")
       .insert({ id: user.id, avatar_url: avatarUrl })
-      .select("*")
+      .select("id, username, display_name, avatar_url, avatar_variant, avatar_type, avatar_preset, accent_color, bio, is_public, favorite_restaurant_ids, is_verified, created_at, updated_at")
       .single();
 
     if (createError) {
@@ -398,12 +497,20 @@ export async function updateAvatar(
     return { profile: newProfile as UserProfile, error: null };
   }
 
-  // Mettre à jour l'avatar
+  // Mettre à jour l'avatar avec whitelist stricte
+  const updatePayload = filterAllowedProfileFields({
+    avatar_url: avatarUrl,
+    updated_at: new Date().toISOString(),
+  });
+  
+  console.log("[Profile] Updating avatar...");
+  console.log("[profiles update keys]", Object.keys(updatePayload));
+  console.log("[Profile] Payload (filtered):", JSON.stringify(updatePayload, null, 2));
   const { data: updatedProfile, error } = await supabase
     .from("profiles")
-    .update({ avatar_url: avatarUrl })
+    .update(updatePayload)
     .eq("id", user.id)
-    .select("*")
+    .select("id, username, display_name, avatar_url, avatar_variant, avatar_type, avatar_preset, accent_color, bio, is_public, favorite_restaurant_ids, is_verified, created_at, updated_at")
     .single();
 
   if (error) {
@@ -475,18 +582,16 @@ export async function updateSocialSettings(data: {
     return { profile: null, error: userError };
   }
 
-  // Construire l'objet de mise à jour
-  const updateData: {
-    username?: string | null;
-    is_public?: boolean;
-    favorite_restaurant_ids?: (string | null)[];
-  } = {};
+  // Construire l'objet de mise à jour avec whitelist stricte
+  const rawUpdateData: Record<string, any> = {
+    updated_at: new Date().toISOString(),
+  };
 
   if (data.username !== undefined) {
-    updateData.username = data.username || null;
+    rawUpdateData.username = data.username || null;
   }
   if (data.is_public !== undefined) {
-    updateData.is_public = data.is_public;
+    rawUpdateData.is_public = data.is_public;
   }
   if (data.favorite_restaurant_ids !== undefined) {
     // S'assurer que c'est un tableau valide (max 3 éléments)
@@ -494,8 +599,11 @@ export async function updateSocialSettings(data: {
     const ids = Array.isArray(data.favorite_restaurant_ids) 
       ? data.favorite_restaurant_ids.slice(0, 3) 
       : [null, null, null];
-    updateData.favorite_restaurant_ids = ids;
+    rawUpdateData.favorite_restaurant_ids = ids;
   }
+
+  // FILTRER STRICTEMENT avec la whitelist
+  const updateData = filterAllowedProfileFields(rawUpdateData);
 
   // Vérifier d'abord si le profil existe, sinon le créer
   const { data: existingProfile, error: checkError } = await supabase
@@ -512,10 +620,17 @@ export async function updateSocialSettings(data: {
   if (!existingProfile) {
     // Créer le profil s'il n'existe pas
     console.log("[Profile] Profile doesn't exist, creating new one...");
+    // Filtrer updateData avant l'insert pour éviter les champs non autorisés
+    const filteredInsertData = filterAllowedProfileFields(updateData);
+    filteredInsertData.id = user.id; // id est toujours autorisé pour insert
+    
+    console.log("[profiles insert keys]", Object.keys(filteredInsertData));
+    console.log("[Profile] Creating profile with payload (filtered):", JSON.stringify(filteredInsertData, null, 2));
+    
     const { data: newProfile, error: createError } = await supabase
       .from("profiles")
-      .insert({ id: user.id, ...updateData })
-      .select("*")
+      .insert(filteredInsertData)
+      .select("id, username, display_name, avatar_url, avatar_variant, avatar_type, avatar_preset, accent_color, bio, is_public, favorite_restaurant_ids, is_verified, created_at, updated_at")
       .single();
 
     if (createError) {
@@ -528,11 +643,13 @@ export async function updateSocialSettings(data: {
 
   // Mettre à jour le profil existant
   console.log("[Profile] Updating social settings...");
+  console.log("[profiles update keys]", Object.keys(updateData));
+  console.log("[Profile] Payload (filtered):", JSON.stringify(updateData, null, 2));
   const { data: updatedProfile, error } = await supabase
     .from("profiles")
     .update(updateData)
     .eq("id", user.id)
-    .select("*")
+    .select("id, username, display_name, avatar_url, avatar_variant, avatar_type, avatar_preset, accent_color, bio, is_public, favorite_restaurant_ids, is_verified, created_at, updated_at")
     .single();
 
   if (error) {
@@ -664,48 +781,50 @@ export async function updateProfile(data: {
     return { profile: null, error: userError };
   }
 
-  // Construire l'objet de mise à jour dynamiquement
-  // Ne jamais écraser les champs existants par null/undefined
-  // Mettre à jour uniquement les champs modifiés
-  const updates: Record<string, any> = {
+  // Construire l'objet de mise à jour dynamiquement avec whitelist stricte
+  const rawUpdates: Record<string, any> = {
     updated_at: new Date().toISOString(),
   };
 
   // Ajouter uniquement les champs définis
   if (data.display_name !== undefined) {
-    updates.display_name = data.display_name;
+    rawUpdates.display_name = data.display_name;
   }
   if (data.bio !== undefined) {
-    updates.bio = data.bio;
+    rawUpdates.bio = data.bio;
   }
   if (data.avatar_variant !== undefined) {
-    updates.avatar_variant = data.avatar_variant;
+    rawUpdates.avatar_variant = data.avatar_variant;
   }
   if (data.avatar_type !== undefined) {
-    updates.avatar_type = data.avatar_type;
+    rawUpdates.avatar_type = data.avatar_type;
   }
   if (data.avatar_preset !== undefined) {
-    updates.avatar_preset = data.avatar_preset;
+    rawUpdates.avatar_preset = data.avatar_preset;
   }
   if (data.avatar_url !== undefined) {
-    updates.avatar_url = data.avatar_url;
+    rawUpdates.avatar_url = data.avatar_url;
   }
   if (data.accent_color !== undefined) {
-    updates.accent_color = data.accent_color;
+    rawUpdates.accent_color = data.accent_color;
   }
   if (data.is_public !== undefined) {
-    updates.is_public = data.is_public;
+    rawUpdates.is_public = data.is_public;
   }
 
-  // Log clair avant l'update
-  console.log("[Profile] Updating profile - user.id:", user.id, "updates:", JSON.stringify(updates, null, 2));
+  // FILTRER STRICTEMENT avec la whitelist
+  const updates = filterAllowedProfileFields(rawUpdates);
+
+  // Log clair avant l'update pour validation
+  console.log("[Profile] Updating profile - user.id:", user.id);
+  console.log("[Profile] Payload (filtered):", JSON.stringify(updates, null, 2));
 
   // Mettre à jour le profil (pas d'upsert, juste update)
   const { data: updatedProfile, error } = await supabase
     .from("profiles")
     .update(updates)
     .eq("id", user.id)
-    .select("id, username, display_name, avatar_url, avatar_variant, avatar_type, avatar_preset, accent_color, bio, is_public, favorite_restaurant_ids, created_at, updated_at")
+    .select("id, username, display_name, avatar_url, avatar_variant, avatar_type, avatar_preset, accent_color, bio, is_public, favorite_restaurant_ids, is_verified, created_at, updated_at")
     .single();
 
   if (error) {

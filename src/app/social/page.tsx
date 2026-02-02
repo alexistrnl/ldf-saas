@@ -8,6 +8,7 @@ import { getAvatarThemeFromVariant } from "@/lib/avatarTheme";
 import { getAvatarUrl, getProfileAccentColor, hexToRgba } from "@/lib/avatarUtils";
 import { UserProfile } from "@/lib/profile";
 import Spinner from "@/components/Spinner";
+import VerifiedBadge from "@/components/VerifiedBadge";
 
 type PublicProfile = UserProfile & {
   favorite_restaurant_ids: string[] | null;
@@ -49,7 +50,7 @@ export default function SocialPage() {
         // Toujours faire une requête fraîche (pas de cache)
         const { data, error: searchError } = await supabase
           .from("profiles")
-          .select("id, username, display_name, bio, avatar_variant, avatar_url, avatar_type, avatar_preset, accent_color, is_public, favorite_restaurant_ids, updated_at")
+          .select("id, username, display_name, bio, avatar_variant, avatar_url, avatar_type, avatar_preset, accent_color, is_public, is_verified, favorite_restaurant_ids, updated_at")
           .eq("is_public", true)
           .ilike("username", `%${cleanQuery}%`)
           .not("username", "is", null)
@@ -69,6 +70,7 @@ export default function SocialPage() {
             accent_color: r.accent_color,
             d: r.display_name,
             b: r.bio,
+            is_verified: r.is_verified,
             t: r.updated_at
           })));
           
@@ -85,6 +87,7 @@ export default function SocialPage() {
               display_name: profile.display_name,
               bio: profile.bio,
               is_public: profile.is_public ?? false,
+              is_verified: profile.is_verified ?? false,
               favorite_restaurant_ids: profile.favorite_restaurant_ids,
               updated_at: profile.updated_at,
             } as PublicProfile;
@@ -267,9 +270,12 @@ export default function SocialPage() {
 
                   {/* Infos */}
                   <div className="flex flex-col flex-1 min-w-0">
-                    <span className="text-base font-semibold truncate" style={{ color: accentColor }}>
-                      @{profile.username}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-base font-semibold truncate" style={{ color: accentColor }}>
+                        @{profile.username}
+                      </span>
+                      {(profile.is_verified === true) && <VerifiedBadge />}
+                    </div>
                     <div className="flex items-center gap-4 mt-1">
                       <div className="flex items-center gap-1.5">
                         <svg

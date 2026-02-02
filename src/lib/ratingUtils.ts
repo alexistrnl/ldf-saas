@@ -55,4 +55,3 @@ export function calculatePublicRating(logs: Array<{ user_id: string; rating: num
     uniqueVotersCount,
   }
 }
-

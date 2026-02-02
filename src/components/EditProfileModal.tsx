@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
-import { UserProfile, updateProfile, updateSocialSettings, sanitizeUsername, validateUsernameFormat, uploadAvatar } from "@/lib/profile";
+import { UserProfile, sanitizeUsername, validateUsernameFormat, uploadAvatar, filterAllowedProfileFields } from "@/lib/profile";
 import { useProfile } from "@/context/ProfileContext";
 import { AvatarVariant } from "@/lib/avatarTheme";
 import Spinner from "@/components/Spinner";
@@ -41,11 +41,11 @@ export default function EditProfileModal({
   profile,
   onSave,
 }: EditProfileModalProps) {
-  const { setProfile: setContextProfile, refreshProfile } = useProfile();
-  const [loading, setLoading] = useState(false);
+  const { setProfile: setContextProfile } = useProfile();
+  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // États du formulaire
+  // États du formulaire - contrôlés localement uniquement
   const [avatarType, setAvatarType] = useState<'preset' | 'photo'>('preset');
   const [avatarPreset, setAvatarPreset] = useState<AvatarVariant>("purple");
   const [avatarPhotoUrl, setAvatarPhotoUrl] = useState<string | null>(null);
@@ -63,7 +63,10 @@ export default function EditProfileModal({
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [restaurantsLoading, setRestaurantsLoading] = useState(false);
 
-  // Pré-remplir les champs avec les valeurs existantes
+  // Ref pour éviter les double-submits
+  const isSubmittingRef = useRef(false);
+
+  // Pré-remplir les champs avec les valeurs existantes UNIQUEMENT à l'ouverture
   useEffect(() => {
     if (profile && isOpen) {
       // Initialiser avatar_type et avatar_preset
@@ -88,6 +91,7 @@ export default function EditProfileModal({
       setUsername(profile.username || "");
       setBio(profile.bio || "");
       setIsPublic(profile.is_public ?? false);
+      
       // Convertir le tableau d'IDs en tableau de 3 positions (avec null pour les places vides)
       const existingIds = profile.favorite_restaurant_ids || [];
       const favoritesWithPositions: (string | null)[] = [null, null, null];
@@ -147,6 +151,8 @@ export default function EditProfileModal({
     } else {
       document.body.style.overflow = "unset";
       document.body.removeAttribute("data-modal-open");
+      // Reset du flag de soumission quand on ferme
+      isSubmittingRef.current = false;
     }
     return () => {
       document.body.style.overflow = "unset";
@@ -241,17 +247,36 @@ export default function EditProfileModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Guard anti double-submit
+    if (isSubmittingRef.current || isSaving) {
+      console.warn("[EditProfileModal] Submit already in progress, ignoring");
+      return;
+    }
+
+    isSubmittingRef.current = true;
     setError(null);
-    setLoading(true);
+    setIsSaving(true);
 
     try {
+      // Récupérer l'utilisateur actuel
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        setError("Erreur d'authentification. Reconnecte-toi.");
+        setIsSaving(false);
+        isSubmittingRef.current = false;
+        return;
+      }
+
       // Valider le username
       const cleanedUsername = username.trim();
       if (cleanedUsername) {
         const validation = validateUsernameFormat(cleanedUsername);
         if (!validation.valid) {
           setError(validation.error || "Nom d'utilisateur invalide.");
-          setLoading(false);
+          setIsSaving(false);
+          isSubmittingRef.current = false;
           return;
         }
       }
@@ -265,7 +290,8 @@ export default function EditProfileModal({
         
         if (uploadError) {
           setError("Erreur lors de l'upload de la photo. Réessaie.");
-          setLoading(false);
+          setIsSaving(false);
+          isSubmittingRef.current = false;
           return;
         }
         
@@ -277,40 +303,45 @@ export default function EditProfileModal({
         finalAvatarUrl = avatarPhotoUrl;
       }
 
-      // Préparer les données de mise à jour
-      const updateData: {
-        display_name?: string | null;
-        bio?: string | null;
-        avatar_type?: 'preset' | 'photo';
-        avatar_preset?: string | null;
-        avatar_url?: string | null;
-        accent_color?: string | null;
-        is_public?: boolean;
-      } = {
+      // Préparer TOUS les champs pour UN SEUL update groupé
+      // Utiliser les valeurs locales ACTUELLES (pas le state précédent)
+      const rawUpdates: Record<string, any> = {
+        updated_at: new Date().toISOString(),
         display_name: displayName.trim() || null,
         bio: bio.trim() || null,
         avatar_type: avatarType,
         accent_color: accentColor,
         is_public: isPublic,
+        username: cleanedUsername || null,
+        favorite_restaurant_ids: favoriteRestaurantIds.slice(0, 3),
       };
 
+      // Gérer avatar selon le type
       if (avatarType === 'preset') {
-        updateData.avatar_preset = avatarPreset;
-        updateData.avatar_url = null; // Nettoyer avatar_url si on passe en preset
+        rawUpdates.avatar_preset = avatarPreset;
+        rawUpdates.avatar_url = null; // Nettoyer avatar_url si on passe en preset
       } else {
-        updateData.avatar_preset = null; // Nettoyer avatar_preset si on passe en photo
-        updateData.avatar_url = finalAvatarUrl;
+        rawUpdates.avatar_preset = null; // Nettoyer avatar_preset si on passe en photo
+        rawUpdates.avatar_url = finalAvatarUrl;
       }
 
-      // Mettre à jour le profil
-      const { profile: updatedProfile, error: updateError } = await updateProfile(updateData);
+      // FILTRER STRICTEMENT avec la whitelist
+      const updates = filterAllowedProfileFields(rawUpdates);
+
+      // Log pour validation avant l'update - VÉRIFIER LES CLÉS
+      console.log("[profiles update keys]", Object.keys(updates));
+      console.log("[EditProfileModal] Payload (filtered):", JSON.stringify(updates, null, 2));
+
+      // UN SEUL appel Supabase avec tous les champs groupés
+      const { data: updatedProfile, error: updateError } = await supabase
+        .from("profiles")
+        .update(updates)
+        .eq("id", user.id)
+        .select("id, username, display_name, avatar_url, avatar_variant, avatar_type, avatar_preset, accent_color, bio, is_public, favorite_restaurant_ids, is_verified, created_at, updated_at")
+        .single();
 
       if (updateError) {
         console.error("[EditProfileModal] Profile save error", updateError);
-        console.error("[EditProfileModal] Error code:", updateError.code);
-        console.error("[EditProfileModal] Error message:", updateError.message);
-        console.error("[EditProfileModal] Error details:", updateError.details);
-        console.error("[EditProfileModal] Error hint:", updateError.hint);
         
         // Afficher le message d'erreur de Supabase
         let message = updateError.message || "Erreur lors de la sauvegarde.";
@@ -324,34 +355,36 @@ export default function EditProfileModal({
         ) {
           message = "Permissions insuffisantes (RLS). Tu n'as pas les droits pour modifier ce profil.";
         } else if (updateError.message?.toLowerCase().includes("column") && updateError.message?.toLowerCase().includes("does not exist")) {
-          message = `Erreur: ${updateError.message}. Certaines colonnes (bio, display_name) n'existent peut-être pas dans la base de données.`;
+          message = `Erreur: ${updateError.message}. Certaines colonnes n'existent peut-être pas dans la base de données.`;
         }
 
         setError(message);
-        setLoading(false);
+        setIsSaving(false);
+        isSubmittingRef.current = false;
         return;
       }
 
-      // Sauvegarder les favoris séparément
-      // Préserver les positions avec null pour les places vides
-      const idsToSave = favoriteRestaurantIds.slice(0, 3);
-      
-      const { profile: profileWithFavorites, error: favoritesError } = await updateSocialSettings({
-        favorite_restaurant_ids: idsToSave,
-      });
+      // Mettre à jour le state local avec les valeurs retournées par Supabase
+      // NE PAS refetch depuis Supabase
+      if (updatedProfile) {
+        const typedProfile: UserProfile = {
+          id: updatedProfile.id,
+          username: updatedProfile.username,
+          avatar_url: updatedProfile.avatar_url,
+          avatar_variant: updatedProfile.avatar_variant,
+          avatar_type: updatedProfile.avatar_type || 'preset',
+          avatar_preset: updatedProfile.avatar_preset || null,
+          accent_color: updatedProfile.accent_color || null,
+          display_name: updatedProfile.display_name || null,
+          bio: updatedProfile.bio || null,
+          is_public: updatedProfile.is_public ?? false,
+          favorite_restaurant_ids: updatedProfile.favorite_restaurant_ids || null,
+          is_verified: updatedProfile.is_verified ?? false,
+          updated_at: updatedProfile.updated_at,
+        };
 
-      if (favoritesError) {
-        console.error("[EditProfileModal] Favorites save error", favoritesError);
-        // Ne pas bloquer si l'erreur vient des favoris, juste logger
-      }
-
-      // Utiliser le profil avec favoris si disponible, sinon celui sans favoris
-      const finalProfile = profileWithFavorites || updatedProfile;
-      
-      if (finalProfile) {
-        console.log("[EditProfileModal] Profile saved successfully, updating context with:", finalProfile);
-        console.log("[EditProfileModal] avatar_variant:", finalProfile.avatar_variant, "display_name:", finalProfile.display_name, "bio:", finalProfile.bio, "favorites:", finalProfile.favorite_restaurant_ids);
-        setContextProfile(finalProfile);
+        console.log("[EditProfileModal] Profile saved successfully, updating context with:", typedProfile);
+        setContextProfile(typedProfile);
       }
 
       // Appeler le callback onSave
@@ -360,11 +393,13 @@ export default function EditProfileModal({
       // Fermer le modal
       onClose();
       
-      setLoading(false);
+      setIsSaving(false);
+      isSubmittingRef.current = false;
     } catch (err) {
       console.error("[EditProfileModal] unexpected error", err);
       setError("Erreur inattendue. Réessaie plus tard.");
-      setLoading(false);
+      setIsSaving(false);
+      isSubmittingRef.current = false;
     }
   };
 
@@ -380,6 +415,7 @@ export default function EditProfileModal({
             onClick={onClose}
             className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-white/5 transition-colors"
             aria-label="Fermer"
+            disabled={isSaving}
           >
             <svg
               className="w-5 h-5 text-slate-400"
@@ -427,11 +463,12 @@ export default function EditProfileModal({
                         key={avatar.key}
                         type="button"
                         onClick={() => handleAvatarPresetSelect(avatar.variant)}
+                        disabled={isSaving}
                         className={`relative w-12 h-12 rounded-full overflow-hidden transition-all ${
                           isSelected
                             ? "ring-2 ring-white ring-offset-2 ring-offset-[#020617]"
                             : ""
-                        }`}
+                        } disabled:opacity-60`}
                       >
                         <Image
                           src={avatar.url}
@@ -464,11 +501,12 @@ export default function EditProfileModal({
                   <button
                     type="button"
                     onClick={handlePhotoSelect}
+                    disabled={isSaving}
                     className={`relative w-12 h-12 rounded-full overflow-hidden transition-all ${
                       avatarType === 'photo'
                         ? "ring-2 ring-white ring-offset-2 ring-offset-[#020617]"
                         : ""
-                    }`}
+                    } disabled:opacity-60`}
                   >
                     {avatarPhotoUrl && avatarType === 'photo' ? (
                       <>
@@ -523,10 +561,13 @@ export default function EditProfileModal({
                       onChange={handlePhotoUpload}
                       className="hidden"
                       id="avatar-photo-input"
+                      disabled={isSaving}
                     />
                     <label
                       htmlFor="avatar-photo-input"
-                      className="flex items-center justify-center gap-2 w-full rounded-xl border border-white/10 bg-slate-800/40 px-4 py-2.5 text-sm font-medium text-white cursor-pointer hover:bg-slate-800/60 hover:border-white/20 transition-all"
+                      className={`flex items-center justify-center gap-2 w-full rounded-xl border border-white/10 bg-slate-800/40 px-4 py-2.5 text-sm font-medium text-white cursor-pointer hover:bg-slate-800/60 hover:border-white/20 transition-all ${
+                        isSaving ? "opacity-60 cursor-not-allowed" : ""
+                      }`}
                     >
                       {uploadingPhoto ? (
                         <>
@@ -574,7 +615,8 @@ export default function EditProfileModal({
                         setAccentColor(color);
                         setShowCustomColorPicker(false);
                       }}
-                      className={`w-12 h-12 rounded-full transition-all ${
+                      disabled={isSaving}
+                      className={`w-12 h-12 rounded-full transition-all disabled:opacity-60 ${
                         accentColor === color && !showCustomColorPicker
                           ? "ring-2 ring-white ring-offset-2 ring-offset-[#020617]"
                           : ""
@@ -588,7 +630,8 @@ export default function EditProfileModal({
                   <button
                     type="button"
                     onClick={() => setShowCustomColorPicker(!showCustomColorPicker)}
-                    className={`w-12 h-12 rounded-full transition-all flex items-center justify-center ${
+                    disabled={isSaving}
+                    className={`w-12 h-12 rounded-full transition-all flex items-center justify-center disabled:opacity-60 ${
                       showCustomColorPicker
                         ? "ring-2 ring-white ring-offset-2 ring-offset-[#020617] bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500"
                         : "bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500"
@@ -627,7 +670,8 @@ export default function EditProfileModal({
                             type="color"
                             value={accentColor}
                             onChange={(e) => setAccentColor(e.target.value)}
-                            className="custom-color-picker w-full h-full cursor-pointer opacity-0 absolute inset-0"
+                            disabled={isSaving}
+                            className="custom-color-picker w-full h-full cursor-pointer opacity-0 absolute inset-0 disabled:cursor-not-allowed"
                           />
                         </div>
                       </div>
@@ -644,7 +688,8 @@ export default function EditProfileModal({
                               setAccentColor('#7c3aed');
                               setShowCustomColorPicker(false);
                             }}
-                            className="text-xs text-slate-400 hover:text-slate-300 transition-colors"
+                            disabled={isSaving}
+                            className="text-xs text-slate-400 hover:text-slate-300 transition-colors disabled:opacity-60"
                           >
                             Réinitialiser
                           </button>
@@ -665,7 +710,8 @@ export default function EditProfileModal({
                   type="text"
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-slate-800/40 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-bitebox focus:outline-none focus:ring-2 focus:ring-bitebox/20 transition"
+                  disabled={isSaving}
+                  className="w-full rounded-xl border border-white/10 bg-slate-800/40 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-bitebox focus:outline-none focus:ring-2 focus:ring-bitebox/20 transition disabled:opacity-60"
                   placeholder="Ton nom"
                   maxLength={50}
                 />
@@ -680,7 +726,8 @@ export default function EditProfileModal({
                   type="text"
                   value={username}
                   onChange={(e) => handleUsernameChange(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-slate-800/40 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-bitebox focus:outline-none focus:ring-2 focus:ring-bitebox/20 transition"
+                  disabled={isSaving}
+                  className="w-full rounded-xl border border-white/10 bg-slate-800/40 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-bitebox focus:outline-none focus:ring-2 focus:ring-bitebox/20 transition disabled:opacity-60"
                   placeholder="@tonpseudo"
                   maxLength={30}
                 />
@@ -698,7 +745,8 @@ export default function EditProfileModal({
                 <textarea
                   value={bio}
                   onChange={(e) => setBio(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-slate-800/40 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-bitebox focus:outline-none focus:ring-2 focus:ring-bitebox/20 transition resize-none"
+                  disabled={isSaving}
+                  className="w-full rounded-xl border border-white/10 bg-slate-800/40 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-bitebox focus:outline-none focus:ring-2 focus:ring-bitebox/20 transition resize-none disabled:opacity-60"
                   placeholder="Une courte description..."
                   rows={4}
                   maxLength={150}
@@ -750,7 +798,7 @@ export default function EditProfileModal({
                         onChange={(e) =>
                           handleFavoriteRestaurantChange(index, e.target.value || null)
                         }
-                        disabled={restaurantsLoading}
+                        disabled={restaurantsLoading || isSaving}
                         className="flex-1 rounded-xl border border-white/10 bg-slate-800/40 px-4 py-2.5 text-sm text-white focus:border-bitebox focus:outline-none focus:ring-2 focus:ring-bitebox/20 transition disabled:opacity-60"
                       >
                         <option value="">
@@ -796,7 +844,8 @@ export default function EditProfileModal({
                 <button
                   type="button"
                   onClick={() => setIsPublic(!isPublic)}
-                  className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
+                  disabled={isSaving}
+                  className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors disabled:opacity-60 ${
                     isPublic ? "bg-bitebox" : "bg-slate-600"
                   }`}
                   role="switch"
@@ -818,10 +867,10 @@ export default function EditProfileModal({
           <button
             type="submit"
             onClick={handleSubmit}
-            disabled={loading}
+            disabled={isSaving}
             className="w-full rounded-xl bg-bitebox px-6 py-4 text-sm font-semibold text-white disabled:opacity-60 disabled:cursor-not-allowed transition-all hover:bg-bitebox-dark hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-bitebox/20 flex items-center justify-center gap-2"
           >
-            {loading ? (
+            {isSaving ? (
               <>
                 <Spinner size="sm" />
                 <span>Enregistrement...</span>
@@ -840,4 +889,3 @@ export default function EditProfileModal({
     </div>
   );
 }
-

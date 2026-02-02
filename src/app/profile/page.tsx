@@ -13,6 +13,7 @@ import { useProfile } from "@/context/ProfileContext";
 import Spinner from "@/components/Spinner";
 import EditProfileModal from "@/components/EditProfileModal";
 import ExperienceGrid from "@/components/ExperienceGrid";
+import VerifiedBadge from "@/components/VerifiedBadge";
 
 type RestaurantLite = {
   id: string;
@@ -399,9 +400,12 @@ export default function ProfilePage() {
           <div className="flex flex-col items-center mb-6">
             {displayName && displayName !== usernameDisplay ? (
               <>
-                <h1 className="text-base font-bold text-white mb-1.5">
-                  {displayName}
-                </h1>
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <h1 className="text-base font-bold text-white">
+                    {displayName}
+                  </h1>
+                  {(profile?.is_verified === true) && <VerifiedBadge />}
+                </div>
                 {usernameDisplay && (
                   <span className="text-sm text-slate-400 font-medium">
                     @{usernameDisplay}
@@ -409,9 +413,12 @@ export default function ProfilePage() {
                 )}
               </>
             ) : (
-              <h1 className="text-base font-bold text-white">
-                {usernameDisplay ? `@${usernameDisplay}` : user?.email ?? "Utilisateur BiteBox"}
-              </h1>
+              <div className="flex items-center gap-1.5">
+                <h1 className="text-base font-bold text-white">
+                  {usernameDisplay ? `@${usernameDisplay}` : user?.email ?? "Utilisateur BiteBox"}
+                </h1>
+                {(profile?.is_verified === true) && <VerifiedBadge />}
+              </div>
             )}
             {profile?.bio && profile.bio.trim().length > 0 && (
               <p className="text-sm text-slate-300 mt-3 leading-relaxed text-center max-w-sm px-4">

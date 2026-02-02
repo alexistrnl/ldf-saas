@@ -6,6 +6,7 @@ import { getAvatarThemeFromVariant } from "@/lib/avatarTheme";
 import { getAvatarUrl, getProfileAccentColor, hexToRgba } from "@/lib/avatarUtils";
 import { UserProfile } from "@/lib/profile";
 import ExperienceGrid from "@/components/ExperienceGrid";
+import VerifiedBadge from "@/components/VerifiedBadge";
 
 // Désactiver le cache pour cette page (données toujours fraîches)
 export const dynamic = "force-dynamic";
@@ -61,7 +62,7 @@ async function getPublicProfile(username: string): Promise<PublicProfileData | n
   // 1. Récupérer le profil par username
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("id, username, display_name, is_public, favorite_restaurant_ids, avatar_url, avatar_variant, avatar_type, avatar_preset, accent_color, bio, updated_at")
+      .select("id, username, display_name, is_public, is_verified, favorite_restaurant_ids, avatar_url, avatar_variant, avatar_type, avatar_preset, accent_color, bio, updated_at")
       .eq("username", username.toLowerCase())
       .eq("is_public", true)
       .maybeSingle();
@@ -88,6 +89,7 @@ async function getPublicProfile(username: string): Promise<PublicProfileData | n
     display_name: (profile.display_name && profile.display_name.trim().length > 0) ? profile.display_name.trim() : null,
     bio: (profile.bio && profile.bio.trim().length > 0) ? profile.bio.trim() : null,
     is_public: profile.is_public ?? false,
+    is_verified: profile.is_verified ?? false,
     favorite_restaurant_ids: profile.favorite_restaurant_ids || null,
     updated_at: profile.updated_at || null,
   };
@@ -352,17 +354,23 @@ export default async function PublicProfilePage({
           <div className="flex flex-col items-center mb-6">
             {profile.display_name && profile.display_name.trim().length > 0 ? (
               <>
-                <h1 className="text-base font-bold text-white mb-1.5">
-                  {profile.display_name}
-                </h1>
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <h1 className="text-base font-bold text-white">
+                    {profile.display_name}
+                  </h1>
+                  {(profile.is_verified === true) && <VerifiedBadge />}
+                </div>
                 <span className="text-sm text-slate-400 font-medium">
                   @{profile.username}
                 </span>
               </>
             ) : (
-              <h1 className="text-base font-bold text-white">
-                @{profile.username}
-              </h1>
+              <div className="flex items-center gap-1.5">
+                <h1 className="text-base font-bold text-white">
+                  @{profile.username}
+                </h1>
+                {(profile.is_verified === true) && <VerifiedBadge />}
+              </div>
             )}
             {profile.bio && profile.bio.trim().length > 0 && (
               <p className="text-sm text-slate-300 mt-3 leading-relaxed text-center max-w-sm px-4">
