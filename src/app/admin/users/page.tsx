@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabaseClient";
 import Spinner from "@/components/Spinner";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { filterAllowedProfileFields } from "@/lib/profile";
+import AdminNav from "@/components/AdminNav";
 
 type User = {
   id: string;
@@ -32,7 +33,7 @@ export default function AdminUsersPage() {
 
         const { data, error: fetchError } = await supabase
           .from("profiles")
-          .select("id, username, display_name, is_verified, created_at")
+          .select("id, username, display_name, is_verified, created_at, email")
           .order("created_at", { ascending: false });
 
         if (fetchError) {
@@ -41,30 +42,15 @@ export default function AdminUsersPage() {
           return;
         }
 
-        // Récupérer les emails depuis auth.users (nécessite des permissions admin)
-        // Pour l'instant, on affiche sans email
-        const usersWithEmail = await Promise.all(
-          (data || []).map(async (profile) => {
-            // Essayer de récupérer l'email (peut échouer si pas admin)
-            let email: string | null = null;
-            try {
-              const { data: authData } = await supabase.auth.admin.getUserById(profile.id);
-              email = authData?.user?.email || null;
-            } catch (err) {
-              // Pas de permissions pour récupérer l'email
-              console.warn("[Admin Users] Cannot fetch email for user:", profile.id);
-            }
-
-            return {
-              id: profile.id,
-              email,
-              username: profile.username,
-              display_name: profile.display_name,
-              is_verified: profile.is_verified || false,
-              created_at: profile.created_at,
-            };
-          })
-        );
+        // Les emails peuvent être dans profiles.email si disponible
+        const usersWithEmail = (data || []).map((profile: any) => ({
+          id: profile.id,
+          email: profile.email || null,
+          username: profile.username,
+          display_name: profile.display_name,
+          is_verified: profile.is_verified || false,
+          created_at: profile.created_at,
+        }));
 
         setUsers(usersWithEmail);
       } catch (err) {
@@ -181,12 +167,35 @@ export default function AdminUsersPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#020617] text-slate-50">
+    <main className="h-full bg-[#020617] text-slate-50 overflow-y-auto no-scrollbar">
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-white mb-2">Gestion des utilisateurs</h1>
           <p className="text-slate-400">Certifier ou retirer la certification des comptes</p>
+        </div>
+
+        {/* Navigation Admin */}
+        <AdminNav />
+
+        {/* Stats */}
+        <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-slate-900/50 rounded-xl border border-white/10 p-4">
+            <div className="text-sm text-slate-400 mb-1">Total utilisateurs</div>
+            <div className="text-2xl font-bold text-white">{users.length}</div>
+          </div>
+          <div className="bg-slate-900/50 rounded-xl border border-white/10 p-4">
+            <div className="text-sm text-slate-400 mb-1">Comptes certifiés</div>
+            <div className="text-2xl font-bold text-blue-400">
+              {users.filter((u) => u.is_verified).length}
+            </div>
+          </div>
+          <div className="bg-slate-900/50 rounded-xl border border-white/10 p-4">
+            <div className="text-sm text-slate-400 mb-1">Non certifiés</div>
+            <div className="text-2xl font-bold text-slate-400">
+              {users.filter((u) => !u.is_verified).length}
+            </div>
+          </div>
         </div>
 
         {/* Toast */}
@@ -265,7 +274,13 @@ export default function AdminUsersPage() {
                         )}
                       </td>
                       <td className="px-4 py-4">
-                        <span className="text-sm text-slate-300">{user.email || "N/A"}</span>
+                        <span className="text-sm text-slate-300">
+                          {user.email ? (
+                            user.email
+                          ) : (
+                            <span className="text-slate-500 italic">Non disponible</span>
+                          )}
+                        </span>
                       </td>
                       <td className="px-4 py-4">
                         <span
@@ -311,26 +326,6 @@ export default function AdminUsersPage() {
                 )}
               </tbody>
             </table>
-          </div>
-        </div>
-
-        {/* Stats */}
-        <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-slate-900/50 rounded-xl border border-white/10 p-4">
-            <div className="text-sm text-slate-400 mb-1">Total utilisateurs</div>
-            <div className="text-2xl font-bold text-white">{users.length}</div>
-          </div>
-          <div className="bg-slate-900/50 rounded-xl border border-white/10 p-4">
-            <div className="text-sm text-slate-400 mb-1">Comptes certifiés</div>
-            <div className="text-2xl font-bold text-blue-400">
-              {users.filter((u) => u.is_verified).length}
-            </div>
-          </div>
-          <div className="bg-slate-900/50 rounded-xl border border-white/10 p-4">
-            <div className="text-sm text-slate-400 mb-1">Non certifiés</div>
-            <div className="text-2xl font-bold text-slate-400">
-              {users.filter((u) => !u.is_verified).length}
-            </div>
           </div>
         </div>
       </div>

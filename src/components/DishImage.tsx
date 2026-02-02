@@ -8,6 +8,8 @@ type DishImageProps = {
   className?: string;
   size?: "default" | "small" | "mini";
   onImageError?: (src: string | null) => void;
+  imageZoom?: number; // Facteur de zoom supplémentaire pour l'image (ex: 1.2 pour 20% de zoom)
+  forceCover?: boolean; // Force le mode cover pour remplir le cadre
 };
 
 type DisplayMode = "cover" | "contain";
@@ -53,6 +55,8 @@ export default function DishImage({
   className = "",
   size = "default",
   onImageError,
+  imageZoom = 1,
+  forceCover = false,
 }: DishImageProps) {
   const [imageError, setImageError] = useState(false);
   const [displayMode, setDisplayMode] = useState<DisplayMode>("cover");
@@ -66,13 +70,19 @@ export default function DishImage({
       return;
     }
 
+    // Si forceCover est activé, toujours utiliser cover
+    if (forceCover) {
+      setDisplayMode("cover");
+      return;
+    }
+
     // Si PNG ou packshot détecté, passer en mode contain
     if (isPngUrl(src) || isPackshotUrl(src)) {
       setDisplayMode("contain");
     } else {
       setDisplayMode("cover");
     }
-  }, [src]);
+  }, [src, forceCover]);
 
   // Vérification post-load du ratio de l'image
   const handleImageLoad = () => {
@@ -86,6 +96,12 @@ export default function DishImage({
 
     const imageRatio = naturalWidth / naturalHeight;
     const containerRatio = 4 / 3; // aspect-[4/3] du conteneur
+
+    // Si forceCover est activé, ne pas basculer en contain
+    if (forceCover) {
+      setImageLoaded(true);
+      return;
+    }
 
     // Si ratio extrême (trop large ou trop haut), basculer en contain
     // Ratio extrême = plus de 2x différent du ratio du conteneur
@@ -122,7 +138,8 @@ export default function DishImage({
   }
 
   const isContainMode = displayMode === "contain";
-  const scale = isContainMode ? 1.08 : 1; // Légère scale en contain pour éviter "tout petit"
+  const baseScale = isContainMode ? 1.08 : 1; // Légère scale en contain pour éviter "tout petit"
+  const scale = baseScale * imageZoom; // Appliquer le zoom supplémentaire si fourni
   
   // Padding adapté selon la taille
   const paddingClass = isContainMode

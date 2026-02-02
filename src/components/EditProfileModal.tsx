@@ -44,6 +44,11 @@ export default function EditProfileModal({
   const { setProfile: setContextProfile } = useProfile();
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // États pour les sections dépliables
+  const [isIdentityExpanded, setIsIdentityExpanded] = useState(false);
+  const [isRestaurantsExpanded, setIsRestaurantsExpanded] = useState(false);
+  const [isVisibilityExpanded, setIsVisibilityExpanded] = useState(false);
 
   // États du formulaire - contrôlés localement uniquement
   const [avatarType, setAvatarType] = useState<'preset' | 'photo'>('preset');
@@ -445,9 +450,26 @@ export default function EditProfileModal({
 
             {/* Section Identité */}
             <div className="space-y-5">
-              <div>
-                <h3 className="text-lg font-bold text-white border-b-2 border-bitebox pb-2">Mon identité BiteBox</h3>
-              </div>
+              <button
+                type="button"
+                onClick={() => setIsIdentityExpanded(!isIdentityExpanded)}
+                className="w-full flex items-center justify-between text-left group hover:opacity-80 transition-opacity"
+              >
+                <h3 className="text-lg font-bold text-white border-b-2 border-bitebox pb-2 flex-1">Mon identité BiteBox</h3>
+                <div className="ml-4 flex items-center justify-center w-8 h-8 rounded-full bg-white/5 group-hover:bg-white/10 transition-colors">
+                  <svg
+                    className={`w-4 h-4 text-white transition-transform duration-200 ${isIdentityExpanded ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </button>
+              
+              {isIdentityExpanded && (
+              <div className="space-y-5">
 
               {/* Avatar Picker */}
               <div className="space-y-3">
@@ -755,13 +777,32 @@ export default function EditProfileModal({
                   {bio.length}/150
                 </p>
               </div>
+              </div>
+              )}
             </div>
 
             {/* Section Mise en avant */}
             <div className="space-y-4 pt-4">
-              <div>
-                <h3 className="text-lg font-bold text-white border-b-2 border-bitebox pb-2">Mes restaurants préférés</h3>
-              </div>
+              <button
+                type="button"
+                onClick={() => setIsRestaurantsExpanded(!isRestaurantsExpanded)}
+                className="w-full flex items-center justify-between text-left group hover:opacity-80 transition-opacity"
+              >
+                <h3 className="text-lg font-bold text-white border-b-2 border-bitebox pb-2 flex-1">Mes restaurants préférés</h3>
+                <div className="ml-4 flex items-center justify-center w-8 h-8 rounded-full bg-white/5 group-hover:bg-white/10 transition-colors">
+                  <svg
+                    className={`w-4 h-4 text-white transition-transform duration-200 ${isRestaurantsExpanded ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </button>
+              
+              {isRestaurantsExpanded && (
+              <div className="space-y-4">
 
               {/* 3 enseignes favorites */}
               <div className="space-y-3">
@@ -821,16 +862,35 @@ export default function EditProfileModal({
                   );
                 })}
               </div>
+              </div>
+              )}
             </div>
 
             {/* Section Visibilité */}
             <div className="space-y-4 pt-6">
-              <div>
-                <h3 className="text-lg font-bold text-white border-b-2 border-bitebox pb-2">Visibilité</h3>
-              </div>
+              <button
+                type="button"
+                onClick={() => setIsVisibilityExpanded(!isVisibilityExpanded)}
+                className="w-full flex items-center justify-between text-left group hover:opacity-80 transition-opacity"
+              >
+                <h3 className="text-lg font-bold text-white border-b-2 border-bitebox pb-2 flex-1">Visibilité</h3>
+                <div className="ml-4 flex items-center justify-center w-8 h-8 rounded-full bg-white/5 group-hover:bg-white/10 transition-colors">
+                  <svg
+                    className={`w-4 h-4 text-white transition-transform duration-200 ${isVisibilityExpanded ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </button>
+              
+              {isVisibilityExpanded && (
+              <div className="space-y-4">
 
-              {/* Toggle Profil public */}
-              <div className="flex items-center justify-between p-4 rounded-xl bg-slate-800/30 border border-white/5">
+                {/* Toggle Profil public */}
+                <div className="flex items-center justify-between p-4 rounded-xl bg-slate-800/30 border border-white/5">
                 <div className="flex-1">
                   <label className="text-sm font-medium text-white block mb-1">
                     Profil public
@@ -857,7 +917,9 @@ export default function EditProfileModal({
                     }`}
                   />
                 </button>
+                </div>
               </div>
+              )}
             </div>
           </div>
         </form>

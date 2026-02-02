@@ -66,7 +66,13 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <ProfileContext.Provider value={{ profile, loading, error, refreshProfile, setProfile }}>
+    <ProfileContext.Provider value={{ 
+      profile, 
+      loading, 
+      error, 
+      refreshProfile, 
+      setProfile,
+    }}>
       {children}
     </ProfileContext.Provider>
   );

@@ -537,7 +537,9 @@ export default function RestaurantPage() {
           ) : categories.length === 0 ? (
             // Affichage sans sections (comportement par défaut)
             <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-              {dishes.filter((dish) => hasValidImage(dish)).map((dish) => (
+              {dishes.filter((dish) => hasValidImage(dish)).map((dish) => {
+                const isBigFernand = restaurant?.name?.toLowerCase().includes("big fernand") || restaurant?.name?.toLowerCase().includes("big dfernand") || restaurant?.slug?.toLowerCase().includes("big-fernand") || restaurant?.slug?.toLowerCase().includes("big-dfernand");
+                return (
                 <div
                   key={dish.id}
                   className="bg-white/5 backdrop-blur-sm rounded-lg overflow-hidden border border-white/10 shadow-sm hover:shadow-md transition-all flex flex-col"
@@ -547,6 +549,7 @@ export default function RestaurantPage() {
                       alt={dish.name}
                       className="rounded-t-lg rounded-b-none"
                       onImageError={handleImageError}
+                      forceCover={isBigFernand}
                     />
 
                   <div className="px-3 py-3 space-y-1">
@@ -597,7 +600,8 @@ export default function RestaurantPage() {
                     </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             // Affichage groupé par sections
@@ -610,6 +614,9 @@ export default function RestaurantPage() {
                 .map((category) => {
                 const categoryDishes = dishes.filter((d) => d.category_id === category.id && hasValidImage(d));
                 const isBurgerKing = restaurant?.name?.toLowerCase().includes("burger king") || restaurant?.slug?.toLowerCase().includes("burger-king");
+                const isBigFernand = restaurant?.name?.toLowerCase().includes("big fernand") || restaurant?.name?.toLowerCase().includes("big dfernand") || restaurant?.slug?.toLowerCase().includes("big-fernand") || restaurant?.slug?.toLowerCase().includes("big-dfernand");
+                const isSmashSection = category.name?.toLowerCase().includes("smash");
+                const shouldZoomImages = isBigFernand && isSmashSection;
 
                 return (
                   <div key={category.id} id={`section-${category.id}`} className={`${isBurgerKing ? 'space-y-1 pt-1' : 'space-y-3 pt-4'}`}>
@@ -627,6 +634,8 @@ export default function RestaurantPage() {
                       alt={dish.name}
                       className="rounded-t-lg rounded-b-none"
                       onImageError={handleImageError}
+                      imageZoom={shouldZoomImages ? 1.3 : 1}
+                      forceCover={isBigFernand}
                     />
 
                           <div className="px-3 py-2.5 space-y-1">
@@ -688,6 +697,7 @@ export default function RestaurantPage() {
                 const dishesWithoutCategory = dishes.filter((d) => !d.category_id && hasValidImage(d));
                 if (dishesWithoutCategory.length === 0) return null;
                 const isBurgerKing = restaurant?.name?.toLowerCase().includes("burger king") || restaurant?.slug?.toLowerCase().includes("burger-king");
+                const isBigFernand = restaurant?.name?.toLowerCase().includes("big fernand") || restaurant?.name?.toLowerCase().includes("big dfernand") || restaurant?.slug?.toLowerCase().includes("big-fernand") || restaurant?.slug?.toLowerCase().includes("big-dfernand");
 
                 return (
                   <div className={isBurgerKing ? "space-y-1" : "space-y-3"}>
@@ -708,6 +718,7 @@ export default function RestaurantPage() {
                       alt={dish.name}
                       className="rounded-t-lg rounded-b-none"
                       onImageError={handleImageError}
+                      forceCover={isBigFernand}
                     />
 
                           <div className="px-3 py-2.5 space-y-1">

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { calculatePublicRating } from "@/lib/ratingUtils";
 import Spinner from "@/components/Spinner";
+import SuggestBrandModal from "@/components/SuggestBrandModal";
 
 type Restaurant = {
   id: string;
@@ -33,6 +34,7 @@ export default function HomePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<'best-rating' | 'worst-rating' | 'alphabetical' | 'most-ratings' | 'least-ratings'>('best-rating');
   const [showSortMenu, setShowSortMenu] = useState(false);
+  const [isSuggestModalOpen, setIsSuggestModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchRestaurants = async () => {
@@ -351,11 +353,24 @@ export default function HomePage() {
           ) : error ? (
             <p className="text-sm text-red-400">{error}</p>
           ) : filteredRestaurants.length === 0 ? (
-            <p className="text-sm text-slate-400">
-              {searchQuery
-                ? `Aucune enseigne ne correspond à "${searchQuery}".`
-                : "Aucune enseigne pour l'instant. Ajoute-en via la page admin."}
-            </p>
+            <div className="flex flex-col items-center justify-center py-12 px-4">
+              <div className="text-center space-y-4 max-w-md">
+                <div className="text-6xl mb-4">🔍</div>
+                <p className="text-base text-slate-300">
+                  {searchQuery
+                    ? `Aucune enseigne ne correspond à "${searchQuery}".`
+                    : "Aucune enseigne pour l'instant."}
+                </p>
+                {searchQuery && (
+                  <button
+                    onClick={() => setIsSuggestModalOpen(true)}
+                    className="mt-4 px-6 py-3 bg-bitebox text-white font-medium rounded-lg hover:bg-bitebox-dark transition-colors shadow-md"
+                  >
+                    Suggérer une enseigne
+                  </button>
+                )}
+              </div>
+            </div>
           ) : (
             <div className="flex flex-col gap-3">
               {filteredRestaurants.map((restaurant) => {
@@ -437,6 +452,13 @@ export default function HomePage() {
         </section>
 
       </div>
+
+      {/* Modal de suggestion */}
+      <SuggestBrandModal
+        isOpen={isSuggestModalOpen}
+        onClose={() => setIsSuggestModalOpen(false)}
+        searchQuery={searchQuery}
+      />
     </div>
   );
 }

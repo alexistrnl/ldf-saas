@@ -31,6 +31,7 @@ const ALLOWED_PROFILE_UPDATE_FIELDS = [
   'favorite_restaurant_ids',
   'is_verified', // Modifiable uniquement par les admins (géré par RLS)
   'is_admin', // Modifiable uniquement par les admins (géré par RLS)
+  'email', // Lecture seule, synchronisé depuis auth.users
   'updated_at',
 ] as const;
 

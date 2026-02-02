@@ -57,6 +57,40 @@ export default function ProfilePage() {
   // Modal édition
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
+  // Ouvrir automatiquement le modal si on vient de la notification (via URL ou événement)
+  useEffect(() => {
+    const openModal = () => {
+      if (!profileLoading && profile) {
+        setTimeout(() => {
+          setIsEditModalOpen(true);
+          // Nettoyer l'URL si nécessaire
+          if (typeof window !== 'undefined' && window.location.search.includes('edit=true')) {
+            router.replace('/profile', { scroll: false });
+          }
+        }, 200);
+      }
+    };
+
+    // Vérifier le paramètre dans l'URL
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const editParam = urlParams.get('edit');
+      if (editParam === 'true') {
+        openModal();
+      }
+    }
+
+    // Écouter l'événement personnalisé
+    const handleOpenModal = () => {
+      openModal();
+    };
+    window.addEventListener('openEditProfileModal', handleOpenModal);
+
+    return () => {
+      window.removeEventListener('openEditProfileModal', handleOpenModal);
+    };
+  }, [router, profileLoading, profile]);
+
   // Charger l'utilisateur et les données complémentaires
   useEffect(() => {
     const loadProfileData = async () => {

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import AppHeader from './AppHeader'
 import BottomNav from './BottomNav'
+import UsernameNotificationBanner from './UsernameNotificationBanner'
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -55,6 +56,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className={`h-screen flex flex-col ${isDesktopInfoPage ? '' : 'bg-[#020617] text-white'} overflow-hidden`}>
       {showHeader && <AppHeader />}
+      {showHeader && !isAuthPage && <UsernameNotificationBanner />}
       <main className={`flex-1 overflow-y-auto overflow-x-hidden overscroll-contain ${showBottomNav ? 'pb-44' : 'pb-2'} ${showHeader ? 'pt-2' : 'pt-0'}`}>
         {children}
       </main>
