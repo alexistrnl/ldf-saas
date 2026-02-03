@@ -331,7 +331,7 @@ export default async function PublicProfilePage({
 
   return (
     <main className="min-h-screen w-full overflow-x-hidden bg-[#020617]">
-      <div className="mx-auto flex w-full max-w-xl flex-col px-4 pb-44 pt-6">
+      <div className="mx-auto flex w-full max-w-xl flex-col px-4 pb-[calc(env(safe-area-inset-bottom,0px)+104px)] pt-6">
         {/* Header profil style TikTok */}
         <section className="px-4 pt-0 pb-6">
           {/* Avatar centré en haut */}

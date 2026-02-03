@@ -345,7 +345,7 @@ export default function ExperiencePage() {
 
   return (
     <main className="min-h-screen w-full overflow-x-hidden bg-[#020617]">
-      <div className="mx-auto flex w-full max-w-xl flex-col gap-6 px-4 pb-44 pt-6">
+      <div className="mx-auto flex w-full max-w-xl flex-col gap-6 px-4 pb-[calc(env(safe-area-inset-bottom,0px)+104px)] pt-6">
         <div className="mb-4 text-center">
           <h1 className="text-2xl font-bold text-white mb-1">Mes stats BiteBox</h1>
           <p className="text-xs text-slate-400">Ton parcours en un coup d'œil</p>

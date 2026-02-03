@@ -45,19 +45,19 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }, [])
 
   // Masquer header et bottom nav sur les pages d'auth et desktop-info
-  // Masquer bottom nav sur admin (mais garder le header)
+  // Masquer header et bottom nav sur admin (les pages admin ont leur propre header)
   // Masquer bottom nav sur le flow "Ajouter une note" (pour ne pas recouvrir le bouton de validation)
   // Masquer bottom nav sur la page de confirmation
   // Masquer bottom nav sur les pages de paramètres
   // Masquer bottom nav quand un modal est ouvert
-  const showHeader = !isAuthPage && !isDesktopInfoPage
+  const showHeader = !isAuthPage && !isDesktopInfoPage && !isAdminPage
   const showBottomNav = !isAuthPage && !isAdminPage && !isAddNotePage && !isDesktopInfoPage && !isConfirmationPage && !isSettingsPage && !isModalOpen
 
   return (
     <div className={`h-screen flex flex-col ${isDesktopInfoPage ? '' : 'bg-[#020617] text-white'} overflow-hidden`}>
       {showHeader && <AppHeader />}
       {showHeader && !isAuthPage && <UsernameNotificationBanner />}
-      <main className={`flex-1 overflow-y-auto overflow-x-hidden overscroll-contain ${showBottomNav ? 'pb-44' : 'pb-2'} ${showHeader ? 'pt-2' : 'pt-0'}`}>
+      <main className={`flex-1 ${isAdminPage ? 'overflow-hidden' : 'overflow-y-auto overflow-x-hidden overscroll-contain'} ${showBottomNav ? 'pb-[calc(env(safe-area-inset-bottom,0px)+104px)]' : 'pb-2'} ${showHeader ? 'pt-2' : 'pt-0'}`}>
         {children}
       </main>
       {showBottomNav && <BottomNav />}

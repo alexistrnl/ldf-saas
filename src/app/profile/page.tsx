@@ -357,7 +357,7 @@ export default function ProfilePage() {
 
   return (
     <main className="min-h-screen w-full overflow-x-hidden bg-[#020617]">
-      <div className="mx-auto flex w-full max-w-xl flex-col px-4 pb-44 pt-6">
+      <div className="mx-auto flex w-full max-w-xl flex-col px-4 pb-[calc(env(safe-area-inset-bottom,0px)+104px)] pt-6">
         {error && (
           <div className="rounded-2xl bg-red-500/10 border border-red-500/40 px-3 py-2 text-sm text-red-300 mb-4">
             {error}

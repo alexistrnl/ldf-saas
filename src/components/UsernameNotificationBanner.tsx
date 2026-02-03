@@ -1,11 +1,32 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useProfile } from "@/context/ProfileContext";
 import { useRouter } from "next/navigation";
 
 export default function UsernameNotificationBanner() {
   const router = useRouter();
   const { profile, loading } = useProfile();
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Détecter si un modal est ouvert (comme EditProfileModal)
+  useEffect(() => {
+    const checkModal = () => {
+      setIsModalOpen(document.body.hasAttribute("data-modal-open"));
+    };
+    
+    // Vérifier au montage
+    checkModal();
+    
+    // Observer les changements d'attribut
+    const observer = new MutationObserver(checkModal);
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: ["data-modal-open"]
+    });
+    
+    return () => observer.disconnect();
+  }, []);
 
   // Ne pas afficher pendant le chargement ou si pas de profil
   if (loading || !profile) {
@@ -16,8 +37,8 @@ export default function UsernameNotificationBanner() {
   const hasUsername = profile.username && profile.username.trim().length > 0;
   const hasDisplayName = profile.display_name && profile.display_name.trim().length > 0;
   
-  // La bannière disparaît uniquement si les deux sont remplis
-  const shouldHide = hasUsername && hasDisplayName;
+  // La bannière disparaît si les deux sont remplis OU si un modal est ouvert
+  const shouldHide = (hasUsername && hasDisplayName) || isModalOpen;
 
   if (shouldHide) {
     return null;
@@ -31,7 +52,7 @@ export default function UsernameNotificationBanner() {
   };
 
   return (
-    <div className="w-full bg-amber-500/10 border-b border-amber-500/40 px-4 py-3 flex items-center justify-between gap-3 z-50">
+    <div className="w-full bg-amber-500/10 border-b border-amber-500/40 px-4 py-3 flex items-center justify-between gap-3 relative z-40">
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-amber-300 mb-0.5">
           Complète ton profil

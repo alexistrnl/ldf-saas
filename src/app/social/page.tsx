@@ -157,7 +157,7 @@ export default function SocialPage() {
 
   return (
     <main className="min-h-screen w-full overflow-x-hidden bg-[#020617]">
-      <div className="mx-auto flex w-full max-w-xl flex-col gap-6 px-4 pb-28 pt-6">
+      <div className="mx-auto flex w-full max-w-xl flex-col gap-6 px-4 pb-[calc(env(safe-area-inset-bottom,0px)+104px)] pt-6">
         <h1 className="text-2xl font-bold text-white">Social</h1>
 
         {/* Champ de recherche */}

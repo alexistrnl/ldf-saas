@@ -7,7 +7,7 @@ import { formatRLSError } from "@/lib/errorMessages";
 import { Restaurant, ViewMode } from "./types";
 import RestaurantListPanel from "./RestaurantListPanel";
 import RestaurantDetailsPanel from "./RestaurantDetailsPanel";
-import AdminNav from "@/components/AdminNav";
+import AdminHeader from "@/components/AdminHeader";
 
 function slugify(name: string) {
   return name
@@ -741,64 +741,14 @@ export default function AdminRestaurantsContent({ initialUser }: AdminRestaurant
   ) || null;
 
   return (
-    <div className="fixed inset-x-0 top-[60px] bottom-0 flex flex-col bg-slate-950 text-slate-50 overflow-hidden">
-      {/* Badge utilisateur Supabase */}
-      <div className="flex-shrink-0 px-6 py-2 bg-slate-900 border-b border-slate-800">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-slate-800 border border-slate-700">
-              <span className="text-xs text-slate-400">Supabase user:</span>
-              {supabaseUser ? (
-                <>
-                  <span className="text-xs font-medium text-slate-200">
-                    {supabaseUser.email || "NONE"}
-                  </span>
-                  {supabaseUser.id && (
-                    <>
-                      <span className="text-xs text-slate-500">•</span>
-                      <span className="text-xs text-slate-400 font-mono">
-                        {supabaseUser.id}
-                      </span>
-                    </>
-                  )}
-                </>
-              ) : (
-                <span className="text-xs font-medium text-slate-200">NONE</span>
-              )}
-            </div>
-            {supabaseUser?.id ? (
-              <button
-                onClick={async () => {
-                  try {
-                    const { data: { user } } = await supabase.auth.getUser();
-                    if (user?.id) {
-                      await navigator.clipboard.writeText(user.id);
-                      // Optionnel: afficher un toast ou feedback visuel
-                    }
-                  } catch (err) {
-                    console.error("Error copying UID:", err);
-                  }
-                }}
-                className="px-3 py-1.5 text-xs font-medium text-slate-300 bg-slate-800 border border-slate-700 rounded-md hover:bg-slate-700 hover:border-slate-600 transition-colors"
-                title="Copier l'UID dans le presse-papiers"
-              >
-                Copy my Supabase UID
-              </button>
-            ) : (
-              <button
-                onClick={() => router.push("/login?next=/admin")}
-                className="px-3 py-1.5 text-xs font-medium text-white bg-bitebox border border-bitebox rounded-md hover:bg-bitebox-dark transition-colors"
-              >
-                Se connecter
-              </button>
-            )}
-          </div>
-          {/* Navigation Admin */}
-          <AdminNav variant="compact" />
-        </div>
-      </div>
+    <div className="h-full w-full bg-[#020617] text-slate-50 flex flex-col overflow-hidden">
+      <AdminHeader
+        title="Gestion des restaurants"
+        description="Gérer les enseignes, leurs plats et leurs menus"
+      />
       
-      <div className="flex-1 flex overflow-hidden">
+      {/* Contenu défilable */}
+      <div className="flex-1 flex overflow-hidden min-h-0">
       {/* Sidebar gauche - Liste des enseignes */}
       <div className="w-80 flex-shrink-0 h-full overflow-hidden flex flex-col">
         <RestaurantListPanel

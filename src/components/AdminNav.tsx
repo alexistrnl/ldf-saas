@@ -44,22 +44,20 @@ export default function AdminNav({ variant = "default" }: AdminNavProps) {
   }
 
   return (
-    <div className="mb-6 pb-4 border-b border-slate-700">
-      <nav className="flex items-center gap-4">
-        {navItems.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={`text-sm font-medium transition-colors ${
-              isActive(item.href)
-                ? "text-bitebox"
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            {item.label}
-          </Link>
-        ))}
-      </nav>
-    </div>
+    <nav className="flex items-center gap-2">
+      {navItems.map((item) => (
+        <Link
+          key={item.href}
+          href={item.href}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+            isActive(item.href)
+              ? "bg-bitebox/20 text-bitebox border border-bitebox/30"
+              : "text-slate-400 hover:text-white hover:bg-white/5 border border-transparent"
+          }`}
+        >
+          {item.label}
+        </Link>
+      ))}
+    </nav>
   );
 }

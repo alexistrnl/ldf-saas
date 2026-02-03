@@ -41,9 +41,12 @@ export default function EditProfileModal({
   profile,
   onSave,
 }: EditProfileModalProps) {
-  const { setProfile: setContextProfile } = useProfile();
+  const { setProfile: setContextProfile, profileReady } = useProfile();
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Garder une référence au profil initial pour comparer les changements
+  const initialProfileRef = useRef<UserProfile | null>(null);
   
   // États pour les sections dépliables
   const [isIdentityExpanded, setIsIdentityExpanded] = useState(false);
@@ -73,7 +76,10 @@ export default function EditProfileModal({
 
   // Pré-remplir les champs avec les valeurs existantes UNIQUEMENT à l'ouverture
   useEffect(() => {
-    if (profile && isOpen) {
+    if (profile && isOpen && profileReady) {
+      // Sauvegarder le profil initial pour comparer les changements
+      initialProfileRef.current = { ...profile };
+      
       // Initialiser avatar_type et avatar_preset
       const type = profile.avatar_type || 'preset';
       setAvatarType(type);
@@ -120,7 +126,7 @@ export default function EditProfileModal({
       setFavoriteRestaurantIds(favoritesWithPositions);
       setError(null);
     }
-  }, [profile, isOpen]);
+  }, [profile, isOpen, profileReady]);
 
   // Charger les restaurants pour les favoris
   useEffect(() => {
@@ -253,6 +259,12 @@ export default function EditProfileModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Bloquer la sauvegarde si le profil n'est pas prêt
+    if (!profileReady || !initialProfileRef.current) {
+      setError("Le profil n'est pas encore chargé. Veuillez patienter...");
+      return;
+    }
+    
     // Guard anti double-submit
     if (isSubmittingRef.current || isSaving) {
       console.warn("[EditProfileModal] Submit already in progress, ignoring");
@@ -308,26 +320,75 @@ export default function EditProfileModal({
         finalAvatarUrl = avatarPhotoUrl;
       }
 
-      // Préparer TOUS les champs pour UN SEUL update groupé
-      // Utiliser les valeurs locales ACTUELLES (pas le state précédent)
+      // Construire le payload uniquement avec les champs modifiés
+      const initial = initialProfileRef.current;
       const rawUpdates: Record<string, any> = {
         updated_at: new Date().toISOString(),
-        display_name: displayName.trim() || null,
-        bio: bio.trim() || null,
-        avatar_type: avatarType,
-        accent_color: accentColor,
-        is_public: isPublic,
-        username: cleanedUsername || null,
-        favorite_restaurant_ids: favoriteRestaurantIds.slice(0, 3),
       };
 
+      // Comparer chaque champ et n'inclure que ceux qui ont changé
+      const trimmedDisplayName = displayName.trim();
+      if (trimmedDisplayName !== (initial.display_name || "")) {
+        rawUpdates.display_name = trimmedDisplayName || null;
+      }
+
+      const trimmedBio = bio.trim();
+      if (trimmedBio !== (initial.bio || "")) {
+        rawUpdates.bio = trimmedBio || null;
+      }
+
+      if (cleanedUsername !== (initial.username || "")) {
+        rawUpdates.username = cleanedUsername || null;
+      }
+
+      if (isPublic !== (initial.is_public ?? false)) {
+        rawUpdates.is_public = isPublic;
+      }
+
+      if (accentColor !== (initial.accent_color || '#7c3aed')) {
+        rawUpdates.accent_color = accentColor;
+      }
+
+      // Comparer les favoris (normaliser pour la comparaison)
+      const currentFavorites = favoriteRestaurantIds.slice(0, 3);
+      const initialFavorites = (initial.favorite_restaurant_ids || []).slice(0, 3);
+      const favoritesChanged = JSON.stringify(currentFavorites) !== JSON.stringify(initialFavorites);
+      if (favoritesChanged) {
+        rawUpdates.favorite_restaurant_ids = currentFavorites;
+      }
+
       // Gérer avatar selon le type
-      if (avatarType === 'preset') {
-        rawUpdates.avatar_preset = avatarPreset;
-        rawUpdates.avatar_url = null; // Nettoyer avatar_url si on passe en preset
+      const initialAvatarType = initial.avatar_type || 'preset';
+      const initialAvatarPreset = initial.avatar_preset || initial.avatar_variant || 'purple';
+      const initialAvatarUrl = initial.avatar_url;
+
+      if (avatarType !== initialAvatarType) {
+        rawUpdates.avatar_type = avatarType;
+        if (avatarType === 'preset') {
+          rawUpdates.avatar_preset = avatarPreset;
+          rawUpdates.avatar_url = null;
+        } else {
+          rawUpdates.avatar_preset = null;
+          rawUpdates.avatar_url = finalAvatarUrl;
+        }
       } else {
-        rawUpdates.avatar_preset = null; // Nettoyer avatar_preset si on passe en photo
-        rawUpdates.avatar_url = finalAvatarUrl;
+        // Même type, vérifier les détails
+        if (avatarType === 'preset' && avatarPreset !== initialAvatarPreset) {
+          rawUpdates.avatar_preset = avatarPreset;
+        } else if (avatarType === 'photo') {
+          if (finalAvatarUrl !== initialAvatarUrl) {
+            rawUpdates.avatar_url = finalAvatarUrl;
+          }
+        }
+      }
+
+      // Si aucun champ n'a changé, ne rien faire
+      if (Object.keys(rawUpdates).length === 1) { // Seulement updated_at
+        console.log("[EditProfileModal] No changes detected, skipping save");
+        setIsSaving(false);
+        isSubmittingRef.current = false;
+        onClose();
+        return;
       }
 
       // FILTRER STRICTEMENT avec la whitelist
@@ -410,6 +471,9 @@ export default function EditProfileModal({
 
   if (!isOpen) return null;
 
+  // Afficher un loader si le profil n'est pas prêt
+  const isProfileNotReady = !profileReady || !profile || !initialProfileRef.current;
+
   return (
     <div className="fixed inset-0 z-50 bg-[#020617] flex flex-col overflow-hidden touch-none">
       <div className="w-full h-full bg-[#020617] overflow-hidden flex flex-col">
@@ -440,6 +504,17 @@ export default function EditProfileModal({
 
         {/* Contenu scrollable */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain">
+          {isProfileNotReady ? (
+            <div className="flex flex-col items-center justify-center h-full px-6 py-12">
+              <Spinner size="lg" />
+              <p className="mt-4 text-sm text-slate-400 text-center">
+                Chargement du profil...
+              </p>
+              <p className="mt-2 text-xs text-slate-500 text-center">
+                Veuillez patienter pendant que nous synchronisons vos données.
+              </p>
+            </div>
+          ) : (
           <div className="px-6 py-5 space-y-8 max-w-full">
             {/* Message d'erreur */}
             {error && (
@@ -922,6 +997,7 @@ export default function EditProfileModal({
               )}
             </div>
           </div>
+          )}
         </form>
 
         {/* Footer avec bouton Enregistrer (sticky) */}
@@ -929,13 +1005,18 @@ export default function EditProfileModal({
           <button
             type="submit"
             onClick={handleSubmit}
-            disabled={isSaving}
+            disabled={isSaving || isProfileNotReady}
             className="w-full rounded-xl bg-bitebox px-6 py-4 text-sm font-semibold text-white disabled:opacity-60 disabled:cursor-not-allowed transition-all hover:bg-bitebox-dark hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-bitebox/20 flex items-center justify-center gap-2"
           >
             {isSaving ? (
               <>
                 <Spinner size="sm" />
                 <span>Enregistrement...</span>
+              </>
+            ) : isProfileNotReady ? (
+              <>
+                <Spinner size="sm" />
+                <span>Chargement du profil...</span>
               </>
             ) : (
               <>

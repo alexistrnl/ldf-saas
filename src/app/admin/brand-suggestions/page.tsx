@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import Spinner from "@/components/Spinner";
-import AdminNav from "@/components/AdminNav";
+import AdminHeader from "@/components/AdminHeader";
 
 type BrandSuggestion = {
   id: string;
@@ -174,19 +174,14 @@ export default function BrandSuggestionsPage() {
   // Le middleware gère déjà la vérification admin et la redirection
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-50 p-4">
-      <div className="max-w-7xl mx-auto">
-        {/* Navigation Admin */}
-        <AdminNav />
-
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-white mb-2">
-            Suggestions d'enseignes
-          </h1>
-          <p className="text-slate-400 text-sm">
-            {totalCount} suggestion{totalCount !== 1 ? "s" : ""} au total
-          </p>
-        </div>
+    <div className="h-full w-full bg-[#020617] text-slate-50 flex flex-col overflow-hidden">
+      <AdminHeader
+        title="Suggestions d'enseignes"
+        description={`${totalCount} suggestion${totalCount !== 1 ? "s" : ""} au total`}
+      />
+      
+      {/* Contenu défilable */}
+      <div className="flex-1 overflow-y-auto no-scrollbar px-6 py-6 min-h-0">
 
         {/* Filtres */}
         <div className="mb-6 flex flex-wrap gap-2">
@@ -456,22 +451,22 @@ export default function BrandSuggestionsPage() {
             )}
           </div>
         )}
-      </div>
 
-      {/* Toast */}
-      {toast && (
-        <div className="fixed bottom-4 right-4 z-50 animate-in slide-in-from-bottom-2">
-          <div
-            className={`px-4 py-3 rounded-lg shadow-lg border ${
-              toast.type === "success"
-                ? "bg-green-950/90 border-green-500/30 text-green-400"
-                : "bg-red-950/90 border-red-500/30 text-red-400"
-            }`}
-          >
-            <p className="text-sm font-medium">{toast.message}</p>
+        {/* Toast */}
+        {toast && (
+          <div className="fixed bottom-4 right-4 z-50 animate-in slide-in-from-bottom-2">
+            <div
+              className={`px-4 py-3 rounded-lg shadow-lg border ${
+                toast.type === "success"
+                  ? "bg-green-950/90 border-green-500/30 text-green-400"
+                  : "bg-red-950/90 border-red-500/30 text-red-400"
+              }`}
+            >
+              <p className="text-sm font-medium">{toast.message}</p>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

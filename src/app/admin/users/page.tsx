@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabaseClient";
 import Spinner from "@/components/Spinner";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { filterAllowedProfileFields } from "@/lib/profile";
-import AdminNav from "@/components/AdminNav";
+import AdminHeader from "@/components/AdminHeader";
 
 type User = {
   id: string;
@@ -167,16 +167,14 @@ export default function AdminUsersPage() {
   }
 
   return (
-    <main className="h-full bg-[#020617] text-slate-50 overflow-y-auto no-scrollbar">
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-white mb-2">Gestion des utilisateurs</h1>
-          <p className="text-slate-400">Certifier ou retirer la certification des comptes</p>
-        </div>
-
-        {/* Navigation Admin */}
-        <AdminNav />
+    <div className="h-full w-full bg-[#020617] text-slate-50 flex flex-col overflow-hidden">
+      <AdminHeader
+        title="Gestion des utilisateurs"
+        description="Certifier ou retirer la certification des comptes"
+      />
+      
+      {/* Contenu défilable */}
+      <div className="flex-1 overflow-y-auto no-scrollbar px-6 py-6 min-h-0">
 
         {/* Stats */}
         <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -329,6 +327,6 @@ export default function AdminUsersPage() {
           </div>
         </div>
       </div>
-    </main>
+    </div>
   );
 }
