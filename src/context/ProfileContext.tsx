@@ -84,140 +84,165 @@ function purgeAllProfileCaches() {
 export function ProfileProvider({ children }: { children: ReactNode }) {
   const [profile, setProfileState] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [profileReady, setProfileReady] = useState(false); // Profil chargé depuis Supabase
+  const [profileReady, setProfileReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const previousUserIdRef = useRef<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  
+  // Ref pour éviter les boucles infinies
+  const isFetchingProfileRef = useRef(false);
+  const currentFetchingUserIdRef = useRef<string | null>(null);
+  const userIdRef = useRef<string | null>(null);
 
-  // Wrapper pour setProfile qui met aussi à jour le cache
-  // Utilise automatiquement currentUserId pour le cache
-  const setProfile = useCallback((newProfile: UserProfile | null) => {
-    setProfileState(newProfile);
-    saveProfileToCache(newProfile, currentUserId);
-  }, [currentUserId]);
+  // Synchroniser userIdRef avec userId
+  useEffect(() => {
+    userIdRef.current = userId;
+  }, [userId]);
+
+  // Fonction pour réinitialiser l'état du profil
+  const resetProfileState = useCallback(() => {
+    setProfileState(null);
+    setProfileReady(false);
+    setLoading(false);
+    setError(null);
+    isFetchingProfileRef.current = false;
+    currentFetchingUserIdRef.current = null;
+  }, []);
 
   // Fonction pour charger le profil d'un userId spécifique
-  const loadProfile = useCallback(async (userId: string | null, skipCache = false) => {
-    if (!userId) {
-      // Pas d'utilisateur, réinitialiser tout
-      setProfileState(null);
-      setProfileReady(false);
-      setLoading(false);
-      setError(null);
+  // NE PAS utiliser useCallback avec des dépendances qui changent
+  const loadProfile = useCallback(async (targetUserId: string) => {
+    // Sécurité anti-boucle : ne pas charger si déjà en cours pour ce userId
+    if (isFetchingProfileRef.current && currentFetchingUserIdRef.current === targetUserId) {
+      console.log("[ProfileContext] Already fetching profile for userId:", targetUserId);
       return;
     }
 
+    isFetchingProfileRef.current = true;
+    currentFetchingUserIdRef.current = targetUserId;
+
     try {
       setError(null);
+      setLoading(true);
       
       // Étape 1: Charger le cache immédiatement si disponible
-      if (!skipCache) {
-        const cachedProfile = loadProfileFromCache(userId);
-        if (cachedProfile) {
-          setProfileState(cachedProfile);
-          setLoading(false); // Ne pas bloquer l'UI avec le cache
-        } else {
-          setLoading(true);
-        }
-      } else {
-        setLoading(true);
+      const cachedProfile = loadProfileFromCache(targetUserId);
+      if (cachedProfile && cachedProfile.id === targetUserId) {
+        setProfileState(cachedProfile);
+        setLoading(false); // Ne pas bloquer l'UI avec le cache
       }
 
-      // Étape 2: Charger depuis Supabase
-      const { profile: userProfile, error: profileError } = await getCurrentUserProfile();
+      // Étape 2: Charger depuis Supabase avec le userId spécifique
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      // Vérifier que le userId n'a pas changé
+      if (!user || user.id !== targetUserId) {
+        console.warn("[ProfileContext] UserId mismatch or no user, ignoring");
+        resetProfileState();
+        return;
+      }
 
-      // Vérifier que le profil correspond bien au userId actuel
-      if (userProfile && userProfile.id !== userId) {
+      const { data: profileData, error: profileError } = await supabase
+        .from("profiles")
+        .select("id, username, display_name, avatar_url, avatar_variant, avatar_type, avatar_preset, accent_color, bio, is_public, favorite_restaurant_ids, is_verified, created_at, updated_at")
+        .eq("id", targetUserId)
+        .maybeSingle();
+
+      // Vérifier que le profil correspond bien au userId
+      if (profileData && profileData.id !== targetUserId) {
         console.warn("[ProfileContext] Profile userId mismatch, ignoring");
-        setProfileState(null);
-        setProfileReady(false);
-        setError(null);
+        resetProfileState();
         return;
       }
 
       if (profileError) {
         console.error("[ProfileContext] Error loading profile:", profileError);
         setError(profileError.message || "Erreur lors du chargement du profil.");
-        setProfile(null);
+        setProfileState(null);
         setProfileReady(false);
-      } else {
-        setProfile(userProfile);
+      } else if (profileData) {
+        const typedProfile: UserProfile = {
+          id: profileData.id,
+          username: profileData.username,
+          avatar_url: profileData.avatar_url,
+          avatar_variant: profileData.avatar_variant,
+          avatar_type: profileData.avatar_type || 'preset',
+          avatar_preset: profileData.avatar_preset || null,
+          accent_color: profileData.accent_color || null,
+          display_name: profileData.display_name || null,
+          bio: profileData.bio || null,
+          is_public: profileData.is_public ?? false,
+          favorite_restaurant_ids: profileData.favorite_restaurant_ids || null,
+          is_verified: profileData.is_verified ?? false,
+          updated_at: profileData.updated_at,
+        };
+        setProfileState(typedProfile);
+        saveProfileToCache(typedProfile, targetUserId);
         setError(null);
         setProfileReady(true);
+      } else {
+        // Pas de profil trouvé
+        setProfileState(null);
+        setProfileReady(false);
+        setError(null);
       }
     } catch (err) {
       console.error("[ProfileContext] Unexpected error:", err);
       setError("Erreur inattendue lors du chargement du profil.");
-      setProfile(null);
+      setProfileState(null);
       setProfileReady(false);
     } finally {
       setLoading(false);
+      isFetchingProfileRef.current = false;
+      currentFetchingUserIdRef.current = null;
     }
-  }, [setProfile]);
+  }, [resetProfileState]); // ✅ Seule dépendance stable
+
+  // Wrapper pour setProfile qui met aussi à jour le cache
+  // Utiliser userIdRef pour éviter les dépendances
+  const setProfile = useCallback((newProfile: UserProfile | null) => {
+    setProfileState(newProfile);
+    if (newProfile && userIdRef.current) {
+      saveProfileToCache(newProfile, userIdRef.current);
+    }
+  }, []); // ✅ Pas de dépendance à userId pour éviter les boucles
 
   const refreshProfile = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
-    await loadProfile(user?.id || null, true);
-  }, [loadProfile]);
+    if (!user?.id) return;
+    await loadProfile(user.id);
+  }, [loadProfile]); // ✅ Pas de dépendance à userId
 
-  // Initialiser le userId au mount
+  // Écouter l'auth UNE SEULE FOIS au mount
   useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const newUserId = session?.user?.id ?? null;
+      console.log("[ProfileContext] Auth state changed, userId:", newUserId);
+      setUserId(newUserId);
+    });
+
+    // Initialiser le userId au mount
     const initializeUserId = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      setCurrentUserId(user?.id || null);
-      previousUserIdRef.current = user?.id || null;
+      setUserId(user?.id ?? null);
     };
     initializeUserId();
-  }, []);
-
-  // Réagir aux changements de userId
-  useEffect(() => {
-    // Si le userId a changé, charger le profil correspondant
-    if (currentUserId !== previousUserIdRef.current) {
-      console.log("[ProfileContext] UserId changed:", previousUserIdRef.current, "->", currentUserId);
-      
-      // Si on passe d'un userId à un autre (ou à null), réinitialiser
-      if (previousUserIdRef.current !== null && currentUserId !== previousUserIdRef.current) {
-        // Purger le cache de l'ancien userId (optionnel, on peut garder les caches)
-        // On ne purge que si on veut vraiment nettoyer, sinon on garde les caches par userId
-      }
-      
-      previousUserIdRef.current = currentUserId;
-      
-      // Charger le profil du nouveau userId
-      loadProfile(currentUserId, false);
-    }
-  }, [currentUserId, loadProfile]);
-
-  // Écouter les changements d'authentification
-  useEffect(() => {
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      const newUserId = session?.user?.id || null;
-      
-      console.log("[ProfileContext] Auth state changed:", event, "userId:", newUserId);
-      
-      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
-        // Mettre à jour le userId, ce qui déclenchera le chargement du profil
-        setCurrentUserId(newUserId);
-      } else if (event === "SIGNED_OUT") {
-        // Réinitialiser complètement
-        setCurrentUserId(null);
-        setProfileState(null);
-        setError(null);
-        setLoading(false);
-        setProfileReady(false);
-        // Purger tous les caches (ou seulement celui du userId sortant)
-        // Pour la sécurité, on purge tout au logout
-        purgeAllProfileCaches();
-      }
-    });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, []);
+  }, []); // ✅ AUCUNE DÉPENDANCE
+
+  // Charger le profil UNIQUEMENT quand userId change
+  useEffect(() => {
+    if (!userId) {
+      resetProfileState();
+      // Purger tous les caches au logout
+      purgeAllProfileCaches();
+      return;
+    }
+    
+    loadProfile(userId);
+  }, [userId, loadProfile, resetProfileState]); // ✅ Dépendances stables uniquement
 
   return (
     <ProfileContext.Provider value={{ 

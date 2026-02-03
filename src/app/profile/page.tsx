@@ -9,7 +9,6 @@ import { supabase } from "@/lib/supabaseClient";
 import { UserProfile } from "@/lib/profile";
 import { getAvatarThemeFromVariant } from "@/lib/avatarTheme";
 import { getAvatarUrl, getProfileAccentColor, hexToRgba } from "@/lib/avatarUtils";
-import { useProfile } from "@/context/ProfileContext";
 import Spinner from "@/components/Spinner";
 import EditProfileModal from "@/components/EditProfileModal";
 import ExperienceGrid from "@/components/ExperienceGrid";
@@ -44,7 +43,12 @@ type Experience = {
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { profile, loading: profileLoading, error: profileError } = useProfile();
+  
+  // États du profil (LOCAUX, pas de Provider)
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -57,70 +61,91 @@ export default function ProfilePage() {
   // Modal édition
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
-  // Ouvrir automatiquement le modal si on vient de la notification (via URL ou événement)
+  // Charger le profil UNE SEULE FOIS au mount (SIMPLE et STABLE)
   useEffect(() => {
-    const openModal = () => {
-      if (!profileLoading && profile) {
-        setTimeout(() => {
-          setIsEditModalOpen(true);
-          // Nettoyer l'URL si nécessaire
-          if (typeof window !== 'undefined' && window.location.search.includes('edit=true')) {
-            router.replace('/profile', { scroll: false });
-          }
-        }, 200);
-      }
-    };
-
-    // Vérifier le paramètre dans l'URL
-    if (typeof window !== 'undefined') {
-      const urlParams = new URLSearchParams(window.location.search);
-      const editParam = urlParams.get('edit');
-      if (editParam === 'true') {
-        openModal();
-      }
-    }
-
-    // Écouter l'événement personnalisé
-    const handleOpenModal = () => {
-      openModal();
-    };
-    window.addEventListener('openEditProfileModal', handleOpenModal);
-
-    return () => {
-      window.removeEventListener('openEditProfileModal', handleOpenModal);
-    };
-  }, [router, profileLoading, profile]);
-
-  // Charger l'utilisateur et les données complémentaires
-  useEffect(() => {
-    const loadProfileData = async () => {
+    const loadProfile = async () => {
       try {
-        setError(null);
-        setLoading(true);
+        setProfileLoading(true);
+        setProfileError(null);
 
-        const {
-          data: { user },
-          error: userError,
-        } = await supabase.auth.getUser();
+        // a) Récupérer l'utilisateur courant
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
 
         if (userError) {
           console.error("[Profile] getUser error", userError);
-          setError("Impossible de récupérer ton profil.");
-          setLoading(false);
+          setProfileError("Erreur d'authentification.");
+          setProfileLoading(false);
           return;
         }
 
+        // b) Si pas d'utilisateur → rediriger vers /login
         if (!user) {
-          setUser(null);
-          setLoading(false);
+          router.push("/login");
           return;
         }
 
         setUser(user);
 
+        // c) Fetch le profil depuis Supabase
+        const { data: profileData, error: profileError } = await supabase
+          .from("profiles")
+          .select("id, username, display_name, avatar_url, avatar_variant, avatar_type, avatar_preset, accent_color, bio, is_public, favorite_restaurant_ids, is_verified, created_at, updated_at")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        if (profileError) {
+          console.error("[Profile] load profile error", profileError);
+          setProfileError("Erreur lors du chargement du profil.");
+          setProfileLoading(false);
+          return;
+        }
+
+        if (profileData) {
+          // d) setProfile(data)
+          const typedProfile: UserProfile = {
+            id: profileData.id,
+            username: profileData.username,
+            avatar_url: profileData.avatar_url,
+            avatar_variant: profileData.avatar_variant,
+            avatar_type: profileData.avatar_type || 'preset',
+            avatar_preset: profileData.avatar_preset || null,
+            accent_color: profileData.accent_color || null,
+            display_name: profileData.display_name || null,
+            bio: profileData.bio || null,
+            is_public: profileData.is_public ?? false,
+            favorite_restaurant_ids: profileData.favorite_restaurant_ids || null,
+            is_verified: profileData.is_verified ?? false,
+            updated_at: profileData.updated_at,
+          };
+          setProfile(typedProfile);
+        } else {
+          setProfile(null);
+        }
+
+        // e) setProfileLoading(false)
+        setProfileLoading(false);
+      } catch (err) {
+        console.error("[Profile] unexpected error", err);
+        setProfileError("Erreur inattendue lors du chargement du profil.");
+        setProfileLoading(false);
+      }
+    };
+
+    loadProfile();
+  }, []); // ✅ SEULEMENT au mount, AUCUNE dépendance
+
+  // Charger les données complémentaires (stats, favoris, expériences) UNIQUEMENT quand le profil est chargé
+  useEffect(() => {
+    if (!profile || !user || profileLoading) return;
+
+    const loadProfileData = async () => {
+      try {
+        setError(null);
+        setLoading(true);
+
         const userId = user.id;
 
-        // Calculer les stats (mini)
+        // Calculer les stats
         const { data: logsData } = await supabase
           .from("fastfood_logs")
           .select("restaurant_id, rating")
@@ -141,14 +166,13 @@ export default function ProfilePage() {
 
         setStats({ restaurantsCount, totalExperiences, avgRating });
 
-        // Charger les restaurants favoris en préservant les positions
-        if (profile?.favorite_restaurant_ids) {
+        // Charger les restaurants favoris
+        if (profile.favorite_restaurant_ids) {
           const favoriteIds: (string | null)[] = Array.isArray(profile.favorite_restaurant_ids)
             ? (profile.favorite_restaurant_ids as (string | null)[])
             : [];
           const favoriteIdsSliced = favoriteIds.slice(0, 3);
 
-          // Filtrer les IDs valides (non null) pour la requête
           const validIds = favoriteIdsSliced.filter((id): id is string => 
             id !== null && id !== undefined && typeof id === 'string' && id.length > 0
           );
@@ -161,9 +185,7 @@ export default function ProfilePage() {
 
             if (restaurantsData) {
               const typedRestaurants = restaurantsData as RestaurantLite[];
-              // Créer un Map pour un accès rapide
               const restaurantMap = new Map(typedRestaurants.map(r => [r.id, r]));
-              // Préserver les positions : mapper selon l'ordre original
               const orderedFavorites: RestaurantLite[] = [];
               favoriteIdsSliced.forEach((id) => {
                 if (id && typeof id === 'string' && restaurantMap.has(id)) {
@@ -181,7 +203,7 @@ export default function ProfilePage() {
           setFavoriteRestaurants([]);
         }
 
-        // Charger toutes les expériences avec leurs images de plats
+        // Charger toutes les expériences
         const { data: allLogs } = await supabase
           .from("fastfood_logs")
           .select("id, restaurant_id, restaurant_name, rating, comment, visited_at, created_at")
@@ -189,7 +211,6 @@ export default function ProfilePage() {
           .order("created_at", { ascending: false });
 
         if (allLogs && allLogs.length > 0) {
-          // Récupérer les logos et slugs des restaurants, et les images des plats depuis dish_ratings
           const experiencesWithDetails: Experience[] = await Promise.all(
             allLogs.map(async (log) => {
               let restaurantLogoUrl: string | null = null;
@@ -206,7 +227,6 @@ export default function ProfilePage() {
                 restaurantSlug = restaurant?.slug || null;
               }
 
-              // Récupérer une image de plat depuis dish_ratings pour ce restaurant
               if (log.restaurant_id) {
                 const { data: dishRatings } = await supabase
                   .from("dish_ratings")
@@ -251,49 +271,95 @@ export default function ProfilePage() {
       }
     };
 
-    // Attendre que le profil soit chargé depuis le contexte avant de charger les stats
-    // Ne charger que si on n'est plus en train de charger le profil
-    if (!profileLoading) {
-      loadProfileData();
-    }
-  }, [profile, profileLoading]);
+    loadProfileData();
+  }, [profile?.id, user?.id]); // ✅ Dépendre uniquement des IDs, pas des objets entiers
 
-  // Recharger le profil quand on revient sur la page
+  // Ouvrir automatiquement le modal si on vient de la notification
   useEffect(() => {
-    // Les données du profil viennent maintenant du ProfileContext
-    // On recharge seulement les stats/activité quand l'utilisateur revient sur la page
-    const handleFocus = async () => {
-      if (user) {
-        // Recharger les stats et l'expérience dernière sans recharger le profil (vient du contexte)
-        const userId = user.id;
-        
-        const { data: logsData } = await supabase
-          .from("fastfood_logs")
-          .select("restaurant_id, rating")
-          .eq("user_id", userId);
-        
-        const logs = logsData || [];
-        const uniqueRestaurantIds = new Set(
-          logs.map((log) => log.restaurant_id).filter((id): id is string => Boolean(id))
-        );
-        const restaurantsCount = uniqueRestaurantIds.size;
-        const totalExperiences = logs.length;
-        const avgRating =
-          logs.length > 0
-            ? logs.reduce((sum, log) => sum + (log.rating || 0), 0) / logs.length
-            : 0;
-        
-        setStats({
-          restaurantsCount,
-          totalExperiences,
-          avgRating: Math.round(avgRating * 10) / 10,
-        });
+    const openModal = () => {
+      if (!profileLoading && profile) {
+        setTimeout(() => {
+          setIsEditModalOpen(true);
+          if (typeof window !== 'undefined' && window.location.search.includes('edit=true')) {
+            router.replace('/profile', { scroll: false });
+          }
+        }, 200);
       }
     };
-    
-    window.addEventListener("focus", handleFocus);
-    return () => window.removeEventListener("focus", handleFocus);
-  }, [user]);
+
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const editParam = urlParams.get('edit');
+      if (editParam === 'true') {
+        openModal();
+      }
+    }
+
+    const handleOpenModal = () => {
+      openModal();
+    };
+    window.addEventListener('openEditProfileModal', handleOpenModal);
+
+    return () => {
+      window.removeEventListener('openEditProfileModal', handleOpenModal);
+    };
+  }, [router, profileLoading, profile?.id]); // ✅ Dépendre de profile?.id, pas de profile entier
+
+  // Fonction pour recharger le profil (utilisée après sauvegarde ou en cas d'erreur)
+  const reloadProfile = async () => {
+    try {
+      setProfileLoading(true);
+      setProfileError(null);
+
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        setProfileError("Erreur d'authentification.");
+        setProfileLoading(false);
+        return;
+      }
+
+      const { data: profileData, error: profileError } = await supabase
+        .from("profiles")
+        .select("id, username, display_name, avatar_url, avatar_variant, avatar_type, avatar_preset, accent_color, bio, is_public, favorite_restaurant_ids, is_verified, created_at, updated_at")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (profileError) {
+        console.error("[Profile] reload profile error", profileError);
+        setProfileError("Erreur lors du chargement du profil.");
+        setProfileLoading(false);
+        return;
+      }
+
+      if (profileData) {
+        const typedProfile: UserProfile = {
+          id: profileData.id,
+          username: profileData.username,
+          avatar_url: profileData.avatar_url,
+          avatar_variant: profileData.avatar_variant,
+          avatar_type: profileData.avatar_type || 'preset',
+          avatar_preset: profileData.avatar_preset || null,
+          accent_color: profileData.accent_color || null,
+          display_name: profileData.display_name || null,
+          bio: profileData.bio || null,
+          is_public: profileData.is_public ?? false,
+          favorite_restaurant_ids: profileData.favorite_restaurant_ids || null,
+          is_verified: profileData.is_verified ?? false,
+          updated_at: profileData.updated_at,
+        };
+        setProfile(typedProfile);
+      } else {
+        setProfile(null);
+      }
+
+      setProfileLoading(false);
+    } catch (err) {
+      console.error("[Profile] unexpected reload error", err);
+      setProfileError("Erreur inattendue lors du chargement du profil.");
+      setProfileLoading(false);
+    }
+  };
 
   // Ouvrir la modal d'édition
   const handleStartEdit = () => {
@@ -313,32 +379,6 @@ export default function ProfilePage() {
     if (!comment) return "";
     if (comment.length <= maxLength) return comment;
     return comment.slice(0, maxLength).trim() + "...";
-  }
-
-  if (loading || profileLoading) {
-    return (
-      <div className="min-h-screen bg-slate-950 text-slate-50 flex items-center justify-center">
-        <Spinner size="lg" />
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-[#020617] text-slate-50 px-4 py-10">
-        <div className="max-w-md mx-auto text-center space-y-4">
-          <p className="text-sm text-slate-300">
-            Tu dois être connecté pour voir ton profil.
-          </p>
-          <Link
-            href="/login"
-            className="inline-flex items-center justify-center rounded-full bg-bitebox px-4 py-2 text-sm font-semibold text-white shadow hover:bg-bitebox-dark transition"
-          >
-            Me connecter
-          </Link>
-        </div>
-      </div>
-    );
   }
 
   // Obtenir la couleur d'accent (nouveau système)
@@ -592,42 +632,9 @@ export default function ProfilePage() {
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
         profile={profile}
-        onSave={() => {
-          // Le profil est déjà mis à jour via le contexte par EditProfileModal
-          // Le useEffect dépend de profile, donc il se déclenchera automatiquement
-          // On recharge les stats, les favoris et les expériences car profile a changé
-          console.log("[Profile] onSave callback called, profile updated via context");
-          // Recharger les données pour mettre à jour les favoris
-          if (user) {
-            const loadFavorites = async () => {
-              if (profile?.favorite_restaurant_ids && profile.favorite_restaurant_ids.length > 0) {
-                const favoriteIds: string[] = Array.isArray(profile.favorite_restaurant_ids)
-                  ? (profile.favorite_restaurant_ids as string[])
-                  : [];
-                const favoriteIdsSliced = favoriteIds.slice(0, 3);
-
-                if (favoriteIdsSliced.length > 0) {
-                  const { data: restaurantsData } = await supabase
-                    .from("restaurants")
-                    .select("id, name, slug, logo_url")
-                    .in("id", favoriteIdsSliced);
-
-                  if (restaurantsData) {
-                    const typedRestaurants = restaurantsData as RestaurantLite[];
-                    const orderedFavorites = favoriteIdsSliced
-                      .map((id: string) => typedRestaurants.find((r) => r.id === id))
-                      .filter((r): r is RestaurantLite => Boolean(r));
-                    setFavoriteRestaurants(orderedFavorites);
-                  }
-                } else {
-                  setFavoriteRestaurants([]);
-                }
-              } else {
-                setFavoriteRestaurants([]);
-              }
-            };
-            loadFavorites();
-          }
+        onSave={async () => {
+          // Recharger le profil après sauvegarde pour avoir les données à jour
+          await reloadProfile();
         }}
       />
     </main>

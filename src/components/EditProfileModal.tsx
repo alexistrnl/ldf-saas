@@ -4,7 +4,6 @@ import { useEffect, useState, useRef } from "react";
 import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
 import { UserProfile, sanitizeUsername, validateUsernameFormat, uploadAvatar, filterAllowedProfileFields } from "@/lib/profile";
-import { useProfile } from "@/context/ProfileContext";
 import { AvatarVariant } from "@/lib/avatarTheme";
 import Spinner from "@/components/Spinner";
 
@@ -41,13 +40,14 @@ export default function EditProfileModal({
   profile,
   onSave,
 }: EditProfileModalProps) {
-  const { setProfile: setContextProfile, profileReady } = useProfile();
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
   // Garder une référence au profil initial pour comparer les changements
   const initialProfileRef = useRef<UserProfile | null>(null);
-  const currentProfileIdRef = useRef<string | null>(null);
+  
+  // Vérifier si le profil est prêt (non null et a un id)
+  const profileReady = profile !== null && profile.id !== undefined;
   
   // États pour les sections dépliables
   const [isIdentityExpanded, setIsIdentityExpanded] = useState(false);
@@ -76,30 +76,10 @@ export default function EditProfileModal({
   const isSubmittingRef = useRef(false);
 
   // Pré-remplir les champs avec les valeurs existantes UNIQUEMENT à l'ouverture
-  // Réagir aussi au changement de profile.id (changement de compte)
   useEffect(() => {
-    // Si le profile.id a changé, réinitialiser le formulaire
-    if (profile && currentProfileIdRef.current !== null && currentProfileIdRef.current !== profile.id) {
-      console.log("[EditProfileModal] Profile ID changed, resetting form");
-      initialProfileRef.current = null;
-      // Réinitialiser tous les champs
-      setAvatarType('preset');
-      setAvatarPreset("purple");
-      setAvatarPhotoUrl(null);
-      setAvatarPhotoFile(null);
-      setAccentColor('#7c3aed');
-      setDisplayName("");
-      setUsername("");
-      setBio("");
-      setIsPublic(false);
-      setFavoriteRestaurantIds([null, null, null]);
-      setError(null);
-    }
-    
     if (profile && isOpen && profileReady) {
       // Sauvegarder le profil initial pour comparer les changements
       initialProfileRef.current = { ...profile };
-      currentProfileIdRef.current = profile.id;
       
       // Initialiser avatar_type et avatar_preset
       const type = profile.avatar_type || 'preset';
@@ -296,6 +276,14 @@ export default function EditProfileModal({
     setError(null);
     setIsSaving(true);
 
+    // CRITIQUE: Interdire save si profileLoading = true ou profile = null
+    if (!profileReady || !profile || !initialProfileRef.current) {
+      setError("Le profil n'est pas encore chargé. Attends quelques instants.");
+      setIsSaving(false);
+      isSubmittingRef.current = false;
+      return;
+    }
+
     try {
       // Récupérer l'utilisateur actuel
       const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -470,8 +458,7 @@ export default function EditProfileModal({
           updated_at: updatedProfile.updated_at,
         };
 
-        console.log("[EditProfileModal] Profile saved successfully, updating context with:", typedProfile);
-        setContextProfile(typedProfile);
+        console.log("[EditProfileModal] Profile saved successfully");
       }
 
       // Appeler le callback onSave
