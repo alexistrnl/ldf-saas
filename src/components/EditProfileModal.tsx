@@ -47,6 +47,7 @@ export default function EditProfileModal({
   
   // Garder une référence au profil initial pour comparer les changements
   const initialProfileRef = useRef<UserProfile | null>(null);
+  const currentProfileIdRef = useRef<string | null>(null);
   
   // États pour les sections dépliables
   const [isIdentityExpanded, setIsIdentityExpanded] = useState(false);
@@ -75,10 +76,30 @@ export default function EditProfileModal({
   const isSubmittingRef = useRef(false);
 
   // Pré-remplir les champs avec les valeurs existantes UNIQUEMENT à l'ouverture
+  // Réagir aussi au changement de profile.id (changement de compte)
   useEffect(() => {
+    // Si le profile.id a changé, réinitialiser le formulaire
+    if (profile && currentProfileIdRef.current !== null && currentProfileIdRef.current !== profile.id) {
+      console.log("[EditProfileModal] Profile ID changed, resetting form");
+      initialProfileRef.current = null;
+      // Réinitialiser tous les champs
+      setAvatarType('preset');
+      setAvatarPreset("purple");
+      setAvatarPhotoUrl(null);
+      setAvatarPhotoFile(null);
+      setAccentColor('#7c3aed');
+      setDisplayName("");
+      setUsername("");
+      setBio("");
+      setIsPublic(false);
+      setFavoriteRestaurantIds([null, null, null]);
+      setError(null);
+    }
+    
     if (profile && isOpen && profileReady) {
       // Sauvegarder le profil initial pour comparer les changements
       initialProfileRef.current = { ...profile };
+      currentProfileIdRef.current = profile.id;
       
       // Initialiser avatar_type et avatar_preset
       const type = profile.avatar_type || 'preset';

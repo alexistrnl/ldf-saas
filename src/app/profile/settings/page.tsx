@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
-  getCurrentUserProfile,
   UserProfile,
   updateProfile,
   sanitizeUsername,
@@ -12,6 +11,7 @@ import {
   updateSocialSettings,
 } from "@/lib/profile";
 import { supabase } from "@/lib/supabaseClient";
+import { useProfile } from "@/context/ProfileContext";
 import Spinner from "@/components/Spinner";
 import { AvatarVariant, getAvatarThemeFromVariant } from "@/lib/avatarTheme";
 
@@ -40,7 +40,7 @@ function getAvatarVariantFromUrl(avatarUrl: string): AvatarVariant | null {
 
 export default function ProfileSettingsPage() {
   const router = useRouter();
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const { profile, setProfile, profileReady, refreshProfile } = useProfile();
   const [loading, setLoading] = useState(true);
   
   // Social settings
@@ -65,44 +65,39 @@ export default function ProfileSettingsPage() {
   const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
 
-  // Charger le profil et les restaurants
+  // Charger les restaurants et initialiser les données depuis le profil du contexte
   useEffect(() => {
     const loadData = async () => {
       try {
         setLoading(true);
         setRestaurantsLoading(true);
         
-        // Charger le profil
-        const { user, profile: userProfile, error } = await getCurrentUserProfile();
-
-        if (error) {
-          console.error("[Settings] load profile error", error);
+        // Le profil est maintenant chargé depuis le ProfileContext
+        // Attendre que le profil soit prêt
+        if (!profileReady || !profile) {
           setLoading(false);
+          setRestaurantsLoading(false);
           return;
         }
-
-        if (user && userProfile) {
-          setProfile(userProfile);
-          
-          // Initialiser avatar_variant depuis le profil
-          if (userProfile.avatar_variant && AVATAR_OPTIONS.some(opt => opt.variant === userProfile.avatar_variant)) {
-            setAvatarVariant(userProfile.avatar_variant as AvatarVariant);
-          }
-          
-          // Charger les données sociales
-          const currentUsername = userProfile.username || "";
-          const currentIsPublic = userProfile.is_public ?? false;
-          const currentFavorites = userProfile.favorite_restaurant_ids || [];
-          
-          setUsername(currentUsername);
-          setIsPublic(currentIsPublic);
-          setFavoriteRestaurantIds(currentFavorites);
-          setInitialSocialData({
-            username: currentUsername || null,
-            is_public: currentIsPublic,
-            favorite_restaurant_ids: currentFavorites,
-          });
+        
+        // Initialiser avatar_variant depuis le profil
+        if (profile.avatar_variant && AVATAR_OPTIONS.some(opt => opt.variant === profile.avatar_variant)) {
+          setAvatarVariant(profile.avatar_variant as AvatarVariant);
         }
+        
+        // Charger les données sociales
+        const currentUsername = profile.username || "";
+        const currentIsPublic = profile.is_public ?? false;
+        const currentFavorites = profile.favorite_restaurant_ids || [];
+        
+        setUsername(currentUsername);
+        setIsPublic(currentIsPublic);
+        setFavoriteRestaurantIds(Array.isArray(currentFavorites) ? currentFavorites : []);
+        setInitialSocialData({
+          username: currentUsername || null,
+          is_public: currentIsPublic,
+          favorite_restaurant_ids: Array.isArray(currentFavorites) ? currentFavorites : [],
+        });
         
         // Charger les restaurants
         const { data: restaurantsData, error: restaurantsError } = await supabase
@@ -124,7 +119,7 @@ export default function ProfileSettingsPage() {
     };
 
     loadData();
-  }, []);
+  }, [profile, profileReady]);
 
   // Synchroniser avatarVariant avec profile.avatar_variant quand le profil change
   useEffect(() => {
@@ -237,7 +232,10 @@ export default function ProfileSettingsPage() {
       }
 
       if (updatedProfile) {
+        // Mettre à jour le profil dans le contexte
         setProfile(updatedProfile);
+        // Rafraîchir le profil depuis le contexte
+        await refreshProfile();
         setInitialSocialData({
           username: cleanedUsername || null,
           is_public: isPublic,
@@ -288,7 +286,10 @@ export default function ProfileSettingsPage() {
 
       if (updatedProfile) {
         console.log("[Settings] Avatar saved successfully, updated profile:", updatedProfile);
+        // Mettre à jour le profil dans le contexte
         setProfile(updatedProfile);
+        // Rafraîchir le profil depuis le contexte
+        await refreshProfile();
       }
     } catch (err) {
       console.error("[Settings] unexpected avatar error:", err);

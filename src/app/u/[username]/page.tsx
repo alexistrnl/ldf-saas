@@ -510,7 +510,9 @@ export default async function PublicProfilePage({
         </section>
 
         {/* Grille d'expériences style Instagram */}
-        <ExperienceGrid experiences={experiences} title="Ses dernières expériences" accentColor={accentColor} />
+        <div className="mb-6">
+          <ExperienceGrid experiences={experiences} title="Ses dernières expériences" accentColor={accentColor} />
+        </div>
       </div>
     </main>
   );

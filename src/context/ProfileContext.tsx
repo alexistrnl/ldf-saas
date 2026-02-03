@@ -1,10 +1,14 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { getCurrentUserProfile, UserProfile } from "@/lib/profile";
 
-const PROFILE_CACHE_KEY = "bitebox_profile_cache";
+// Clé de cache dépendante du userId
+function getProfileCacheKey(userId: string | null): string {
+  if (!userId) return "bitebox_profile_cache_guest";
+  return `bitebox_profile_cache_${userId}`;
+}
 
 type ProfileContextType = {
   profile: UserProfile | null;
@@ -18,14 +22,17 @@ type ProfileContextType = {
 const ProfileContext = createContext<ProfileContextType | undefined>(undefined);
 
 // Fonction helper pour sauvegarder le profil dans le cache
-function saveProfileToCache(profile: UserProfile | null) {
+function saveProfileToCache(profile: UserProfile | null, userId: string | null) {
   if (typeof window === "undefined") return;
   
   try {
-    if (profile) {
-      localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(profile));
-    } else {
-      localStorage.removeItem(PROFILE_CACHE_KEY);
+    if (profile && userId) {
+      const cacheKey = getProfileCacheKey(userId);
+      localStorage.setItem(cacheKey, JSON.stringify(profile));
+    } else if (userId) {
+      // Supprimer le cache pour ce userId
+      const cacheKey = getProfileCacheKey(userId);
+      localStorage.removeItem(cacheKey);
     }
   } catch (err) {
     console.warn("[ProfileContext] Failed to save profile to cache:", err);
@@ -33,13 +40,21 @@ function saveProfileToCache(profile: UserProfile | null) {
 }
 
 // Fonction helper pour charger le profil depuis le cache
-function loadProfileFromCache(): UserProfile | null {
-  if (typeof window === "undefined") return null;
+function loadProfileFromCache(userId: string | null): UserProfile | null {
+  if (typeof window === "undefined" || !userId) return null;
   
   try {
-    const cached = localStorage.getItem(PROFILE_CACHE_KEY);
+    const cacheKey = getProfileCacheKey(userId);
+    const cached = localStorage.getItem(cacheKey);
     if (cached) {
-      return JSON.parse(cached) as UserProfile;
+      const parsed = JSON.parse(cached) as UserProfile;
+      // Vérifier que le profil correspond bien au userId
+      if (parsed.id === userId) {
+        return parsed;
+      } else {
+        // Le cache est invalide, le supprimer
+        localStorage.removeItem(cacheKey);
+      }
     }
   } catch (err) {
     console.warn("[ProfileContext] Failed to load profile from cache:", err);
@@ -48,28 +63,77 @@ function loadProfileFromCache(): UserProfile | null {
   return null;
 }
 
+// Fonction helper pour purger tous les caches de profil
+function purgeAllProfileCaches() {
+  if (typeof window === "undefined") return;
+  
+  try {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith("bitebox_profile_cache_")) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+  } catch (err) {
+    console.warn("[ProfileContext] Failed to purge profile caches:", err);
+  }
+}
+
 export function ProfileProvider({ children }: { children: ReactNode }) {
   const [profile, setProfileState] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [profileReady, setProfileReady] = useState(false); // Profil chargé depuis Supabase
   const [error, setError] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const previousUserIdRef = useRef<string | null>(null);
 
   // Wrapper pour setProfile qui met aussi à jour le cache
+  // Utilise automatiquement currentUserId pour le cache
   const setProfile = useCallback((newProfile: UserProfile | null) => {
     setProfileState(newProfile);
-    saveProfileToCache(newProfile);
-  }, []);
+    saveProfileToCache(newProfile, currentUserId);
+  }, [currentUserId]);
 
-  const refreshProfile = useCallback(async (skipCache = false) => {
+  // Fonction pour charger le profil d'un userId spécifique
+  const loadProfile = useCallback(async (userId: string | null, skipCache = false) => {
+    if (!userId) {
+      // Pas d'utilisateur, réinitialiser tout
+      setProfileState(null);
+      setProfileReady(false);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
     try {
       setError(null);
       
-      // Ne pas mettre loading à true si on charge depuis le cache (pour éviter le flash)
+      // Étape 1: Charger le cache immédiatement si disponible
       if (!skipCache) {
+        const cachedProfile = loadProfileFromCache(userId);
+        if (cachedProfile) {
+          setProfileState(cachedProfile);
+          setLoading(false); // Ne pas bloquer l'UI avec le cache
+        } else {
+          setLoading(true);
+        }
+      } else {
         setLoading(true);
       }
 
+      // Étape 2: Charger depuis Supabase
       const { profile: userProfile, error: profileError } = await getCurrentUserProfile();
+
+      // Vérifier que le profil correspond bien au userId actuel
+      if (userProfile && userProfile.id !== userId) {
+        console.warn("[ProfileContext] Profile userId mismatch, ignoring");
+        setProfileState(null);
+        setProfileReady(false);
+        setError(null);
+        return;
+      }
 
       if (profileError) {
         console.error("[ProfileContext] Error loading profile:", profileError);
@@ -91,60 +155,69 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     }
   }, [setProfile]);
 
+  const refreshProfile = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    await loadProfile(user?.id || null, true);
+  }, [loadProfile]);
+
+  // Initialiser le userId au mount
   useEffect(() => {
-    // Étape 1: Charger le cache immédiatement (synchrone)
-    const cachedProfile = loadProfileFromCache();
-    if (cachedProfile) {
-      setProfileState(cachedProfile);
-      setLoading(false); // Ne pas bloquer l'UI avec le cache
-    }
-
-    // Étape 2: Vérifier l'authentification et charger depuis Supabase
-    const initializeProfile = async () => {
+    const initializeUserId = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      
-      if (user) {
-        // Revalider le profil en arrière-plan
-        await refreshProfile(true);
-      } else {
-        // Pas d'utilisateur connecté, nettoyer le cache
-        setProfile(null);
-        setProfileReady(false);
-        setLoading(false);
-      }
+      setCurrentUserId(user?.id || null);
+      previousUserIdRef.current = user?.id || null;
     };
+    initializeUserId();
+  }, []);
 
-    initializeProfile();
+  // Réagir aux changements de userId
+  useEffect(() => {
+    // Si le userId a changé, charger le profil correspondant
+    if (currentUserId !== previousUserIdRef.current) {
+      console.log("[ProfileContext] UserId changed:", previousUserIdRef.current, "->", currentUserId);
+      
+      // Si on passe d'un userId à un autre (ou à null), réinitialiser
+      if (previousUserIdRef.current !== null && currentUserId !== previousUserIdRef.current) {
+        // Purger le cache de l'ancien userId (optionnel, on peut garder les caches)
+        // On ne purge que si on veut vraiment nettoyer, sinon on garde les caches par userId
+      }
+      
+      previousUserIdRef.current = currentUserId;
+      
+      // Charger le profil du nouveau userId
+      loadProfile(currentUserId, false);
+    }
+  }, [currentUserId, loadProfile]);
 
-    // Écouter les changements d'authentification
+  // Écouter les changements d'authentification
+  useEffect(() => {
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      const newUserId = session?.user?.id || null;
+      
+      console.log("[ProfileContext] Auth state changed:", event, "userId:", newUserId);
+      
       if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
-        // Charger le cache immédiatement
-        const cachedProfile = loadProfileFromCache();
-        if (cachedProfile) {
-          setProfileState(cachedProfile);
-          setLoading(false);
-        }
-        // Puis revalider en arrière-plan
-        await refreshProfile(true);
+        // Mettre à jour le userId, ce qui déclenchera le chargement du profil
+        setCurrentUserId(newUserId);
       } else if (event === "SIGNED_OUT") {
-        setProfile(null);
+        // Réinitialiser complètement
+        setCurrentUserId(null);
+        setProfileState(null);
         setError(null);
         setLoading(false);
         setProfileReady(false);
-        // Nettoyer le cache
-        if (typeof window !== "undefined") {
-          localStorage.removeItem(PROFILE_CACHE_KEY);
-        }
+        // Purger tous les caches (ou seulement celui du userId sortant)
+        // Pour la sécurité, on purge tout au logout
+        purgeAllProfileCaches();
       }
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [refreshProfile]);
+  }, []);
 
   return (
     <ProfileContext.Provider value={{ 

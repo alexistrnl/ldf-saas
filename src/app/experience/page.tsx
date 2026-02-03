@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
-import { getCurrentUserProfile, UserProfile } from "@/lib/profile";
+import { UserProfile } from "@/lib/profile";
+import { useProfile } from "@/context/ProfileContext";
 import Spinner from "@/components/Spinner";
 
 type ProfileRestaurantSummary = {
@@ -38,8 +39,8 @@ type ProfileExperience = {
 
 export default function ExperiencePage() {
   const router = useRouter();
+  const { profile, profileReady } = useProfile();
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [restaurantsSummary, setRestaurantsSummary] = useState<
     ProfileRestaurantSummary[]
   >([]);
@@ -75,14 +76,8 @@ export default function ExperiencePage() {
 
         setUser(user);
 
-        // Charger le profil (username)
-        const { profile: userProfile, error: profileError } =
-          await getCurrentUserProfile();
-        if (profileError) {
-          console.error("[Experience] load profile error", profileError);
-        } else {
-          setProfile(userProfile);
-        }
+        // Le profil est maintenant chargé depuis le ProfileContext
+        // Pas besoin de le charger ici
 
         // 1) Charger tous les logs
         const { data: logsData, error: logsError } = await supabase

@@ -138,7 +138,7 @@ export default function ExperienceGrid({ experiences, title, accentColor = '#7c3
 
   return (
     <>
-      <section className="mt-4 px-4">
+      <section className="mt-4 px-4 pb-6">
         <h2 className="text-base font-bold text-white mb-3 border-b-2 pb-2" style={{ borderBottomColor: accentColor }}>{title}</h2>
         <div className="grid grid-cols-3 gap-1">
           {experiences.map((exp) => (
